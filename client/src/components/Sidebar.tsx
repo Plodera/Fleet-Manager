@@ -42,8 +42,8 @@ export function Sidebar() {
             <Car className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-xl tracking-tight text-foreground">FleetCmd</h1>
-            <p className="text-xs text-muted-foreground">Transport Mgmt</p>
+            <h1 className="font-display font-bold text-lg tracking-tight text-foreground">FleetCmD</h1>
+            <p className="text-xs text-muted-foreground">Aisco Transport Mgmt</p>
           </div>
         </div>
       </div>
