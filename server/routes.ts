@@ -192,6 +192,25 @@ export async function registerRoutes(
     }
   });
 
+  app.put(api.users.updateApprover.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.users.updateApprover.input.parse(req.body);
+      const updatedUser = await storage.updateUserApprover(Number(req.params.id), input.isApprover);
+      res.json(updatedUser);
+    } catch (err) {
+      res.status(404).json({ message: "User not found" });
+    }
+  });
+
+  // Approvers
+  app.get(api.approvers.list.path, async (req, res) => {
+    const approvers = await storage.getApprovers();
+    res.json(approvers);
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

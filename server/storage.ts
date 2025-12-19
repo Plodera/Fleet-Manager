@@ -22,7 +22,7 @@ export interface IStorage {
   updateVehicle(id: number, vehicle: Partial<InsertVehicle>): Promise<Vehicle>;
   deleteVehicle(id: number): Promise<void>;
 
-  getBookings(): Promise<(Booking & { vehicle: Vehicle; user: User })[]>;
+  getBookings(): Promise<(Booking & { vehicle: Vehicle; user: User; approver?: User })[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBooking(id: number, booking: Partial<InsertBooking>): Promise<Booking>;
 
@@ -33,8 +33,10 @@ export interface IStorage {
   createFuelRecord(record: InsertFuel): Promise<FuelRecord>;
   
   getUsers(): Promise<User[]>;
+  getApprovers(): Promise<User[]>;
   updateUserRole(id: number, role: string): Promise<User>;
   updateUserPermissions(id: number, permissions: string[]): Promise<User>;
+  updateUserApprover(id: number, isApprover: boolean): Promise<User>;
 
   sessionStore: session.Store;
 }
@@ -101,11 +103,12 @@ export class DatabaseStorage implements IStorage {
     await db.delete(vehicles).where(eq(vehicles.id, id));
   }
 
-  async getBookings(): Promise<(Booking & { vehicle: Vehicle; user: User })[]> {
+  async getBookings(): Promise<(Booking & { vehicle: Vehicle; user: User; approver?: User })[]> {
     return await db.query.bookings.findMany({
       with: {
         vehicle: true,
         user: true,
+        approver: true,
       },
     });
   }
@@ -148,6 +151,15 @@ export class DatabaseStorage implements IStorage {
 
   async getUsers(): Promise<User[]> {
     return await db.select().from(users);
+  }
+
+  async getApprovers(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.isApprover, true));
+  }
+
+  async updateUserApprover(id: number, isApprover: boolean): Promise<User> {
+    const [user] = await db.update(users).set({ isApprover }).where(eq(users.id, id)).returning();
+    return user;
   }
 }
 

@@ -116,7 +116,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/bookings',
       responses: {
-        200: z.array(z.custom<typeof bookings.$inferSelect & { vehicle: typeof vehicles.$inferSelect; user: typeof users.$inferSelect }>()),
+        200: z.array(z.custom<typeof bookings.$inferSelect & { vehicle: typeof vehicles.$inferSelect; user: typeof users.$inferSelect; approver?: typeof users.$inferSelect }>()),
       },
     },
     create: {
@@ -135,6 +135,15 @@ export const api = {
       responses: {
         200: z.custom<typeof bookings.$inferSelect>(),
         404: errorSchemas.notFound,
+      },
+    },
+  },
+  approvers: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/approvers',
+      responses: {
+        200: z.array(z.custom<typeof users.$inferSelect>()),
       },
     },
   },
@@ -204,6 +213,15 @@ export const api = {
       method: 'PUT' as const,
       path: '/api/users/:id/permissions',
       input: z.object({ permissions: z.array(z.string()) }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    updateApprover: {
+      method: 'PUT' as const,
+      path: '/api/users/:id/approver',
+      input: z.object({ isApprover: z.boolean() }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
         404: errorSchemas.notFound,

@@ -75,6 +75,25 @@ export function useUsers() {
     },
   });
 
+  const updateApproverMutation = useMutation({
+    mutationFn: async ({ userId, isApprover }: { userId: number; isApprover: boolean }) => {
+      const res = await fetch(api.users.updateApprover.path.replace(":id", String(userId)), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isApprover }),
+      });
+      if (!res.ok) throw new Error("Failed to update user approver status");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      toast({ title: "Approver status updated", description: "User approver status has been changed" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to update approver status", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     users,
     isLoading,
@@ -84,5 +103,7 @@ export function useUsers() {
     isUpdatingRole: updateRoleMutation.isPending,
     updatePermissions: updatePermissionsMutation.mutate,
     isUpdatingPermissions: updatePermissionsMutation.isPending,
+    updateApprover: updateApproverMutation.mutate,
+    isUpdatingApprover: updateApproverMutation.isPending,
   };
 }

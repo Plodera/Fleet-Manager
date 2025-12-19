@@ -13,10 +13,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, AVAILABLE_PERMISSIONS } from "@shared/schema";
-import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock } from "lucide-react";
+import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle } from "lucide-react";
 
 export default function Users() {
-  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions } = useUsers();
+  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover } = useUsers();
   const { user: currentUser } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
@@ -184,6 +184,7 @@ export default function Users() {
                 <TableHead>Role</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>License #</TableHead>
+                <TableHead>Approver</TableHead>
                 <TableHead>Permissions</TableHead>
                 {currentUser?.role === 'admin' && <TableHead>Actions</TableHead>}
               </TableRow>
@@ -191,7 +192,7 @@ export default function Users() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={currentUser?.role === 'admin' ? 7 : 6} className="h-24 text-center">Loading...</TableCell>
+                  <TableCell colSpan={currentUser?.role === 'admin' ? 8 : 7} className="h-24 text-center">Loading...</TableCell>
                 </TableRow>
               ) : users?.map((user) => {
                 const userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions || [];
@@ -216,6 +217,30 @@ export default function Users() {
                   </TableCell>
                   <TableCell>{user.department || "-"}</TableCell>
                   <TableCell className="font-mono text-xs">{user.licenseNumber || "-"}</TableCell>
+                  <TableCell>
+                    {currentUser?.role === 'admin' ? (
+                      <Button
+                        size="sm"
+                        variant={user.isApprover ? "default" : "outline"}
+                        onClick={() => updateApprover({ userId: user.id, isApprover: !user.isApprover })}
+                        disabled={isUpdatingApprover}
+                        data-testid={`button-toggle-approver-${user.id}`}
+                        className={user.isApprover ? "" : "border-muted-foreground/30"}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        {user.isApprover ? "Approver" : "Not Set"}
+                      </Button>
+                    ) : (
+                      user.isApprover ? (
+                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Approver
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )
+                    )}
+                  </TableCell>
                   <TableCell>
                     {editingPermissionsUserId === user.id ? (
                       <Dialog open={editingPermissionsUserId === user.id} onOpenChange={(open) => {

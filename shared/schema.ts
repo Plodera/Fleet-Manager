@@ -34,6 +34,7 @@ export const users = pgTable("users", {
   licenseNumber: text("license_number"),
   department: text("department"),
   permissions: text("permissions").default('["view_dashboard","view_vehicles","view_bookings"]').notNull(), // JSON array stored as text
+  isApprover: boolean("is_approver").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -54,6 +55,7 @@ export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
   vehicleId: integer("vehicle_id").references(() => vehicles.id).notNull(),
   userId: integer("user_id").references(() => users.id).notNull(),
+  approverId: integer("approver_id").references(() => users.id),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
   status: bookingStatusEnum("status").default("pending").notNull(),
@@ -100,6 +102,7 @@ export const vehiclesRelations = relations(vehicles, ({ many }) => ({
 export const bookingsRelations = relations(bookings, ({ one }) => ({
   vehicle: one(vehicles, { fields: [bookings.vehicleId], references: [vehicles.id] }),
   user: one(users, { fields: [bookings.userId], references: [users.id] }),
+  approver: one(users, { fields: [bookings.approverId], references: [users.id] }),
 }));
 
 export const maintenanceRecordsRelations = relations(maintenanceRecords, ({ one }) => ({

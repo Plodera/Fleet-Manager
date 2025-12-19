@@ -14,17 +14,18 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Bookings() {
-  const { bookings, isLoading, createBooking, updateBookingStatus } = useBookings();
+  const { bookings, isLoading, createBooking, updateBookingStatus, approvers } = useBookings();
   const { vehicles } = useVehicles();
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Filter available vehicles
   const availableVehicles = vehicles?.filter(v => v.status === "available");
+  const isApprover = user?.isApprover;
 
   const form = useForm({
     resolver: zodResolver(insertBookingSchema),
@@ -168,6 +169,27 @@ export default function Bookings() {
                   </FormItem>
                 )} />
 
+                <FormField control={form.control} name="approverId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Approver (Required)</FormLabel>
+                    <Select onValueChange={(val) => field.onChange(val ? Number(val) : undefined)} defaultValue={field.value ? String(field.value) : undefined}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select approver" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {approvers?.map(approver => (
+                          <SelectItem key={approver.id} value={String(approver.id)}>
+                            {approver.fullName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
                 <Button type="submit" className="w-full" disabled={createBooking.isPending}>
                   {createBooking.isPending ? "Submitting..." : "Submit Request"}
                 </Button>
@@ -185,11 +207,11 @@ export default function Bookings() {
         ) : bookings?.map((booking) => (
           <Card key={booking.id} className="border-none shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-4 flex-1">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <CalendarDays className="w-6 h-6 text-primary" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <h3 className="font-semibold text-lg">{booking.vehicle.make} {booking.vehicle.model}</h3>
                     {getStatusBadge(booking.status)}
@@ -207,18 +229,26 @@ export default function Bookings() {
                     </div>
                     <div className="hidden sm:inline text-muted-foreground/50">|</div>
                     <div>Requested by: <span className="text-foreground font-medium">{booking.user.fullName}</span></div>
+                    {booking.approver && (
+                      <>
+                        <div className="hidden sm:inline text-muted-foreground/50">|</div>
+                        <div>Approver: <span className="text-foreground font-medium">{booking.approver.fullName}</span></div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Admin Actions */}
-              {user?.role === 'admin' && booking.status === 'pending' && (
+              {/* Approver Actions */}
+              {isApprover && booking.status === 'pending' && booking.approverId === user?.id && (
                 <div className="flex gap-2">
                   <Button 
                     size="sm" 
                     variant="outline" 
                     className="border-green-200 hover:bg-green-50 text-green-700"
                     onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'approved' })}
+                    disabled={updateBookingStatus.isPending}
+                    data-testid={`button-approve-booking-${booking.id}`}
                   >
                     <Check className="w-4 h-4 mr-1" /> Approve
                   </Button>
@@ -227,17 +257,37 @@ export default function Bookings() {
                     variant="outline"
                     className="border-red-200 hover:bg-red-50 text-red-700"
                     onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'rejected' })}
+                    disabled={updateBookingStatus.isPending}
+                    data-testid={`button-reject-booking-${booking.id}`}
                   >
                     <X className="w-4 h-4 mr-1" /> Reject
                   </Button>
                 </div>
               )}
+
+              {/* Show pending approver info */}
+              {booking.status === 'pending' && booking.approverId !== user?.id && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-50 border border-yellow-200">
+                  <Clock className="w-4 h-4 text-yellow-600" />
+                  <span className="text-sm font-medium text-yellow-700">Awaiting Approval</span>
+                </div>
+              )}
+
+              {/* Show approved status */}
+              {booking.status === 'approved' && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">Approved</span>
+                </div>
+              )}
               
-              {/* Actions for active bookings */}
-              {user?.role === 'admin' && booking.status === 'approved' && (
+              {/* Actions for completing approved bookings */}
+              {isApprover && booking.status === 'approved' && booking.approverId === user?.id && (
                 <Button 
                   size="sm"
                   onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'completed' })}
+                  disabled={updateBookingStatus.isPending}
+                  data-testid={`button-complete-booking-${booking.id}`}
                 >
                   Mark Completed
                 </Button>

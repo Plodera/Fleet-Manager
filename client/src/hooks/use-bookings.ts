@@ -61,10 +61,20 @@ export function useBookings() {
       if (!res.ok) throw new Error("Failed to update booking status");
       return api.bookings.update.responses[200].parse(await res.json());
     },
-    onSuccess: () => {
+    onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
-      queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] }); // Status might change vehicle availability
-      toast({ title: "Status updated", description: "Booking status has been changed." });
+      queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] });
+      const message = status === 'approved' ? 'Booking approved' : status === 'rejected' ? 'Booking rejected' : 'Booking completed';
+      toast({ title: "Status updated", description: message });
+    },
+  });
+
+  const { data: approvers } = useQuery({
+    queryKey: [api.approvers.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.approvers.list.path);
+      if (!res.ok) throw new Error("Failed to fetch approvers");
+      return api.approvers.list.responses[200].parse(await res.json());
     },
   });
 
@@ -73,5 +83,6 @@ export function useBookings() {
     isLoading,
     createBooking,
     updateBookingStatus,
+    approvers,
   };
 }
