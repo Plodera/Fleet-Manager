@@ -66,100 +66,95 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground font-display">Dashboard</h1>
-        <p className="text-muted-foreground mt-2">Overview of fleet performance and activities.</p>
+    <div className="space-y-3 animate-in fade-in duration-500 h-screen overflow-hidden flex flex-col">
+      <div className="flex-shrink-0">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground font-display">Dashboard</h1>
+        <p className="text-muted-foreground text-sm mt-1">Fleet performance overview</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-5 gap-2 flex-shrink-0">
         <StatsCard 
-          title="Total Vehicles" 
+          title="Vehicles" 
           value={totalVehicles} 
           icon={Car}
         />
         <StatsCard 
-          title="Active Rentals" 
+          title="Active" 
           value={activeRentals} 
           icon={CalendarCheck}
         />
         <StatsCard 
-          title="In Maintenance" 
+          title="Maintenance" 
           value={vehiclesInMaintenance} 
           icon={Wrench}
           className={vehiclesInMaintenance > 0 ? "border-l-4 border-l-amber-500" : ""}
         />
         <StatsCard 
-          title="Pending Requests" 
+          title="Pending" 
           value={pendingBookings} 
           icon={AlertCircle}
           className={pendingBookings > 0 ? "border-l-4 border-l-red-500" : ""}
         />
         <StatsCard 
-          title="Completion Rate" 
+          title="Completion" 
           value={`${bookingCompletionRate}%`}
           icon={TrendingUp}
           className="border-l-4 border-l-green-500"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="shadow-md border-none lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-display flex items-center gap-2">
-              <Fuel className="w-5 h-5 text-primary" />
-              Fuel Consumption Analysis
+      <div className="grid grid-cols-3 gap-2 flex-1 overflow-hidden min-h-0">
+        <Card className="shadow-md border-none flex flex-col">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Fuel className="w-4 h-4 text-primary" />
+              Fuel Analysis
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="text-sm">
-                <p className="text-muted-foreground mb-2">Total Fleet Fuel Cost</p>
-                <p className="text-2xl font-bold">${totalFuelCost.toFixed(2)}</p>
-              </div>
-              <div className="h-[250px]">
-                {fuelChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={fuelChartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                      <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip 
-                        cursor={{ fill: '#F1F5F9' }}
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      />
-                      <Bar dataKey="cost" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    No fuel data available
-                  </div>
-                )}
-              </div>
+          <CardContent className="flex-1 overflow-hidden flex flex-col">
+            <div className="text-xs mb-1">
+              <p className="text-muted-foreground">Total Cost</p>
+              <p className="text-lg font-bold">${totalFuelCost.toFixed(2)}</p>
+            </div>
+            <div className="flex-1 min-h-0">
+              {fuelChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={fuelChartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis fontSize={10} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Bar dataKey="cost" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                  No fuel data
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-md border-none">
-          <CardHeader>
-            <CardTitle className="font-display flex items-center gap-2">
-              <Car className="w-5 h-5 text-primary" />
+        <Card className="shadow-md border-none flex flex-col">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Car className="w-4 h-4 text-primary" />
               Fleet Status
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 overflow-hidden flex flex-col">
             {vehicleStatusData.length > 0 ? (
-              <div className="space-y-4">
-                <div className="h-[200px]">
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex-1 min-h-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={vehicleStatusData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
+                        innerRadius={40}
+                        outerRadius={65}
                         dataKey="value"
                       >
                         {vehicleStatusData.map((item, idx) => (
@@ -169,77 +164,73 @@ export default function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-1 text-xs mt-2">
                   {vehicleStatusData.map((item) => (
                     <div key={item.name} className="flex justify-between items-center">
                       <span className="text-muted-foreground">{item.name}</span>
-                      <Badge variant="outline" className="font-semibold">{item.value}</Badge>
+                      <Badge variant="outline" className="text-xs">{item.value}</Badge>
                     </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="text-center text-muted-foreground py-8">No vehicles</div>
+              <div className="flex items-center justify-center h-full text-xs text-muted-foreground">No vehicles</div>
             )}
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-md border-none">
-          <CardHeader>
-            <CardTitle className="font-display flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary" />
-              Booking Status Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              {bookingStatusData.map((item) => (
-                <div key={item.status} className="text-center">
-                  <p className={cn("text-2xl font-bold mb-1")}>{item.count}</p>
-                  <p className="text-xs text-muted-foreground">{item.status}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md border-none">
-          <CardHeader>
-            <CardTitle className="font-display flex items-center gap-2">
-              <CalendarCheck className="w-5 h-5 text-primary" />
-              Recent Bookings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {bookings?.slice(0, 4).map((booking) => (
-                <div key={booking.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                      {booking.user.username.slice(0,2).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{booking.vehicle.make} {booking.vehicle.model}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(booking.startTime).toLocaleDateString()}</p>
-                    </div>
+        <div className="flex flex-col gap-2">
+          <Card className="shadow-md border-none flex-1">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary" />
+                Booking Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-2">
+                {bookingStatusData.map((item) => (
+                  <div key={item.status} className="text-center">
+                    <p className="text-lg font-bold">{item.count}</p>
+                    <p className="text-xs text-muted-foreground">{item.status}</p>
                   </div>
-                  <Badge variant={
-                    booking.status === 'approved' ? 'default' :
-                    booking.status === 'pending' ? 'secondary' :
-                    'outline'
-                  } className="text-xs">
-                    {booking.status}
-                  </Badge>
-                </div>
-              ))}
-              {(!bookings || bookings.length === 0) && (
-                <div className="text-center text-muted-foreground py-8 text-sm">No bookings found</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-md border-none flex-1 flex flex-col">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <CalendarCheck className="w-4 h-4 text-primary" />
+                Recent
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto">
+              <div className="space-y-2">
+                {bookings?.slice(0, 3).map((booking) => (
+                  <div key={booking.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                        {booking.user.username.slice(0,1).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-xs truncate">{booking.vehicle.make}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(booking.startTime).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <Badge variant={booking.status === 'approved' ? 'default' : booking.status === 'pending' ? 'secondary' : 'outline'} className="text-xs flex-shrink-0">
+                      {booking.status === 'completed' ? 'Done' : booking.status === 'pending' ? 'Pending' : 'OK'}
+                    </Badge>
+                  </div>
+                ))}
+                {(!bookings || bookings.length === 0) && (
+                  <div className="text-center text-muted-foreground text-xs py-2">No bookings</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
