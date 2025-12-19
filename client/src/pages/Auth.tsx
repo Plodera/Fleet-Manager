@@ -39,8 +39,8 @@ export default function Auth() {
             <Car className="w-8 h-8 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground tracking-tight">FleetCmD</h1>
-            <p className="text-muted-foreground">Aisco Transport Mgmt</p>
+            <h1 className="text-3xl font-display font-bold text-foreground tracking-tight">ATMS</h1>
+            <p className="text-muted-foreground">Aisco Transport Mgmt System</p>
           </div>
         </div>
 
