@@ -5,11 +5,13 @@ import {
   insertBookingSchema, 
   insertMaintenanceSchema, 
   insertFuelSchema,
+  insertDepartmentSchema,
   users,
   vehicles,
   bookings,
   maintenanceRecords,
-  fuelRecords
+  fuelRecords,
+  departments
 } from './schema';
 
 export const errorSchemas = {
@@ -255,6 +257,32 @@ export const api = {
       input: z.object({ email: z.string().email("Invalid email address") }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  departments: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/departments',
+      responses: {
+        200: z.array(z.custom<typeof departments.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/departments',
+      input: insertDepartmentSchema,
+      responses: {
+        201: z.custom<typeof departments.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/departments/:id',
+      responses: {
+        204: z.void(),
         404: errorSchemas.notFound,
       },
     },

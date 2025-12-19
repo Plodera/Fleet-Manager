@@ -1,8 +1,9 @@
 import { 
-  users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings,
+  users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
-  type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings
+  type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
+  type Department, type InsertDepartment
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq } from "drizzle-orm";
@@ -43,6 +44,10 @@ export interface IStorage {
 
   getEmailSettings(): Promise<EmailSettings | undefined>;
   upsertEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings>;
+
+  getDepartments(): Promise<Department[]>;
+  createDepartment(dept: InsertDepartment): Promise<Department>;
+  deleteDepartment(id: number): Promise<void>;
 
   sessionStore: session.Store;
 }
@@ -199,6 +204,19 @@ export class DatabaseStorage implements IStorage {
       const [created] = await db.insert(emailSettings).values(settings).returning();
       return created;
     }
+  }
+
+  async getDepartments(): Promise<Department[]> {
+    return await db.select().from(departments);
+  }
+
+  async createDepartment(dept: InsertDepartment): Promise<Department> {
+    const [department] = await db.insert(departments).values(dept).returning();
+    return department;
+  }
+
+  async deleteDepartment(id: number): Promise<void> {
+    await db.delete(departments).where(eq(departments.id, id));
   }
 }
 

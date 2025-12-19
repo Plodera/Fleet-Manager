@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useUsers } from "@/hooks/use-users";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertUserSchema, AVAILABLE_PERMISSIONS } from "@shared/schema";
-import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail } from "lucide-react";
+import { insertUserSchema, AVAILABLE_PERMISSIONS, type Department } from "@shared/schema";
+import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail, Building2, Trash2, Plus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Users() {
   const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail } = useUsers();
   const { user: currentUser } = useAuth();
+  const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingPermissionsUserId, setEditingPermissionsUserId] = useState<number | null>(null);
@@ -25,6 +29,43 @@ export default function Users() {
   const [newPassword, setNewPassword] = useState("");
   const [editEmailUserId, setEditEmailUserId] = useState<number | null>(null);
   const [newEmail, setNewEmail] = useState("");
+  const [isDeptDialogOpen, setIsDeptDialogOpen] = useState(false);
+  const [newDeptName, setNewDeptName] = useState("");
+  const [newDeptDesc, setNewDeptDesc] = useState("");
+
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ["/api/departments"],
+  });
+
+  const createDeptMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string }) => {
+      const res = await apiRequest("POST", "/api/departments", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
+      setIsDeptDialogOpen(false);
+      setNewDeptName("");
+      setNewDeptDesc("");
+      toast({ title: "Department created successfully" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to create department", description: err.message, variant: "destructive" });
+    }
+  });
+
+  const deleteDeptMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/departments/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
+      toast({ title: "Department deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to delete department", description: err.message, variant: "destructive" });
+    }
+  });
 
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
@@ -132,9 +173,20 @@ export default function Users() {
                   <FormField control={form.control} name="department" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Management, Operations..." {...field} />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-department">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.name} data-testid={`select-department-${dept.id}`}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -459,6 +511,84 @@ export default function Users() {
           </Table>
         </CardContent>
       </Card>
+
+      {currentUser?.role === 'admin' && (
+        <Card className="border-none shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-primary" />
+              Departments
+            </CardTitle>
+            <Dialog open={isDeptDialogOpen} onOpenChange={setIsDeptDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" data-testid="button-add-department">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Department
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Department</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Name</label>
+                    <Input
+                      placeholder="Department name"
+                      value={newDeptName}
+                      onChange={(e) => setNewDeptName(e.target.value)}
+                      data-testid="input-department-name"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Description (optional)</label>
+                    <Input
+                      placeholder="Description"
+                      value={newDeptDesc}
+                      onChange={(e) => setNewDeptDesc(e.target.value)}
+                      data-testid="input-department-description"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (newDeptName.trim()) {
+                        createDeptMutation.mutate({ name: newDeptName.trim(), description: newDeptDesc.trim() || undefined });
+                      }
+                    }}
+                    disabled={!newDeptName.trim() || createDeptMutation.isPending}
+                    data-testid="button-confirm-department"
+                  >
+                    {createDeptMutation.isPending ? "Creating..." : "Create Department"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </CardHeader>
+          <CardContent>
+            {departments.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No departments configured. Add a department to get started.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {departments.map((dept) => (
+                  <Badge key={dept.id} variant="secondary" className="flex items-center gap-2 py-1.5 px-3">
+                    <span>{dept.name}</span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-4 w-4 p-0"
+                      onClick={() => deleteDeptMutation.mutate(dept.id)}
+                      disabled={deleteDeptMutation.isPending}
+                      data-testid={`button-delete-department-${dept.id}`}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

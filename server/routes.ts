@@ -305,6 +305,36 @@ export async function registerRoutes(
     res.json(approvers);
   });
 
+  // Departments
+  app.get(api.departments.list.path, async (req, res) => {
+    const depts = await storage.getDepartments();
+    res.json(depts);
+  });
+
+  app.post(api.departments.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const input = api.departments.create.input.parse(req.body);
+      const dept = await storage.createDepartment(input);
+      res.status(201).json(dept);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.departments.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Forbidden");
+    await storage.deleteDepartment(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
   // Email Settings (admin only)
   app.get("/api/settings/email", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
