@@ -56,6 +56,25 @@ export function useUsers() {
     },
   });
 
+  const updatePermissionsMutation = useMutation({
+    mutationFn: async ({ userId, permissions }: { userId: number; permissions: string[] }) => {
+      const res = await fetch(api.users.updatePermissions.path.replace(":id", String(userId)), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ permissions }),
+      });
+      if (!res.ok) throw new Error("Failed to update user permissions");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      toast({ title: "Permissions updated", description: "User permissions have been changed" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to update permissions", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     users,
     isLoading,
@@ -63,5 +82,7 @@ export function useUsers() {
     isCreatingUser: createUserMutation.isPending,
     updateRole: updateRoleMutation.mutate,
     isUpdatingRole: updateRoleMutation.isPending,
+    updatePermissions: updatePermissionsMutation.mutate,
+    isUpdatingPermissions: updatePermissionsMutation.isPending,
   };
 }

@@ -3,6 +3,24 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
+export const PERMISSIONS = {
+  VIEW_DASHBOARD: 'view_dashboard',
+  VIEW_VEHICLES: 'view_vehicles',
+  VIEW_BOOKINGS: 'view_bookings',
+  VIEW_MAINTENANCE: 'view_maintenance',
+  VIEW_FUEL: 'view_fuel',
+  MANAGE_USERS: 'manage_users',
+} as const;
+
+export const AVAILABLE_PERMISSIONS = [
+  { id: 'view_dashboard', label: 'Dashboard' },
+  { id: 'view_vehicles', label: 'Vehicles' },
+  { id: 'view_bookings', label: 'Bookings' },
+  { id: 'view_maintenance', label: 'Maintenance' },
+  { id: 'view_fuel', label: 'Fuel Logs' },
+  { id: 'manage_users', label: 'User Management' },
+] as const;
+
 export const roleEnum = pgEnum("role", ["admin", "staff", "customer"]);
 export const vehicleStatusEnum = pgEnum("vehicle_status", ["available", "rented", "maintenance"]);
 export const bookingStatusEnum = pgEnum("booking_status", ["pending", "approved", "rejected", "completed", "cancelled"]);
@@ -15,6 +33,7 @@ export const users = pgTable("users", {
   fullName: text("full_name").notNull(),
   licenseNumber: text("license_number"),
   department: text("department"),
+  permissions: text("permissions").default('["view_dashboard","view_vehicles","view_bookings"]').notNull(), // JSON array stored as text
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -92,7 +111,11 @@ export const fuelRecordsRelations = relations(fuelRecords, ({ one }) => ({
 }));
 
 // Schemas
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export const insertUserSchema = createInsertSchema(users)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    permissions: z.array(z.string()).optional().default([])
+  });
 export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true, createdAt: true });
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, createdAt: true });
 export const insertMaintenanceSchema = createInsertSchema(maintenanceRecords).omit({ id: true, createdAt: true });
@@ -101,6 +124,7 @@ export const insertFuelSchema = createInsertSchema(fuelRecords).omit({ id: true,
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UserPermissions = typeof PERMISSIONS[keyof typeof PERMISSIONS];
 export type Vehicle = typeof vehicles.$inferSelect;
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 export type Booking = typeof bookings.$inferSelect;

@@ -200,6 +200,15 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    updatePermissions: {
+      method: 'PUT' as const,
+      path: '/api/users/:id/permissions',
+      input: z.object({ permissions: z.array(z.string()) }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
   }
 };
 

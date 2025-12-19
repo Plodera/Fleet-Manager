@@ -34,6 +34,7 @@ export interface IStorage {
   
   getUsers(): Promise<User[]>;
   updateUserRole(id: number, role: string): Promise<User>;
+  updateUserPermissions(id: number, permissions: string[]): Promise<User>;
 
   sessionStore: session.Store;
 }
@@ -59,12 +60,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+    const userToInsert = {
+      ...insertUser,
+      permissions: insertUser.permissions ? JSON.stringify(insertUser.permissions) : JSON.stringify(["view_dashboard", "view_vehicles", "view_bookings"])
+    };
+    const [user] = await db.insert(users).values(userToInsert as any).returning();
     return user;
   }
 
   async updateUserRole(id: number, role: string): Promise<User> {
     const [user] = await db.update(users).set({ role: role as any }).where(eq(users.id, id)).returning();
+    return user;
+  }
+
+  async updateUserPermissions(id: number, permissions: string[]): Promise<User> {
+    const [user] = await db.update(users).set({ permissions: JSON.stringify(permissions) }).where(eq(users.id, id)).returning();
     return user;
   }
 

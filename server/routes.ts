@@ -179,6 +179,19 @@ export async function registerRoutes(
     }
   });
 
+  app.put(api.users.updatePermissions.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.users.updatePermissions.input.parse(req.body);
+      const updatedUser = await storage.updateUserPermissions(Number(req.params.id), input.permissions);
+      res.json(updatedUser);
+    } catch (err) {
+      res.status(404).json({ message: "User not found" });
+    }
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {
@@ -188,7 +201,8 @@ export async function registerRoutes(
       password: hashedPassword,
       fullName: "Admin User",
       role: "admin",
-      department: "Management"
+      department: "Management",
+      permissions: ["view_dashboard", "view_vehicles", "view_bookings", "view_maintenance", "view_fuel", "manage_users"]
     });
     console.log("Seeded admin user");
 
