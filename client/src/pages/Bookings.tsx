@@ -56,6 +56,9 @@ export default function Bookings() {
     });
   };
 
+  const selectedVehicleId = form.watch('vehicleId');
+  const selectedVehicle = selectedVehicleId ? vehicles?.find(v => v.id === Number(selectedVehicleId)) : null;
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'approved': return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Approved</Badge>;
@@ -104,6 +107,13 @@ export default function Bookings() {
                     <FormMessage />
                   </FormItem>
                 )} />
+
+                {selectedVehicle && (
+                  <div className="bg-muted p-3 rounded-md">
+                    <p className="text-sm font-medium text-muted-foreground">Current Mileage</p>
+                    <p className="text-lg font-semibold">{selectedVehicle.currentMileage?.toLocaleString() || 0} miles</p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="startTime" render={({ field }) => (

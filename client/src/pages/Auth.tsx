@@ -11,16 +11,15 @@ import { useLocation } from "wouter";
 export default function Auth() {
   const { login, register, isLoggingIn, isRegistering, user } = useAuth();
   const [, setLocation] = useLocation();
+  const [loginData, setLoginData] = useState({ username: "", password: "" });
+  const [regData, setRegData] = useState({ 
+    username: "", password: "", fullName: "", role: "customer", licenseNumber: "", department: "" 
+  });
 
   if (user) {
     setLocation("/");
     return null;
   }
-
-  const [loginData, setLoginData] = useState({ username: "", password: "" });
-  const [regData, setRegData] = useState({ 
-    username: "", password: "", fullName: "", role: "customer", licenseNumber: "", department: "" 
-  });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
