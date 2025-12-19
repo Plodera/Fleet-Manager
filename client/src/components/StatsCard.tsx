@@ -6,35 +6,66 @@ interface StatsCardProps {
   title: string;
   value: string | number;
   icon: LucideIcon;
-  trend?: string;
-  trendUp?: boolean;
+  description?: string;
+  variant?: "default" | "primary" | "success" | "warning" | "danger";
   className?: string;
 }
 
-export function StatsCard({ title, value, icon: Icon, trend, trendUp, className }: StatsCardProps) {
+const variantStyles = {
+  default: {
+    icon: "bg-muted text-muted-foreground",
+    accent: ""
+  },
+  primary: {
+    icon: "bg-primary/10 text-primary",
+    accent: ""
+  },
+  success: {
+    icon: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    accent: ""
+  },
+  warning: {
+    icon: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    accent: ""
+  },
+  danger: {
+    icon: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+    accent: ""
+  }
+};
+
+export function StatsCard({ 
+  title, 
+  value, 
+  icon: Icon, 
+  description,
+  variant = "default",
+  className 
+}: StatsCardProps) {
+  const styles = variantStyles[variant];
+  
   return (
-    <Card className={cn("overflow-hidden hover:shadow-lg transition-all duration-300 border-none shadow-md", className)}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <h3 className="text-2xl font-bold tracking-tight text-foreground">{value}</h3>
+    <Card className={cn(
+      "group relative overflow-hidden transition-all duration-300",
+      "hover:shadow-lg dark:hover:shadow-primary/5",
+      className
+    )}>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1 min-w-0">
+            <p className="text-sm font-medium text-muted-foreground truncate">{title}</p>
+            <p className="text-3xl font-bold tracking-tight text-foreground">{value}</p>
+            {description && (
+              <p className="text-xs text-muted-foreground mt-1">{description}</p>
+            )}
           </div>
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Icon className="w-6 h-6 text-primary" />
+          <div className={cn(
+            "flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110",
+            styles.icon
+          )}>
+            <Icon className="w-5 h-5" />
           </div>
         </div>
-        {trend && (
-          <div className="mt-4 flex items-center text-xs">
-            <span className={cn(
-              "font-medium px-2 py-0.5 rounded-full mr-2",
-              trendUp ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-            )}>
-              {trend}
-            </span>
-            <span className="text-muted-foreground">vs last month</span>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
