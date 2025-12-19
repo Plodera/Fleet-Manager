@@ -14,6 +14,7 @@ import Maintenance from "@/pages/Maintenance";
 import Fuel from "@/pages/Fuel";
 import Users from "@/pages/Users";
 import Settings from "@/pages/Settings";
+import Reports from "@/pages/Reports";
 import Auth from "@/pages/Auth";
 import NotFound from "@/pages/not-found";
 
@@ -61,6 +62,9 @@ function Router() {
       </Route>
       <Route path="/settings">
         <PrivateRoute component={Settings} adminOnly />
+      </Route>
+      <Route path="/reports">
+        <PrivateRoute component={Reports} />
       </Route>
       
       <Route component={NotFound} />
