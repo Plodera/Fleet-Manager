@@ -6,6 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
+import { sendBookingNotification, sendBookingStatusUpdate } from "./email";
 
 const scryptAsync = promisify(scrypt);
 
@@ -78,6 +79,17 @@ export async function registerRoutes(
     try {
       const input = api.bookings.create.input.parse(req.body);
       const booking = await storage.createBooking(input);
+      
+      // Send email notification to approver if one is assigned
+      if (input.approverId) {
+        const approver = await storage.getUser(input.approverId);
+        const vehicle = await storage.getVehicle(input.vehicleId);
+        const requester = await storage.getUser(input.userId);
+        if (approver && vehicle && requester) {
+          await sendBookingNotification(approver, booking, vehicle, requester);
+        }
+      }
+      
       res.status(201).json(booking);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -92,6 +104,44 @@ export async function registerRoutes(
     try {
       const input = api.bookings.update.input.parse(req.body);
       const booking = await storage.updateBooking(Number(req.params.id), input);
+      res.json(booking);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  // Booking status update (approve/reject/pending) - only approvers can do this
+  app.put(api.bookings.updateStatus.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const currentUser = req.user as User;
+    
+    try {
+      const bookingId = Number(req.params.id);
+      const input = api.bookings.updateStatus.input.parse(req.body);
+      
+      // Get the booking to check if the current user is the assigned approver
+      const existingBooking = await storage.getBooking(bookingId);
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // Only the assigned approver or admin can change status
+      if (existingBooking.approverId !== currentUser.id && currentUser.role !== 'admin') {
+        return res.status(401).json({ message: "Only the assigned approver can change booking status" });
+      }
+      
+      const booking = await storage.updateBooking(bookingId, { status: input.status });
+      
+      // Send email notification to requester about status change
+      const requester = await storage.getUser(existingBooking.userId);
+      const vehicle = await storage.getVehicle(existingBooking.vehicleId);
+      if (requester && vehicle) {
+        await sendBookingStatusUpdate(requester, booking, vehicle, input.status, currentUser);
+      }
+      
       res.json(booking);
     } catch (err) {
       if (err instanceof z.ZodError) {

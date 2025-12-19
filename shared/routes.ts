@@ -137,6 +137,16 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    updateStatus: {
+      method: 'PUT' as const,
+      path: '/api/bookings/:id/status',
+      input: z.object({ status: z.enum(['pending', 'approved', 'rejected']) }),
+      responses: {
+        200: z.custom<typeof bookings.$inferSelect>(),
+        404: errorSchemas.notFound,
+        401: errorSchemas.unauthorized,
+      },
+    },
   },
   approvers: {
     list: {

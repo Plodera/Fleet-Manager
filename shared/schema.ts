@@ -31,6 +31,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: roleEnum("role").default("customer").notNull(),
   fullName: text("full_name").notNull(),
+  email: text("email"),
   licenseNumber: text("license_number"),
   department: text("department"),
   permissions: text("permissions").default('["view_dashboard","view_vehicles","view_bookings"]').notNull(), // JSON array stored as text

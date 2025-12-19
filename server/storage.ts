@@ -23,6 +23,7 @@ export interface IStorage {
   deleteVehicle(id: number): Promise<void>;
 
   getBookings(): Promise<(Booking & { vehicle: Vehicle; user: User; approver?: User })[]>;
+  getBooking(id: number): Promise<Booking | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBooking(id: number, booking: Partial<InsertBooking>): Promise<Booking>;
 
@@ -111,6 +112,11 @@ export class DatabaseStorage implements IStorage {
         approver: true,
       },
     });
+  }
+
+  async getBooking(id: number): Promise<Booking | undefined> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
+    return booking;
   }
 
   async createBooking(insertBooking: InsertBooking): Promise<Booking> {
