@@ -279,6 +279,49 @@ export async function registerRoutes(
     res.json(approvers);
   });
 
+  // Email Settings (admin only)
+  app.get("/api/settings/email", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    const settings = await storage.getEmailSettings();
+    if (settings) {
+      // Mask password for security
+      res.json({ ...settings, smtpPass: settings.smtpPass ? "********" : "" });
+    } else {
+      res.json(null);
+    }
+  });
+
+  app.put("/api/settings/email", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    try {
+      const existing = await storage.getEmailSettings();
+      // If password is masked, keep the existing password
+      const smtpPass = req.body.smtpPass === "********" && existing ? existing.smtpPass : req.body.smtpPass;
+      const settings = await storage.upsertEmailSettings({ ...req.body, smtpPass });
+      res.json({ ...settings, smtpPass: "********" });
+    } catch (err) {
+      console.error("Email settings error:", err);
+      res.status(400).json({ message: "Failed to save email settings" });
+    }
+  });
+
+  app.post("/api/settings/email/test", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    try {
+      const { testEmail } = await import("./email");
+      const result = await testEmail(req.body.email);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

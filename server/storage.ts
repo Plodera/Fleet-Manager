@@ -1,8 +1,8 @@
 import { 
-  users, vehicles, bookings, maintenanceRecords, fuelRecords,
+  users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
-  type FuelRecord, type InsertFuel
+  type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq } from "drizzle-orm";
@@ -39,6 +39,9 @@ export interface IStorage {
   updateUserPermissions(id: number, permissions: string[]): Promise<User>;
   updateUserApprover(id: number, isApprover: boolean): Promise<User>;
   updateUserPassword(id: number, password: string): Promise<void>;
+
+  getEmailSettings(): Promise<EmailSettings | undefined>;
+  upsertEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings>;
 
   sessionStore: session.Store;
 }
@@ -171,6 +174,25 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserPassword(id: number, password: string): Promise<void> {
     await db.update(users).set({ password }).where(eq(users.id, id));
+  }
+
+  async getEmailSettings(): Promise<EmailSettings | undefined> {
+    const [settings] = await db.select().from(emailSettings).limit(1);
+    return settings;
+  }
+
+  async upsertEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings> {
+    const existing = await this.getEmailSettings();
+    if (existing) {
+      const [updated] = await db.update(emailSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(emailSettings.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(emailSettings).values(settings).returning();
+      return created;
+    }
   }
 }
 

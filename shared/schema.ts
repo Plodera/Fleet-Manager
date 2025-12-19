@@ -89,6 +89,19 @@ export const fuelRecords = pgTable("fuel_records", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const emailSettings = pgTable("email_settings", {
+  id: serial("id").primaryKey(),
+  smtpHost: text("smtp_host").notNull(),
+  smtpPort: integer("smtp_port").default(465).notNull(),
+  smtpUser: text("smtp_user").notNull(),
+  smtpPass: text("smtp_pass").notNull(),
+  smtpSecure: boolean("smtp_secure").default(true).notNull(),
+  fromName: text("from_name").default("FleetCmd").notNull(),
+  fromEmail: text("from_email").notNull(),
+  enabled: boolean("enabled").default(false).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
@@ -133,6 +146,7 @@ export const insertBookingSchema = createInsertSchema(bookings)
   });
 export const insertMaintenanceSchema = createInsertSchema(maintenanceRecords).omit({ id: true, createdAt: true });
 export const insertFuelSchema = createInsertSchema(fuelRecords).omit({ id: true, createdAt: true });
+export const insertEmailSettingsSchema = createInsertSchema(emailSettings).omit({ id: true, updatedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -146,3 +160,5 @@ export type MaintenanceRecord = typeof maintenanceRecords.$inferSelect;
 export type InsertMaintenance = z.infer<typeof insertMaintenanceSchema>;
 export type FuelRecord = typeof fuelRecords.$inferSelect;
 export type InsertFuel = z.infer<typeof insertFuelSchema>;
+export type EmailSettings = typeof emailSettings.$inferSelect;
+export type InsertEmailSettings = z.infer<typeof insertEmailSettingsSchema>;
