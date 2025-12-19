@@ -32,6 +32,7 @@ export default function Bookings() {
     defaultValues: {
       userId: user?.id,
       vehicleId: undefined,
+      approverId: undefined,
       startTime: "",
       endTime: "",
       purpose: "",
@@ -46,6 +47,8 @@ export default function Bookings() {
     const payload = {
       ...data,
       userId: user?.id, // Ensure current user ID is used
+      vehicleId: Number(data.vehicleId),
+      approverId: data.approverId ? Number(data.approverId) : undefined,
       startTime: new Date(data.startTime).toISOString(),
       endTime: new Date(data.endTime).toISOString(),
     };
@@ -239,13 +242,13 @@ export default function Bookings() {
                 </div>
               </div>
 
-              {/* Approver Actions */}
-              {isApprover && booking.status === 'pending' && booking.approverId === user?.id && (
+              {/* Approver/Admin Actions for pending bookings */}
+              {booking.status === 'pending' && (booking.approverId === user?.id || user?.role === 'admin') && (
                 <div className="flex gap-2">
                   <Button 
                     size="sm" 
                     variant="outline" 
-                    className="border-green-200 hover:bg-green-50 text-green-700"
+                    className="border-green-200 text-green-700"
                     onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'approved' })}
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-approve-booking-${booking.id}`}
@@ -255,7 +258,7 @@ export default function Bookings() {
                   <Button 
                     size="sm" 
                     variant="outline"
-                    className="border-red-200 hover:bg-red-50 text-red-700"
+                    className="border-red-200 text-red-700"
                     onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'rejected' })}
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-reject-booking-${booking.id}`}
@@ -265,31 +268,32 @@ export default function Bookings() {
                 </div>
               )}
 
-              {/* Show pending approver info */}
-              {booking.status === 'pending' && booking.approverId !== user?.id && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-50 border border-yellow-200">
-                  <Clock className="w-4 h-4 text-yellow-600" />
-                  <span className="text-sm font-medium text-yellow-700">Awaiting Approval</span>
+              {/* Show pending approver info - only for non-approvers viewing their own or others' bookings */}
+              {booking.status === 'pending' && booking.approverId !== user?.id && user?.role !== 'admin' && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+                  <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Awaiting Approval</span>
                 </div>
               )}
 
               {/* Show approved status */}
               {booking.status === 'approved' && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-700">Approved</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-medium text-green-700 dark:text-green-300">Approved</span>
                 </div>
               )}
               
-              {/* Actions for completing approved bookings */}
-              {isApprover && booking.status === 'approved' && booking.approverId === user?.id && (
+              {/* Actions for setting approved bookings back to pending */}
+              {booking.status === 'approved' && (booking.approverId === user?.id || user?.role === 'admin') && (
                 <Button 
                   size="sm"
-                  onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'completed' })}
+                  variant="outline"
+                  onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'pending' })}
                   disabled={updateBookingStatus.isPending}
-                  data-testid={`button-complete-booking-${booking.id}`}
+                  data-testid={`button-revert-pending-booking-${booking.id}`}
                 >
-                  Mark Completed
+                  Set Pending
                 </Button>
               )}
             </CardContent>

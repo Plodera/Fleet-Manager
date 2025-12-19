@@ -51,21 +51,31 @@ export function useBookings() {
   });
 
   const updateBookingStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: number, status: 'approved' | 'rejected' | 'completed' | 'cancelled' }) => {
-      const url = buildUrl(api.bookings.update.path, { id });
+    mutationFn: async ({ id, status }: { id: number, status: 'approved' | 'rejected' | 'pending' }) => {
+      const url = buildUrl(api.bookings.updateStatus.path, { id });
       const res = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      if (!res.ok) throw new Error("Failed to update booking status");
-      return api.bookings.update.responses[200].parse(await res.json());
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update booking status");
+      }
+      return api.bookings.updateStatus.responses[200].parse(await res.json());
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] });
-      const message = status === 'approved' ? 'Booking approved' : status === 'rejected' ? 'Booking rejected' : 'Booking completed';
-      toast({ title: "Status updated", description: message });
+      const messages: Record<string, string> = {
+        approved: 'Booking approved successfully',
+        rejected: 'Booking rejected',
+        pending: 'Booking set to pending'
+      };
+      toast({ title: "Status updated", description: messages[status] });
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
