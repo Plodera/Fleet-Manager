@@ -4,17 +4,18 @@ import { useVehicles } from "@/hooks/use-vehicles";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger 
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription
 } from "@/components/ui/dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertBookingSchema } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Bookings() {
@@ -22,10 +23,11 @@ export default function Bookings() {
   const { vehicles } = useVehicles();
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelBookingId, setCancelBookingId] = useState<number | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
 
-  // Filter available vehicles
   const availableVehicles = vehicles?.filter(v => v.status === "available");
-  const isApprover = user?.isApprover;
 
   const form = useForm({
     resolver: zodResolver(insertBookingSchema),
@@ -43,10 +45,9 @@ export default function Bookings() {
   });
 
   const onSubmit = (data: any) => {
-    // Need to ensure dates are properly ISO formatted strings for the API schema
     const payload = {
       ...data,
-      userId: user?.id, // Ensure current user ID is used
+      userId: user?.id,
       vehicleId: Number(data.vehicleId),
       approverId: data.approverId ? Number(data.approverId) : undefined,
       startTime: new Date(data.startTime).toISOString(),
@@ -61,22 +62,46 @@ export default function Bookings() {
     });
   };
 
+  const handleCancelClick = (bookingId: number) => {
+    setCancelBookingId(bookingId);
+    setCancelReason("");
+    setCancelDialogOpen(true);
+  };
+
+  const handleConfirmCancel = () => {
+    if (cancelBookingId && cancelReason.trim()) {
+      updateBookingStatus.mutate(
+        { id: cancelBookingId, status: 'cancelled', cancellationReason: cancelReason.trim() },
+        {
+          onSuccess: () => {
+            setCancelDialogOpen(false);
+            setCancelBookingId(null);
+            setCancelReason("");
+          }
+        }
+      );
+    }
+  };
+
   const selectedVehicleId = form.watch('vehicleId');
   const selectedVehicle = selectedVehicleId ? vehicles?.find(v => v.id === Number(selectedVehicleId)) : null;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'approved': return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">Approved</Badge>;
-      case 'pending': return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200">Pending</Badge>;
-      case 'rejected': return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200">Rejected</Badge>;
-      case 'completed': return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">Completed</Badge>;
+      case 'approved': return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">Approved</Badge>;
+      case 'pending': return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800">Pending</Badge>;
+      case 'rejected': return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">Rejected</Badge>;
+      case 'completed': return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">Completed</Badge>;
+      case 'cancelled': return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800">Cancelled</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
   };
 
+  const cancellingBooking = bookings?.find(b => b.id === cancelBookingId);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold font-display tracking-tight">Bookings</h1>
           <p className="text-muted-foreground mt-1">Manage reservations and requests.</p>
@@ -84,7 +109,7 @@ export default function Bookings() {
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="shadow-lg shadow-primary/25">New Booking</Button>
+            <Button className="shadow-lg shadow-primary/25" data-testid="button-new-booking">New Booking</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -97,7 +122,7 @@ export default function Bookings() {
                     <FormLabel>Select Vehicle</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger data-testid="select-vehicle">
                           <SelectValue placeholder="Choose an available vehicle" />
                         </SelectTrigger>
                       </FormControl>
@@ -129,6 +154,7 @@ export default function Bookings() {
                         placeholder="Enter current odometer reading" 
                         {...field}
                         onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        data-testid="input-mileage"
                       />
                     </FormControl>
                     <FormMessage />
@@ -140,7 +166,7 @@ export default function Bookings() {
                     <FormItem>
                       <FormLabel>Start Time</FormLabel>
                       <FormControl>
-                        <Input type="datetime-local" {...field} />
+                        <Input type="datetime-local" {...field} data-testid="input-start-time" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -149,7 +175,7 @@ export default function Bookings() {
                     <FormItem>
                       <FormLabel>End Time</FormLabel>
                       <FormControl>
-                        <Input type="datetime-local" {...field} />
+                        <Input type="datetime-local" {...field} data-testid="input-end-time" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -159,7 +185,7 @@ export default function Bookings() {
                 <FormField control={form.control} name="destination" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Destination</FormLabel>
-                    <FormControl><Input placeholder="City, Location..." {...field} /></FormControl>
+                    <FormControl><Input placeholder="City, Location..." {...field} data-testid="input-destination" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -167,7 +193,7 @@ export default function Bookings() {
                 <FormField control={form.control} name="purpose" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Purpose</FormLabel>
-                    <FormControl><Input placeholder="Client meeting, Delivery..." {...field} /></FormControl>
+                    <FormControl><Input placeholder="Client meeting, Delivery..." {...field} data-testid="input-purpose" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -177,7 +203,7 @@ export default function Bookings() {
                     <FormLabel>Approver (Required)</FormLabel>
                     <Select onValueChange={(val) => field.onChange(val ? Number(val) : undefined)} defaultValue={field.value ? String(field.value) : undefined}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger data-testid="select-approver">
                           <SelectValue placeholder="Select approver" />
                         </SelectTrigger>
                       </FormControl>
@@ -193,7 +219,7 @@ export default function Bookings() {
                   </FormItem>
                 )} />
 
-                <Button type="submit" className="w-full" disabled={createBooking.isPending}>
+                <Button type="submit" className="w-full" disabled={createBooking.isPending} data-testid="button-submit-booking">
                   {createBooking.isPending ? "Submitting..." : "Submit Request"}
                 </Button>
               </form>
@@ -202,20 +228,63 @@ export default function Bookings() {
         </Dialog>
       </div>
 
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-500" />
+              Cancel Booking
+            </DialogTitle>
+            <DialogDescription>
+              {cancellingBooking && (
+                <span>
+                  Cancelling booking for {cancellingBooking.vehicle.make} {cancellingBooking.vehicle.model}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Reason for cancellation <span className="text-destructive">*</span></label>
+              <Textarea
+                placeholder="Please provide a reason for cancelling this booking..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="min-h-24"
+                data-testid="input-cancel-reason"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)} data-testid="button-cancel-dialog-close">
+              Go Back
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleConfirmCancel}
+              disabled={!cancelReason.trim() || updateBookingStatus.isPending}
+              data-testid="button-confirm-cancel"
+            >
+              {updateBookingStatus.isPending ? "Cancelling..." : "Confirm Cancellation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-4">
         {isLoading ? (
           <div className="space-y-4">
             {[1,2,3].map(i => <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />)}
           </div>
         ) : bookings?.map((booking) => (
-          <Card key={booking.id} className="border-none shadow-sm hover:shadow-md transition-shadow">
+          <Card key={booking.id} className="border-none shadow-sm hover:shadow-md transition-shadow" data-testid={`card-booking-${booking.id}`}>
             <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-start gap-4 flex-1">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <CalendarDays className="w-6 h-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-1">
+                  <div className="flex items-center gap-3 mb-1 flex-wrap">
                     <h3 className="font-semibold text-lg">{booking.vehicle.make} {booking.vehicle.model}</h3>
                     {getStatusBadge(booking.status)}
                   </div>
@@ -239,12 +308,18 @@ export default function Bookings() {
                       </>
                     )}
                   </div>
+                  {booking.status === 'cancelled' && booking.cancellationReason && (
+                    <div className="mt-2 p-2 rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                      <p className="text-sm text-orange-700 dark:text-orange-300">
+                        <span className="font-medium">Cancellation reason:</span> {booking.cancellationReason}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Approver/Admin Actions for pending bookings */}
               {booking.status === 'pending' && (booking.approverId === user?.id || user?.role === 'admin') && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button 
                     size="sm" 
                     variant="outline" 
@@ -269,7 +344,7 @@ export default function Bookings() {
                     size="sm" 
                     variant="outline"
                     className="border-orange-200 text-orange-700"
-                    onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'cancelled' })}
+                    onClick={() => handleCancelClick(booking.id)}
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-cancel-booking-${booking.id}`}
                   >
@@ -278,7 +353,6 @@ export default function Bookings() {
                 </div>
               )}
 
-              {/* Show pending approver info - only for non-approvers viewing their own or others' bookings */}
               {booking.status === 'pending' && booking.approverId !== user?.id && user?.role !== 'admin' && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
                   <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
@@ -286,7 +360,6 @@ export default function Bookings() {
                 </div>
               )}
 
-              {/* Show approved status */}
               {booking.status === 'approved' && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
                   <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
@@ -294,9 +367,8 @@ export default function Bookings() {
                 </div>
               )}
               
-              {/* Actions for approved bookings */}
               {booking.status === 'approved' && (booking.approverId === user?.id || user?.role === 'admin') && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button 
                     size="sm"
                     variant="outline"
@@ -310,7 +382,7 @@ export default function Bookings() {
                     size="sm"
                     variant="outline"
                     className="border-orange-200 text-orange-700"
-                    onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'cancelled' })}
+                    onClick={() => handleCancelClick(booking.id)}
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-cancel-approved-booking-${booking.id}`}
                   >
@@ -319,17 +391,15 @@ export default function Bookings() {
                 </div>
               )}
 
-              {/* Show cancelled status with actions to re-approve */}
-              {booking.status === 'cancelled' && (
+              {booking.status === 'cancelled' && !booking.cancellationReason && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
                   <Ban className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                   <span className="text-sm font-medium text-orange-700 dark:text-orange-300">Cancelled</span>
                 </div>
               )}
 
-              {/* Actions for cancelled bookings - allow re-approval */}
               {booking.status === 'cancelled' && (booking.approverId === user?.id || user?.role === 'admin') && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button 
                     size="sm" 
                     variant="outline" 

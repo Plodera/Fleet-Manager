@@ -51,12 +51,14 @@ export function useBookings() {
   });
 
   const updateBookingStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: number, status: 'approved' | 'rejected' | 'pending' }) => {
+    mutationFn: async ({ id, status, cancellationReason }: { id: number, status: 'approved' | 'rejected' | 'pending' | 'cancelled' | 'completed', cancellationReason?: string }) => {
       const url = buildUrl(api.bookings.updateStatus.path, { id });
+      const body: { status: string; cancellationReason?: string } = { status };
+      if (cancellationReason) body.cancellationReason = cancellationReason;
       const res = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -70,7 +72,9 @@ export function useBookings() {
       const messages: Record<string, string> = {
         approved: 'Booking approved successfully',
         rejected: 'Booking rejected',
-        pending: 'Booking set to pending'
+        pending: 'Booking set to pending',
+        cancelled: 'Booking cancelled',
+        completed: 'Booking marked as completed'
       };
       toast({ title: "Status updated", description: messages[status] });
     },

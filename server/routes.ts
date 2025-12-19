@@ -133,7 +133,13 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Only the assigned approver can change booking status" });
       }
       
-      const booking = await storage.updateBooking(bookingId, { status: input.status });
+      const updateData: { status: string; cancellationReason?: string | null } = { status: input.status };
+      if (input.status === 'cancelled' && input.cancellationReason) {
+        updateData.cancellationReason = input.cancellationReason;
+      } else if (input.status !== 'cancelled') {
+        updateData.cancellationReason = null;
+      }
+      const booking = await storage.updateBooking(bookingId, updateData);
       
       // Send email notification to requester about status change
       const requester = await storage.getUser(existingBooking.userId);

@@ -140,7 +140,10 @@ export const api = {
     updateStatus: {
       method: 'PUT' as const,
       path: '/api/bookings/:id/status',
-      input: z.object({ status: z.enum(['pending', 'approved', 'rejected', 'completed', 'cancelled']) }),
+      input: z.object({ 
+        status: z.enum(['pending', 'approved', 'rejected', 'completed', 'cancelled']),
+        cancellationReason: z.string().optional()
+      }),
       responses: {
         200: z.custom<typeof bookings.$inferSelect>(),
         404: errorSchemas.notFound,
