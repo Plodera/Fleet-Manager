@@ -35,6 +35,7 @@ export default function Bookings() {
       endTime: "",
       purpose: "",
       destination: "",
+      mileage: 0,
       status: "pending"
     }
   });
@@ -114,6 +115,21 @@ export default function Bookings() {
                     <p className="text-lg font-semibold">{selectedVehicle.currentMileage?.toLocaleString() || 0} miles</p>
                   </div>
                 )}
+
+                <FormField control={form.control} name="mileage" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Odometer Reading (Current Mileage)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        placeholder="Enter current odometer reading" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="startTime" render={({ field }) => (

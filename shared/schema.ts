@@ -40,6 +40,7 @@ export const bookings = pgTable("bookings", {
   status: bookingStatusEnum("status").default("pending").notNull(),
   purpose: text("purpose").notNull(),
   destination: text("destination"),
+  mileage: integer("mileage").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
