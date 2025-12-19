@@ -182,6 +182,24 @@ export const api = {
         200: z.array(z.custom<typeof users.$inferSelect>()),
       },
     },
+    create: {
+      method: 'POST' as const,
+      path: '/api/users',
+      input: insertUserSchema,
+      responses: {
+        201: z.custom<typeof users.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    updateRole: {
+      method: 'PUT' as const,
+      path: '/api/users/:id/role',
+      input: z.object({ role: z.enum(['admin', 'staff', 'customer']) }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
   }
 };
 

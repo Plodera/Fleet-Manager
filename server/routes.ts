@@ -148,6 +148,37 @@ export async function registerRoutes(
     res.json(users);
   });
 
+  app.post(api.users.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.users.create.input.parse(req.body);
+      const existingUser = await storage.getUserByUsername(input.username);
+      if (existingUser) return res.status(400).json({ message: "Username already exists" });
+      const newUser = await storage.createUser(input);
+      res.status(201).json(newUser);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.put(api.users.updateRole.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.users.updateRole.input.parse(req.body);
+      const updatedUser = await storage.updateUserRole(Number(req.params.id), input.role);
+      res.json(updatedUser);
+    } catch (err) {
+      res.status(404).json({ message: "User not found" });
+    }
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

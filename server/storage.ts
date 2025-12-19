@@ -33,6 +33,7 @@ export interface IStorage {
   createFuelRecord(record: InsertFuel): Promise<FuelRecord>;
   
   getUsers(): Promise<User[]>;
+  updateUserRole(id: number, role: string): Promise<User>;
 
   sessionStore: session.Store;
 }
@@ -59,6 +60,11 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async updateUserRole(id: number, role: string): Promise<User> {
+    const [user] = await db.update(users).set({ role: role as any }).where(eq(users.id, id)).returning();
     return user;
   }
 
