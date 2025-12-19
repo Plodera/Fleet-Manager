@@ -314,8 +314,8 @@ export async function registerRoutes(
     const user = req.user as User;
     if (user.role !== 'admin') return res.status(401).send("Unauthorized");
     try {
-      const { testEmail } = await import("./email");
-      const result = await testEmail(req.body.email);
+      const { sendTestEmail } = await import("./email");
+      const result = await sendTestEmail(req.body.email);
       res.json(result);
     } catch (err: any) {
       res.status(400).json({ success: false, message: err.message });

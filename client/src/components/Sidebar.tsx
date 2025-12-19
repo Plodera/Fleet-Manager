@@ -8,7 +8,8 @@ import {
   Users, 
   LogOut,
   Menu,
-  X
+  X,
+  Settings
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,10 @@ export function Sidebar() {
     { href: "/bookings", label: "Bookings", icon: CalendarDays },
     { href: "/maintenance", label: "Maintenance", icon: Wrench },
     { href: "/fuel", label: "Fuel Log", icon: Fuel },
-    ...(user?.role === "admin" ? [{ href: "/users", label: "Users", icon: Users }] : []),
+    ...(user?.role === "admin" ? [
+      { href: "/users", label: "Users", icon: Users },
+      { href: "/settings", label: "Settings", icon: Settings }
+    ] : []),
   ];
 
   const NavContent = () => (

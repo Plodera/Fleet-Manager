@@ -1,9 +1,49 @@
+import nodemailer from "nodemailer";
 import type { User, Booking, Vehicle } from "@shared/schema";
+import { storage } from "./storage";
 
 interface EmailContent {
   to: string;
   subject: string;
   body: string;
+}
+
+async function sendEmail(emailContent: EmailContent): Promise<boolean> {
+  const settings = await storage.getEmailSettings();
+  
+  if (!settings || !settings.enabled) {
+    console.log("=== EMAIL NOTIFICATION (Email disabled - logging only) ===");
+    console.log(`To: ${emailContent.to}`);
+    console.log(`Subject: ${emailContent.subject}`);
+    console.log(`Body:\n${emailContent.body}`);
+    console.log("=== END EMAIL ===");
+    return false;
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: settings.smtpHost,
+      port: settings.smtpPort,
+      secure: settings.smtpSecure,
+      auth: {
+        user: settings.smtpUser,
+        pass: settings.smtpPass,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"${settings.fromName}" <${settings.fromEmail}>`,
+      to: emailContent.to,
+      subject: emailContent.subject,
+      text: emailContent.body,
+    });
+
+    console.log(`Email sent successfully to ${emailContent.to}`);
+    return true;
+  } catch (error) {
+    console.error("Failed to send email:", error);
+    return false;
+  }
 }
 
 export async function sendBookingNotification(
@@ -35,11 +75,7 @@ Transport Management System
     `.trim()
   };
 
-  console.log("=== EMAIL NOTIFICATION ===");
-  console.log(`To: ${emailContent.to}`);
-  console.log(`Subject: ${emailContent.subject}`);
-  console.log(`Body:\n${emailContent.body}`);
-  console.log("=== END EMAIL ===");
+  await sendEmail(emailContent);
 }
 
 export async function sendBookingStatusUpdate(
@@ -78,9 +114,36 @@ Transport Management System
     `.trim()
   };
 
-  console.log("=== EMAIL NOTIFICATION ===");
-  console.log(`To: ${emailContent.to}`);
-  console.log(`Subject: ${emailContent.subject}`);
-  console.log(`Body:\n${emailContent.body}`);
-  console.log("=== END EMAIL ===");
+  await sendEmail(emailContent);
+}
+
+export async function sendTestEmail(to: string): Promise<{ success: boolean; error?: string }> {
+  const settings = await storage.getEmailSettings();
+  
+  if (!settings) {
+    return { success: false, error: "Email settings not configured" };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: settings.smtpHost,
+      port: settings.smtpPort,
+      secure: settings.smtpSecure,
+      auth: {
+        user: settings.smtpUser,
+        pass: settings.smtpPass,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"${settings.fromName}" <${settings.fromEmail}>`,
+      to: to,
+      subject: "Test Email - FleetCmd Transport Management",
+      text: "This is a test email from the FleetCmd Transport Management System. If you received this email, your SMTP settings are configured correctly.",
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Failed to send test email" };
+  }
 }

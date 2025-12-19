@@ -13,6 +13,7 @@ import Bookings from "@/pages/Bookings";
 import Maintenance from "@/pages/Maintenance";
 import Fuel from "@/pages/Fuel";
 import Users from "@/pages/Users";
+import Settings from "@/pages/Settings";
 import Auth from "@/pages/Auth";
 import NotFound from "@/pages/not-found";
 
@@ -57,6 +58,9 @@ function Router() {
       </Route>
       <Route path="/users">
         <PrivateRoute component={Users} adminOnly />
+      </Route>
+      <Route path="/settings">
+        <PrivateRoute component={Settings} adminOnly />
       </Route>
       
       <Route component={NotFound} />
