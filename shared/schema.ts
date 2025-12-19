@@ -121,7 +121,16 @@ export const insertUserSchema = createInsertSchema(users)
     permissions: z.array(z.string()).optional().default([])
   });
 export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true, createdAt: true });
-export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, createdAt: true });
+export const insertBookingSchema = createInsertSchema(bookings)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    vehicleId: z.coerce.number(),
+    userId: z.coerce.number(),
+    approverId: z.coerce.number().optional(),
+    mileage: z.coerce.number(),
+    startTime: z.coerce.date(),
+    endTime: z.coerce.date(),
+  });
 export const insertMaintenanceSchema = createInsertSchema(maintenanceRecords).omit({ id: true, createdAt: true });
 export const insertFuelSchema = createInsertSchema(fuelRecords).omit({ id: true, createdAt: true });
 
