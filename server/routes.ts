@@ -273,6 +273,23 @@ export async function registerRoutes(
     }
   });
 
+  // Update user email (admin only)
+  app.put(api.users.updateEmail.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.users.updateEmail.input.parse(req.body);
+      const updatedUser = await storage.updateUserEmail(Number(req.params.id), input.email);
+      res.json(updatedUser);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(404).json({ message: "User not found" });
+    }
+  });
+
   // Approvers
   app.get(api.approvers.list.path, async (req, res) => {
     const approvers = await storage.getApprovers();

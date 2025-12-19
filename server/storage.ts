@@ -39,6 +39,7 @@ export interface IStorage {
   updateUserPermissions(id: number, permissions: string[]): Promise<User>;
   updateUserApprover(id: number, isApprover: boolean): Promise<User>;
   updateUserPassword(id: number, password: string): Promise<void>;
+  updateUserEmail(id: number, email: string): Promise<User>;
 
   getEmailSettings(): Promise<EmailSettings | undefined>;
   upsertEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings>;
@@ -174,6 +175,11 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserPassword(id: number, password: string): Promise<void> {
     await db.update(users).set({ password }).where(eq(users.id, id));
+  }
+
+  async updateUserEmail(id: number, email: string): Promise<User> {
+    const [user] = await db.update(users).set({ email }).where(eq(users.id, id)).returning();
+    return user;
   }
 
   async getEmailSettings(): Promise<EmailSettings | undefined> {

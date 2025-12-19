@@ -13,16 +13,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, AVAILABLE_PERMISSIONS } from "@shared/schema";
-import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key } from "lucide-react";
+import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail } from "lucide-react";
 
 export default function Users() {
-  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updatePassword, isUpdatingPassword } = useUsers();
+  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail } = useUsers();
   const { user: currentUser } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingPermissionsUserId, setEditingPermissionsUserId] = useState<number | null>(null);
   const [changePasswordUserId, setChangePasswordUserId] = useState<number | null>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [editEmailUserId, setEditEmailUserId] = useState<number | null>(null);
+  const [newEmail, setNewEmail] = useState("");
 
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
@@ -30,6 +32,7 @@ export default function Users() {
       username: "",
       password: "",
       fullName: "",
+      email: "",
       role: "customer" as const,
       licenseNumber: "",
       department: "",
@@ -92,6 +95,16 @@ export default function Users() {
                       <FormLabel>Password</FormLabel>
                       <FormControl>
                         <Input type="password" placeholder="Enter password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="email" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="user@example.com" {...field} data-testid="input-user-email" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -183,9 +196,9 @@ export default function Users() {
               <TableRow>
                 <TableHead>Full Name</TableHead>
                 <TableHead>Username</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Department</TableHead>
-                <TableHead>License #</TableHead>
                 <TableHead>Approver</TableHead>
                 <TableHead>Permissions</TableHead>
                 {currentUser?.role === 'admin' && <TableHead>Actions</TableHead>}
@@ -202,6 +215,7 @@ export default function Users() {
                 <TableRow key={user.id} className="hover:bg-muted/20">
                   <TableCell className="font-medium">{user.fullName}</TableCell>
                   <TableCell>{user.username}</TableCell>
+                  <TableCell className="text-sm">{user.email || "-"}</TableCell>
                   <TableCell>
                     {currentUser?.role === 'admin' && editingUserId !== user.id ? (
                       <div className="flex items-center gap-2">
@@ -328,6 +342,60 @@ export default function Users() {
                             >
                               <Lock className="w-4 h-4" />
                             </Button>
+                            <Dialog open={editEmailUserId === user.id} onOpenChange={(open) => {
+                              if (!open) {
+                                setEditEmailUserId(null);
+                                setNewEmail("");
+                              }
+                            }}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditEmailUserId(user.id);
+                                    setNewEmail(user.email || "");
+                                  }}
+                                  disabled={isUpdatingEmail}
+                                  data-testid={`button-edit-email-${user.id}`}
+                                >
+                                  <Mail className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Edit Email for {user.fullName}</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <label className="text-sm font-medium">Email Address</label>
+                                    <Input
+                                      type="email"
+                                      placeholder="user@example.com"
+                                      value={newEmail}
+                                      onChange={(e) => setNewEmail(e.target.value)}
+                                      data-testid={`input-edit-email-${user.id}`}
+                                    />
+                                  </div>
+                                  <Button
+                                    onClick={() => {
+                                      if (newEmail) {
+                                        updateEmail({ userId: user.id, email: newEmail }, {
+                                          onSuccess: () => {
+                                            setEditEmailUserId(null);
+                                            setNewEmail("");
+                                          }
+                                        });
+                                      }
+                                    }}
+                                    disabled={!newEmail || isUpdatingEmail}
+                                    data-testid={`button-confirm-email-${user.id}`}
+                                  >
+                                    {isUpdatingEmail ? "Updating..." : "Update Email"}
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
                             <Dialog open={changePasswordUserId === user.id} onOpenChange={(open) => {
                               if (!open) {
                                 setChangePasswordUserId(null);

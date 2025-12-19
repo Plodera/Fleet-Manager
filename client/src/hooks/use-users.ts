@@ -115,6 +115,28 @@ export function useUsers() {
     },
   });
 
+  const updateEmailMutation = useMutation({
+    mutationFn: async ({ userId, email }: { userId: number; email: string }) => {
+      const res = await fetch(api.users.updateEmail.path.replace(":id", String(userId)), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update email");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      toast({ title: "Email updated", description: "User email has been changed successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to update email", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     users,
     isLoading,
@@ -128,5 +150,7 @@ export function useUsers() {
     isUpdatingApprover: updateApproverMutation.isPending,
     updatePassword: updatePasswordMutation.mutate,
     isUpdatingPassword: updatePasswordMutation.isPending,
+    updateEmail: updateEmailMutation.mutate,
+    isUpdatingEmail: updateEmailMutation.isPending,
   };
 }

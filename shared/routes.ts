@@ -246,6 +246,15 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    updateEmail: {
+      method: 'PUT' as const,
+      path: '/api/users/:id/email',
+      input: z.object({ email: z.string().email("Invalid email address") }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
   }
 };
 
