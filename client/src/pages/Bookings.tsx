@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin, CheckCircle } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Bookings() {
@@ -265,6 +265,16 @@ export default function Bookings() {
                   >
                     <X className="w-4 h-4 mr-1" /> Reject
                   </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="border-orange-200 text-orange-700"
+                    onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'cancelled' })}
+                    disabled={updateBookingStatus.isPending}
+                    data-testid={`button-cancel-booking-${booking.id}`}
+                  >
+                    <Ban className="w-4 h-4 mr-1" /> Cancel
+                  </Button>
                 </div>
               )}
 
@@ -284,17 +294,29 @@ export default function Bookings() {
                 </div>
               )}
               
-              {/* Actions for setting approved bookings back to pending */}
+              {/* Actions for approved bookings */}
               {booking.status === 'approved' && (booking.approverId === user?.id || user?.role === 'admin') && (
-                <Button 
-                  size="sm"
-                  variant="outline"
-                  onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'pending' })}
-                  disabled={updateBookingStatus.isPending}
-                  data-testid={`button-revert-pending-booking-${booking.id}`}
-                >
-                  Set Pending
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm"
+                    variant="outline"
+                    onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'pending' })}
+                    disabled={updateBookingStatus.isPending}
+                    data-testid={`button-revert-pending-booking-${booking.id}`}
+                  >
+                    Set Pending
+                  </Button>
+                  <Button 
+                    size="sm"
+                    variant="outline"
+                    className="border-orange-200 text-orange-700"
+                    onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'cancelled' })}
+                    disabled={updateBookingStatus.isPending}
+                    data-testid={`button-cancel-approved-booking-${booking.id}`}
+                  >
+                    <Ban className="w-4 h-4 mr-1" /> Cancel
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
