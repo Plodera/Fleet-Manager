@@ -13,14 +13,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, AVAILABLE_PERMISSIONS } from "@shared/schema";
-import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle } from "lucide-react";
+import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key } from "lucide-react";
 
 export default function Users() {
-  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover } = useUsers();
+  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updatePassword, isUpdatingPassword } = useUsers();
   const { user: currentUser } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingPermissionsUserId, setEditingPermissionsUserId] = useState<number | null>(null);
+  const [changePasswordUserId, setChangePasswordUserId] = useState<number | null>(null);
+  const [newPassword, setNewPassword] = useState("");
 
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
@@ -326,6 +328,57 @@ export default function Users() {
                             >
                               <Lock className="w-4 h-4" />
                             </Button>
+                            <Dialog open={changePasswordUserId === user.id} onOpenChange={(open) => {
+                              if (!open) {
+                                setChangePasswordUserId(null);
+                                setNewPassword("");
+                              }
+                            }}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setChangePasswordUserId(user.id)}
+                                  disabled={isUpdatingPassword}
+                                  data-testid={`button-change-password-${user.id}`}
+                                >
+                                  <Key className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Change Password for {user.fullName}</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <label className="text-sm font-medium">New Password</label>
+                                    <Input
+                                      type="password"
+                                      placeholder="Enter new password (min 6 characters)"
+                                      value={newPassword}
+                                      onChange={(e) => setNewPassword(e.target.value)}
+                                      data-testid={`input-new-password-${user.id}`}
+                                    />
+                                  </div>
+                                  <Button
+                                    onClick={() => {
+                                      if (newPassword.length >= 6) {
+                                        updatePassword({ userId: user.id, password: newPassword }, {
+                                          onSuccess: () => {
+                                            setChangePasswordUserId(null);
+                                            setNewPassword("");
+                                          }
+                                        });
+                                      }
+                                    }}
+                                    disabled={newPassword.length < 6 || isUpdatingPassword}
+                                    data-testid={`button-confirm-password-${user.id}`}
+                                  >
+                                    {isUpdatingPassword ? "Updating..." : "Update Password"}
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
                           </>
                         )}
                       </div>

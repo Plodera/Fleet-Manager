@@ -38,6 +38,7 @@ export interface IStorage {
   updateUserRole(id: number, role: string): Promise<User>;
   updateUserPermissions(id: number, permissions: string[]): Promise<User>;
   updateUserApprover(id: number, isApprover: boolean): Promise<User>;
+  updateUserPassword(id: number, password: string): Promise<void>;
 
   sessionStore: session.Store;
 }
@@ -166,6 +167,10 @@ export class DatabaseStorage implements IStorage {
   async updateUserApprover(id: number, isApprover: boolean): Promise<User> {
     const [user] = await db.update(users).set({ isApprover }).where(eq(users.id, id)).returning();
     return user;
+  }
+
+  async updateUserPassword(id: number, password: string): Promise<void> {
+    await db.update(users).set({ password }).where(eq(users.id, id));
   }
 }
 

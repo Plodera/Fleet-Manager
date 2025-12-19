@@ -237,6 +237,15 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    updatePassword: {
+      method: 'PUT' as const,
+      path: '/api/users/:id/password',
+      input: z.object({ password: z.string().min(6, "Password must be at least 6 characters") }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        404: errorSchemas.notFound,
+      },
+    },
   }
 };
 

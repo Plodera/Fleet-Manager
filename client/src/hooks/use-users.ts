@@ -94,6 +94,27 @@ export function useUsers() {
     },
   });
 
+  const updatePasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: number; password: string }) => {
+      const res = await fetch(api.users.updatePassword.path.replace(":id", String(userId)), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update password");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Password updated", description: "User password has been changed successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to update password", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     users,
     isLoading,
@@ -105,5 +126,7 @@ export function useUsers() {
     isUpdatingPermissions: updatePermissionsMutation.isPending,
     updateApprover: updateApproverMutation.mutate,
     isUpdatingApprover: updateApproverMutation.isPending,
+    updatePassword: updatePasswordMutation.mutate,
+    isUpdatingPassword: updatePasswordMutation.isPending,
   };
 }

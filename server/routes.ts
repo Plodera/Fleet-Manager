@@ -255,6 +255,24 @@ export async function registerRoutes(
     }
   });
 
+  // Update user password (admin only)
+  app.put(api.users.updatePassword.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.users.updatePassword.input.parse(req.body);
+      const hashedPassword = await hashPassword(input.password);
+      await storage.updateUserPassword(Number(req.params.id), hashedPassword);
+      res.json({ message: "Password updated successfully" });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(404).json({ message: "User not found" });
+    }
+  });
+
   // Approvers
   app.get(api.approvers.list.path, async (req, res) => {
     const approvers = await storage.getApprovers();
