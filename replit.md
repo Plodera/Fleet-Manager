@@ -13,13 +13,18 @@ A fleet management and booking system for organizational vehicles with user auth
 - Booking Approval Workflow: Designate approvers, bookings require approval before use
 
 ## Email Notifications
-The system logs email notifications to the console. When an email integration is connected:
+The system supports SMTP email notifications configured through the Settings page (admin only):
 - New booking notifications are sent to the assigned approver
 - Status change notifications are sent to the requester when approved/rejected
 
-Currently using console logging. To enable real email sending:
-1. Set up an email integration (Resend, SendGrid, etc.)
-2. Update `server/email.ts` to use the email service API
+To enable email notifications:
+1. Log in as admin and navigate to Settings
+2. Configure SMTP settings (host, port, username, password)
+3. Set the "From" name and email address
+4. Enable email notifications with the toggle
+5. Use "Send Test Email" to verify configuration
+
+When disabled, emails are logged to the console instead.
 
 ## Architecture
 - **Frontend**: React with TypeScript, Wouter routing, shadcn UI
