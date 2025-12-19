@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useVehicles } from "@/hooks/use-vehicles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,18 +7,20 @@ import {
 } from "@/components/ui/dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertVehicleSchema } from "@shared/schema";
+import { insertVehicleSchema, type Vehicle } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Car, Gauge, Calendar } from "lucide-react";
+import { Plus, Search, Car, Gauge, Calendar, Pencil, Image } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Vehicles() {
-  const { vehicles, isLoading, createVehicle, deleteVehicle } = useVehicles();
+  const { vehicles, isLoading, createVehicle, updateVehicle, deleteVehicle } = useVehicles();
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
 
   const filteredVehicles = vehicles?.filter(v => 
     v.make.toLowerCase().includes(search.toLowerCase()) || 
@@ -47,6 +49,51 @@ export default function Vehicles() {
         form.reset();
       }
     });
+  };
+
+  const editForm = useForm({
+    resolver: zodResolver(insertVehicleSchema),
+    defaultValues: {
+      make: "",
+      model: "",
+      year: new Date().getFullYear(),
+      licensePlate: "",
+      vin: "",
+      currentMileage: 0,
+      status: "available" as const,
+      imageUrl: ""
+    }
+  });
+
+  useEffect(() => {
+    if (editingVehicle) {
+      editForm.reset({
+        make: editingVehicle.make,
+        model: editingVehicle.model,
+        year: editingVehicle.year,
+        licensePlate: editingVehicle.licensePlate,
+        vin: editingVehicle.vin,
+        currentMileage: editingVehicle.currentMileage,
+        status: editingVehicle.status as any,
+        imageUrl: editingVehicle.imageUrl || ""
+      });
+    }
+  }, [editingVehicle, editForm]);
+
+  const onEditSubmit = (data: any) => {
+    if (!editingVehicle) return;
+    updateVehicle.mutate({ id: editingVehicle.id, ...data }, {
+      onSuccess: () => {
+        setIsEditDialogOpen(false);
+        setEditingVehicle(null);
+        editForm.reset();
+      }
+    });
+  };
+
+  const openEditDialog = (vehicle: Vehicle) => {
+    setEditingVehicle(vehicle);
+    setIsEditDialogOpen(true);
   };
 
   const statusColors = {
@@ -125,6 +172,38 @@ export default function Vehicles() {
                   </FormItem>
                 )} />
 
+                <FormField control={form.control} name="status" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-status">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="available">Available</SelectItem>
+                        <SelectItem value="rented">Rented</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="imageUrl" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Image URL (optional)</FormLabel>
+                    <FormControl>
+                      <div className="flex gap-2">
+                        <Image className="w-4 h-4 mt-3 text-muted-foreground" />
+                        <Input placeholder="https://example.com/car-image.jpg" {...field} />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
                 <div className="flex justify-end pt-4">
                   <Button type="submit" disabled={createVehicle.isPending}>
                     {createVehicle.isPending ? "Adding..." : "Add Vehicle"}
@@ -135,6 +214,116 @@ export default function Vehicles() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) setEditingVehicle(null);
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Vehicle</DialogTitle>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={editForm.control} name="make" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Make</FormLabel>
+                    <FormControl><Input placeholder="Toyota" {...field} data-testid="input-edit-make" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="model" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Model</FormLabel>
+                    <FormControl><Input placeholder="Camry" {...field} data-testid="input-edit-model" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={editForm.control} name="year" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Year</FormLabel>
+                    <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} data-testid="input-edit-year" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="currentMileage" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mileage</FormLabel>
+                    <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} data-testid="input-edit-mileage" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <FormField control={editForm.control} name="licensePlate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>License Plate</FormLabel>
+                  <FormControl><Input placeholder="ABC-1234" {...field} data-testid="input-edit-plate" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={editForm.control} name="vin" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>VIN</FormLabel>
+                  <FormControl><Input placeholder="Unique VIN..." {...field} data-testid="input-edit-vin" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={editForm.control} name="status" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-edit-status">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="available">Available</SelectItem>
+                      <SelectItem value="rented">Rented</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={editForm.control} name="imageUrl" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Image URL (optional)</FormLabel>
+                  <FormControl>
+                    <div className="flex gap-2">
+                      <Image className="w-4 h-4 mt-3 text-muted-foreground" />
+                      <Input placeholder="https://example.com/car-image.jpg" {...field} data-testid="input-edit-imageUrl" />
+                    </div>
+                  </FormControl>
+                  {field.value && (
+                    <div className="mt-2 rounded-md overflow-hidden border h-24">
+                      <img src={field.value} alt="Preview" className="w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} />
+                    </div>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateVehicle.isPending} data-testid="button-save-vehicle">
+                  {updateVehicle.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -153,12 +342,10 @@ export default function Vehicles() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredVehicles?.map((vehicle) => (
-            <Card key={vehicle.id} className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300">
+            <Card key={vehicle.id} className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300" data-testid={`card-vehicle-${vehicle.id}`}>
               <div className="h-40 bg-gradient-to-br from-slate-100 to-slate-200 relative overflow-hidden flex items-center justify-center">
-                {/* Descriptive HTML Comment for Unsplash image */}
-                {/* Modern car placeholder image */}
                 <img 
-                  src={`https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80`} 
+                  src={vehicle.imageUrl || `https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80`} 
                   alt={`${vehicle.make} ${vehicle.model}`}
                   className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500"
                 />
@@ -191,10 +378,12 @@ export default function Vehicles() {
               <CardFooter className="p-6 pt-0 flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => {
                   if(confirm("Delete this vehicle?")) deleteVehicle.mutate(vehicle.id);
-                }}>
+                }} data-testid={`button-delete-vehicle-${vehicle.id}`}>
                   Delete
                 </Button>
-                <Button className="flex-1">Details</Button>
+                <Button variant="outline" className="flex-1" onClick={() => openEditDialog(vehicle)} data-testid={`button-edit-vehicle-${vehicle.id}`}>
+                  <Pencil className="w-4 h-4 mr-2" /> Edit
+                </Button>
               </CardFooter>
             </Card>
           ))}
