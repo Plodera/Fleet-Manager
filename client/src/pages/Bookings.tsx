@@ -318,6 +318,39 @@ export default function Bookings() {
                   </Button>
                 </div>
               )}
+
+              {/* Show cancelled status with actions to re-approve */}
+              {booking.status === 'cancelled' && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                  <Ban className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                  <span className="text-sm font-medium text-orange-700 dark:text-orange-300">Cancelled</span>
+                </div>
+              )}
+
+              {/* Actions for cancelled bookings - allow re-approval */}
+              {booking.status === 'cancelled' && (booking.approverId === user?.id || user?.role === 'admin') && (
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="border-green-200 text-green-700"
+                    onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'approved' })}
+                    disabled={updateBookingStatus.isPending}
+                    data-testid={`button-reapprove-booking-${booking.id}`}
+                  >
+                    <Check className="w-4 h-4 mr-1" /> Approve
+                  </Button>
+                  <Button 
+                    size="sm"
+                    variant="outline"
+                    onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'pending' })}
+                    disabled={updateBookingStatus.isPending}
+                    data-testid={`button-set-pending-cancelled-${booking.id}`}
+                  >
+                    Set Pending
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
