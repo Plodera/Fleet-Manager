@@ -121,16 +121,43 @@ Test locally by opening http://localhost:5000 in a browser on the server.
 
 ---
 
-## Step 4: Configure Your Domain
+## Step 4: Configure Your Domain (Bluehost)
 
-### 4.1 DNS Settings
-Log into your domain registrar's DNS management and create:
-- **A Record**: `@` pointing to your server's public IP
-- **A Record**: `www` pointing to your server's public IP
+### 4.1 DNS Settings in Bluehost
 
-Allow 5-30 minutes for DNS propagation.
+1. **Log in** to your Bluehost account at https://my.bluehost.com
+2. Click **Domains** in the left menu
+3. Select your domain name
+4. Click the **DNS** tab
 
-### 4.2 Configure Windows Firewall
+### 4.2 Add A Records
+
+**For the root domain (yourdomain.com):**
+1. Find existing A record for `@` or click **Add Record**
+2. Configure:
+   - **Host Record**: `@`
+   - **Type**: A
+   - **Points To**: Your Windows Server's public IP address
+   - **TTL**: 14400 (default)
+3. Click **Save**
+
+**For www subdomain:**
+1. Click **Add Record**
+2. Configure:
+   - **Host Record**: `www`
+   - **Type**: A
+   - **Points To**: Your Windows Server's public IP address (same as above)
+   - **TTL**: 14400
+3. Click **Save**
+
+### 4.3 Verify DNS Propagation
+- Changes take 1-48 hours to propagate globally
+- Check status at https://www.whatsmydns.net
+- Enter your domain and select "A" record type
+
+**Note**: If you're using Bluehost email, keep the MX records unchanged.
+
+### 4.4 Configure Windows Firewall
 Open PowerShell as Administrator:
 ```powershell
 New-NetFirewallRule -DisplayName "HTTP" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow
