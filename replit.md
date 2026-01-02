@@ -37,3 +37,6 @@ When disabled, emails are logged to the console instead.
 ## Default Test Credentials
 - Username: admin
 - Password: admin123
+
+## Deployment
+See `DEPLOYMENT_GUIDE.md` for step-by-step instructions to deploy on Windows Server 2022 with IIS and your own domain.
