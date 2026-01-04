@@ -3,11 +3,9 @@ echo ============================================
 echo   FleetCmD Quick Installer for Windows
 echo ============================================
 echo.
-echo This will install FleetCmD on your Windows Server.
-echo.
 echo BEFORE RUNNING THIS:
-echo   1. Install Node.js from https://nodejs.org/
-echo   2. Install PostgreSQL from https://www.postgresql.org/download/windows/
+echo   1. Install Node.js 20+ from https://nodejs.org/
+echo   2. Install PostgreSQL 15+ from https://www.postgresql.org/download/windows/
 echo   3. Remember your PostgreSQL password!
 echo.
 echo Press any key to continue or CTRL+C to cancel...
@@ -18,14 +16,22 @@ echo Step 1: Installing dependencies...
 call npm install
 
 echo.
-echo Step 2: Building for Windows Server...
-call node build-windows.cjs
+echo Step 2: Creating database...
+set /p PGPASS="Enter your PostgreSQL password: "
+set DATABASE_URL=postgresql://postgres:%PGPASS%@localhost:5432/fleetcmd
+
+echo Creating database 'fleetcmd'...
+psql -U postgres -c "CREATE DATABASE fleetcmd" 2>nul
+
+echo.
+echo Step 3: Setting up database tables...
+call npx drizzle-kit push
 
 echo.
 echo ============================================
-echo   Build Complete!
+echo   Installation Complete!
 echo ============================================
 echo.
-echo To start the app, run START.bat
+echo To start the app, run: START.bat
 echo.
 pause

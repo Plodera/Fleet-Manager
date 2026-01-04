@@ -56,8 +56,9 @@ Open PowerShell as Administrator:
 ```powershell
 cd C:\FleetCmD
 npm install
-npm run build
 ```
+
+Note: The app automatically detects local PostgreSQL and uses the correct driver.
 
 ### 2.3 Configure Environment Variables
 Create a file named `.env` in `C:\FleetCmD` with:
@@ -94,9 +95,9 @@ C:\nssm\win64\nssm.exe install FleetCmD
 ```
 
 In the GUI that appears:
-- **Path**: `C:\Program Files\nodejs\node.exe`
+- **Path**: `C:\Program Files\nodejs\npx.cmd`
 - **Startup directory**: `C:\FleetCmD`
-- **Arguments**: `dist/index.js`
+- **Arguments**: `tsx server/index.ts`
 
 Click the **Details** tab:
 - **Display name**: FleetCmD Fleet Management

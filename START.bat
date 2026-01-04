@@ -1,17 +1,31 @@
 @echo off
-echo Starting FleetCmD...
+echo ============================================
+echo   FleetCmD - Starting Application
+echo ============================================
 echo.
 
-set /p PGPASS="Enter your PostgreSQL password: "
+if not exist .env (
+    echo ERROR: .env file not found!
+    echo.
+    echo Please copy .env.example to .env and update your database password.
+    echo   copy .env.example .env
+    echo   notepad .env
+    echo.
+    pause
+    exit /b 1
+)
 
-set DATABASE_URL=postgresql://postgres:%PGPASS%@localhost:5432/fleetcmd
-set SESSION_SECRET=FleetCmD2025SecureSessionKeyAisco
-set NODE_ENV=production
-set PORT=5000
+echo Loading configuration from .env file...
+for /f "usebackq tokens=1,* delims==" %%a in (".env") do (
+    set "line=%%a"
+    if not "!line:~0,1!"=="#" (
+        if not "%%a"=="" set "%%a=%%b"
+    )
+)
 
-echo.
-echo Starting server on http://localhost:5000
+echo Starting server on http://localhost:%PORT%
 echo Press Ctrl+C to stop
 echo.
 
-node dist/index.cjs
+setlocal enabledelayedexpansion
+npx tsx server/index.ts
