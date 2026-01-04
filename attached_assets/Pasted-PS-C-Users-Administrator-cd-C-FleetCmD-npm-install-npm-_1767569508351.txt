@@ -1,0 +1,83 @@
+PS C:\Users\Administrator> cd C:\FleetCmD
+>> npm install
+>> npm run build
+
+added 560 packages, and audited 561 packages in 5m
+
+68 packages are looking for funding
+  run `npm fund` for details
+
+3 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+> rest-express@1.0.0 build
+> tsx script/build.ts
+
+building client...
+vite v7.3.0 building client environment for production...
+✓ 2764 modules transformed.
+../dist/public/index.html                     2.06 kB │ gzip:   0.80 kB
+../dist/public/assets/index-ovlu7rPZ.css     75.47 kB │ gzip:  12.33 kB
+../dist/public/assets/index-BqgwOhHd.js   1,018.72 kB │ gzip: 285.82 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 13.62s
+building server...
+X [ERROR] Top-level await is currently not supported with the "cjs" output format
+
+    server/db.ts:19:13:
+      19 │   const pg = await import('pg');
+         ╵              ~~~~~
+
+X [ERROR] Top-level await is currently not supported with the "cjs" output format
+
+    server/db.ts:20:22:
+      20 │   const { drizzle } = await import('drizzle-orm/node-postgres');
+         ╵                       ~~~~~
+
+X [ERROR] Top-level await is currently not supported with the "cjs" output format
+
+    server/db.ts:25:31:
+      25 │   const { Pool, neonConfig } = await import('@neondatabase/serverless');
+         ╵                                ~~~~~
+
+X [ERROR] Top-level await is currently not supported with the "cjs" output format
+
+    server/db.ts:26:22:
+      26 │   const { drizzle } = await import('drizzle-orm/neon-serverless');
+         ╵                       ~~~~~
+
+X [ERROR] Top-level await is currently not supported with the "cjs" output format
+
+    server/db.ts:27:13:
+      27 │   const ws = await import('ws');
+         ╵              ~~~~~
+
+5 errors
+Error: Build failed with 5 errors:
+server/db.ts:19:13: ERROR: Top-level await is currently not supported with the "cjs" output format
+server/db.ts:20:22: ERROR: Top-level await is currently not supported with the "cjs" output format
+server/db.ts:25:31: ERROR: Top-level await is currently not supported with the "cjs" output format
+server/db.ts:26:22: ERROR: Top-level await is currently not supported with the "cjs" output format
+server/db.ts:27:13: ERROR: Top-level await is currently not supported with the "cjs" output format
+    at failureErrorWithLog (C:\FleetCmD\node_modules\esbuild\lib\main.js:1467:15)
+    at C:\FleetCmD\node_modules\esbuild\lib\main.js:926:25
+    at C:\FleetCmD\node_modules\esbuild\lib\main.js:878:52
+    at buildResponseToResult (C:\FleetCmD\node_modules\esbuild\lib\main.js:924:7)
+    at C:\FleetCmD\node_modules\esbuild\lib\main.js:951:16
+    at responseCallbacks.<computed> (C:\FleetCmD\node_modules\esbuild\lib\main.js:603:9)
+    at handleIncomingPacket (C:\FleetCmD\node_modules\esbuild\lib\main.js:658:12)
+    at Socket.readFromStdout (C:\FleetCmD\node_modules\esbuild\lib\main.js:581:7)
+    at Socket.emit (node:events:508:28)
+    at addChunk (node:internal/streams/readable:559:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+PS C:\FleetCmD>

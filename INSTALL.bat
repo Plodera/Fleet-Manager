@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo   FleetCmD Quick Installer
+echo   FleetCmD Quick Installer for Windows
 echo ============================================
 echo.
 echo This will install FleetCmD on your Windows Server.
@@ -13,6 +13,19 @@ echo.
 echo Press any key to continue or CTRL+C to cancel...
 pause >nul
 
-powershell -ExecutionPolicy Bypass -File "%~dp0install-windows.ps1"
+echo.
+echo Step 1: Installing dependencies...
+call npm install
 
+echo.
+echo Step 2: Building for Windows Server...
+call node build-windows.js
+
+echo.
+echo ============================================
+echo   Build Complete!
+echo ============================================
+echo.
+echo To start the app, run START.bat
+echo.
 pause
