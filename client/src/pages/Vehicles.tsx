@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Car, Gauge, Calendar, Pencil, Image } from "lucide-react";
+import { Plus, Search, Car, Gauge, Calendar, Pencil, Image, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Vehicles() {
@@ -38,7 +38,9 @@ export default function Vehicles() {
       vin: "",
       currentMileage: 0,
       status: "available" as const,
-      imageUrl: ""
+      imageUrl: "",
+      category: "car" as const,
+      capacity: 5
     }
   });
 
@@ -61,7 +63,9 @@ export default function Vehicles() {
       vin: "",
       currentMileage: 0,
       status: "available" as const,
-      imageUrl: ""
+      imageUrl: "",
+      category: "car" as const,
+      capacity: 5
     }
   });
 
@@ -75,7 +79,9 @@ export default function Vehicles() {
         vin: editingVehicle.vin,
         currentMileage: editingVehicle.currentMileage,
         status: editingVehicle.status as any,
-        imageUrl: editingVehicle.imageUrl || ""
+        imageUrl: editingVehicle.imageUrl || "",
+        category: (editingVehicle as any).category || "car",
+        capacity: (editingVehicle as any).capacity || 5
       });
     }
   }, [editingVehicle, editForm]);
@@ -171,6 +177,35 @@ export default function Vehicles() {
                     <FormMessage />
                   </FormItem>
                 )} />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="category" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="car">Car (1-5 seats)</SelectItem>
+                          <SelectItem value="van">Van (6-14 seats)</SelectItem>
+                          <SelectItem value="bus">Bus (15+ seats)</SelectItem>
+                          <SelectItem value="truck">Truck</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="capacity" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Passenger Capacity</FormLabel>
+                      <FormControl><Input type="number" min="1" {...field} onChange={e => field.onChange(parseInt(e.target.value))} data-testid="input-capacity" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
 
                 <FormField control={form.control} name="status" render={({ field }) => (
                   <FormItem>
@@ -275,6 +310,35 @@ export default function Vehicles() {
                 </FormItem>
               )} />
 
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={editForm.control} name="category" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="car">Car (1-5 seats)</SelectItem>
+                        <SelectItem value="van">Van (6-14 seats)</SelectItem>
+                        <SelectItem value="bus">Bus (15+ seats)</SelectItem>
+                        <SelectItem value="truck">Truck</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="capacity" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Passenger Capacity</FormLabel>
+                    <FormControl><Input type="number" min="1" {...field} onChange={e => field.onChange(parseInt(e.target.value))} data-testid="input-edit-capacity" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
               <FormField control={editForm.control} name="status" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Status</FormLabel>
@@ -364,14 +428,18 @@ export default function Vehicles() {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                   <div className="flex items-center gap-1.5">
                     <Gauge className="w-4 h-4" />
                     <span>{vehicle.currentMileage.toLocaleString()} mi</span>
                   </div>
                   <div className="flex items-center gap-1.5">
+                    <Users className="w-4 h-4" />
+                    <span>{(vehicle as any).capacity || 5} seats</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
                     <Car className="w-4 h-4" />
-                    <span>{vehicle.vin.slice(-6)}</span>
+                    <span className="capitalize">{(vehicle as any).category || 'car'}</span>
                   </div>
                 </div>
               </CardContent>
