@@ -39,6 +39,8 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const vehicleCategoryEnum = pgEnum("vehicle_category", ["car", "van", "bus", "truck"]);
+
 export const vehicles = pgTable("vehicles", {
   id: serial("id").primaryKey(),
   make: text("make").notNull(),
@@ -49,6 +51,8 @@ export const vehicles = pgTable("vehicles", {
   status: vehicleStatusEnum("status").default("available").notNull(),
   currentMileage: integer("current_mileage").default(0).notNull(),
   imageUrl: text("image_url"),
+  category: vehicleCategoryEnum("category").default("car").notNull(),
+  capacity: integer("capacity").default(5).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -64,6 +68,10 @@ export const bookings = pgTable("bookings", {
   destination: text("destination"),
   mileage: integer("mileage").notNull(),
   cancellationReason: text("cancellation_reason"),
+  passengerCount: integer("passenger_count").default(1).notNull(),
+  shareAllowed: boolean("share_allowed").default(false).notNull(),
+  sharedTripId: integer("shared_trip_id"),
+  allocatedVehicleId: integer("allocated_vehicle_id").references(() => vehicles.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -110,6 +118,22 @@ export const departments = pgTable("departments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const sharedTripStatusEnum = pgEnum("shared_trip_status", ["open", "full", "completed", "cancelled"]);
+
+export const sharedTrips = pgTable("shared_trips", {
+  id: serial("id").primaryKey(),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id).notNull(),
+  approverId: integer("approver_id").references(() => users.id).notNull(),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  destination: text("destination"),
+  status: sharedTripStatusEnum("status").default("open").notNull(),
+  totalCapacity: integer("total_capacity").notNull(),
+  reservedSeats: integer("reserved_seats").default(0).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
@@ -151,11 +175,25 @@ export const insertBookingSchema = createInsertSchema(bookings)
     mileage: z.coerce.number(),
     startTime: z.coerce.date(),
     endTime: z.coerce.date(),
+    passengerCount: z.coerce.number().default(1),
+    shareAllowed: z.boolean().default(false),
+    sharedTripId: z.coerce.number().optional().nullable(),
+    allocatedVehicleId: z.coerce.number().optional().nullable(),
   });
 export const insertMaintenanceSchema = createInsertSchema(maintenanceRecords).omit({ id: true, createdAt: true });
 export const insertFuelSchema = createInsertSchema(fuelRecords).omit({ id: true, createdAt: true });
 export const insertEmailSettingsSchema = createInsertSchema(emailSettings).omit({ id: true, updatedAt: true });
 export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true });
+export const insertSharedTripSchema = createInsertSchema(sharedTrips)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    vehicleId: z.coerce.number(),
+    approverId: z.coerce.number(),
+    startTime: z.coerce.date(),
+    endTime: z.coerce.date(),
+    totalCapacity: z.coerce.number(),
+    reservedSeats: z.coerce.number().default(0),
+  });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -173,3 +211,5 @@ export type EmailSettings = typeof emailSettings.$inferSelect;
 export type InsertEmailSettings = z.infer<typeof insertEmailSettingsSchema>;
 export type Department = typeof departments.$inferSelect;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
+export type SharedTrip = typeof sharedTrips.$inferSelect;
+export type InsertSharedTrip = z.infer<typeof insertSharedTripSchema>;
