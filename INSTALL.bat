@@ -19,7 +19,7 @@ call npm install
 
 echo.
 echo Step 2: Building for Windows Server...
-call node build-windows.js
+call node build-windows.cjs
 
 echo.
 echo ============================================
