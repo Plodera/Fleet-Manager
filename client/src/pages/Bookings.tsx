@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useBookings } from "@/hooks/use-bookings";
 import { useVehicles } from "@/hooks/use-vehicles";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,7 +15,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 
 export default function Bookings() {
@@ -40,7 +41,9 @@ export default function Bookings() {
       purpose: "",
       destination: "",
       mileage: 0,
-      status: "pending"
+      status: "pending",
+      passengerCount: 1,
+      shareAllowed: false
     }
   });
 
@@ -85,6 +88,23 @@ export default function Bookings() {
 
   const selectedVehicleId = form.watch('vehicleId');
   const selectedVehicle = selectedVehicleId ? vehicles?.find(v => v.id === Number(selectedVehicleId)) : null;
+  const selectedVehicleCapacity = selectedVehicle ? (selectedVehicle as any).capacity || 5 : 5;
+
+  // Reset shareAllowed and validate passengerCount when vehicle changes
+  useEffect(() => {
+    const currentPassengerCount = form.getValues('passengerCount');
+    const currentShareAllowed = form.getValues('shareAllowed');
+    
+    // Reset sharing when switching to a smaller vehicle
+    if (selectedVehicleCapacity <= 5 && currentShareAllowed) {
+      form.setValue('shareAllowed', false);
+    }
+    
+    // Clamp passenger count to vehicle capacity
+    if (currentPassengerCount > selectedVehicleCapacity) {
+      form.setValue('passengerCount', selectedVehicleCapacity);
+    }
+  }, [selectedVehicleId, selectedVehicleCapacity, form]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -129,7 +149,7 @@ export default function Bookings() {
                       <SelectContent>
                         {availableVehicles?.map(v => (
                           <SelectItem key={v.id} value={String(v.id)}>
-                            {v.make} {v.model} ({v.licensePlate})
+                            {v.make} {v.model} ({v.licensePlate}) - {(v as any).capacity || 5} seats
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -197,6 +217,52 @@ export default function Bookings() {
                     <FormMessage />
                   </FormItem>
                 )} />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="passengerCount" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Number of Passengers</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="1"
+                          max={selectedVehicleCapacity}
+                          placeholder="1" 
+                          {...field}
+                          onChange={(e) => field.onChange(Math.min(parseInt(e.target.value) || 1, selectedVehicleCapacity))}
+                          data-testid="input-passenger-count"
+                        />
+                      </FormControl>
+                      {selectedVehicle && (
+                        <p className="text-xs text-muted-foreground">
+                          Vehicle capacity: {(selectedVehicle as any).capacity || 5} passengers
+                        </p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  
+                  {selectedVehicle && selectedVehicleCapacity > 5 && (
+                    <FormField control={form.control} name="shareAllowed" render={({ field }) => (
+                      <FormItem className="flex flex-col justify-end pb-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="shareAllowed" 
+                            checked={field.value} 
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-share-allowed"
+                          />
+                          <label htmlFor="shareAllowed" className="text-sm font-medium cursor-pointer">
+                            Allow car sharing
+                          </label>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Let approver combine trips with others going the same way
+                        </p>
+                      </FormItem>
+                    )} />
+                  )}
+                </div>
 
                 <FormField control={form.control} name="approverId" render={({ field }) => (
                   <FormItem>
@@ -298,6 +364,13 @@ export default function Bookings() {
                     <div className="flex items-center gap-1.5">
                       <MapPin className="w-4 h-4" />
                       <span>{booking.destination || "Local"}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Users className="w-4 h-4" />
+                      <span>{(booking as any).passengerCount || 1} passenger{((booking as any).passengerCount || 1) > 1 ? 's' : ''}</span>
+                      {(booking as any).shareAllowed && (
+                        <Badge variant="outline" className="text-xs ml-1">Shareable</Badge>
+                      )}
                     </div>
                     <div className="hidden sm:inline text-muted-foreground/50">|</div>
                     <div>Requested by: <span className="text-foreground font-medium">{booking.user.fullName}</span></div>
