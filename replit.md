@@ -39,4 +39,11 @@ When disabled, emails are logged to the console instead.
 - Password: admin123
 
 ## Deployment
-See `DEPLOYMENT_GUIDE.md` for step-by-step instructions to deploy on Windows Server 2022 with IIS and your own domain.
+- **Ubuntu (Recommended)**: See `UBUNTU_DEPLOYMENT.md` for Ubuntu Server deployment with PM2 and Nginx
+- **Windows**: See `DEPLOYMENT_GUIDE.md` for Windows Server 2022 with IIS (more complex)
+- **Replit**: Click "Deploy" button for instant cloud deployment
+
+## Database Driver
+The app auto-detects local PostgreSQL (localhost/127.0.0.1 in DATABASE_URL) and uses the appropriate driver:
+- Local PostgreSQL: Uses `pg` driver
+- Cloud/Neon: Uses `@neondatabase/serverless` driver
