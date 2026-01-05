@@ -59,7 +59,12 @@ app.use((req, res, next) => {
   next();
 });
 
+import { initDatabase } from "./db";
+
 (async () => {
+  // Initialize database first
+  await initDatabase();
+  
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

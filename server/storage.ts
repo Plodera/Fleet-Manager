@@ -5,7 +5,7 @@ import {
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
   type Department, type InsertDepartment
 } from "@shared/schema";
-import { db, pool } from "./db";
+import { getDb, getPool } from "./db";
 import { eq } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -57,18 +57,18 @@ export class DatabaseStorage implements IStorage {
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({
-      pool,
+      pool: getPool(),
       createTableIfMissing: true,
     });
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await getDb().select().from(users).where(eq(users.id, id));
     return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    const [user] = await getDb().select().from(users).where(eq(users.username, username));
     return user;
   }
 
@@ -77,45 +77,45 @@ export class DatabaseStorage implements IStorage {
       ...insertUser,
       permissions: insertUser.permissions ? JSON.stringify(insertUser.permissions) : JSON.stringify(["view_dashboard", "view_vehicles", "view_bookings"])
     };
-    const [user] = await db.insert(users).values(userToInsert as any).returning();
+    const [user] = await getDb().insert(users).values(userToInsert as any).returning();
     return user;
   }
 
   async updateUserRole(id: number, role: string): Promise<User> {
-    const [user] = await db.update(users).set({ role: role as any }).where(eq(users.id, id)).returning();
+    const [user] = await getDb().update(users).set({ role: role as any }).where(eq(users.id, id)).returning();
     return user;
   }
 
   async updateUserPermissions(id: number, permissions: string[]): Promise<User> {
-    const [user] = await db.update(users).set({ permissions: JSON.stringify(permissions) }).where(eq(users.id, id)).returning();
+    const [user] = await getDb().update(users).set({ permissions: JSON.stringify(permissions) }).where(eq(users.id, id)).returning();
     return user;
   }
 
   async getVehicles(): Promise<Vehicle[]> {
-    return await db.select().from(vehicles);
+    return await getDb().select().from(vehicles);
   }
 
   async getVehicle(id: number): Promise<Vehicle | undefined> {
-    const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, id));
+    const [vehicle] = await getDb().select().from(vehicles).where(eq(vehicles.id, id));
     return vehicle;
   }
 
   async createVehicle(insertVehicle: InsertVehicle): Promise<Vehicle> {
-    const [vehicle] = await db.insert(vehicles).values(insertVehicle).returning();
+    const [vehicle] = await getDb().insert(vehicles).values(insertVehicle).returning();
     return vehicle;
   }
 
   async updateVehicle(id: number, updates: Partial<InsertVehicle>): Promise<Vehicle> {
-    const [vehicle] = await db.update(vehicles).set(updates).where(eq(vehicles.id, id)).returning();
+    const [vehicle] = await getDb().update(vehicles).set(updates).where(eq(vehicles.id, id)).returning();
     return vehicle;
   }
 
   async deleteVehicle(id: number): Promise<void> {
-    await db.delete(vehicles).where(eq(vehicles.id, id));
+    await getDb().delete(vehicles).where(eq(vehicles.id, id));
   }
 
   async getBookings(): Promise<(Booking & { vehicle: Vehicle; user: User; approver?: User })[]> {
-    return await db.query.bookings.findMany({
+    return await getDb().query.bookings.findMany({
       with: {
         vehicle: true,
         user: true,
@@ -125,22 +125,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBooking(id: number): Promise<Booking | undefined> {
-    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
+    const [booking] = await getDb().select().from(bookings).where(eq(bookings.id, id));
     return booking;
   }
 
   async createBooking(insertBooking: InsertBooking): Promise<Booking> {
-    const [booking] = await db.insert(bookings).values(insertBooking).returning();
+    const [booking] = await getDb().insert(bookings).values(insertBooking).returning();
     return booking;
   }
 
   async updateBooking(id: number, updates: Partial<InsertBooking>): Promise<Booking> {
-    const [booking] = await db.update(bookings).set(updates).where(eq(bookings.id, id)).returning();
+    const [booking] = await getDb().update(bookings).set(updates).where(eq(bookings.id, id)).returning();
     return booking;
   }
 
   async getMaintenanceRecords(): Promise<(MaintenanceRecord & { vehicle: Vehicle })[]> {
-    return await db.query.maintenanceRecords.findMany({
+    return await getDb().query.maintenanceRecords.findMany({
       with: {
         vehicle: true,
       },
@@ -148,12 +148,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMaintenanceRecord(insertRecord: InsertMaintenance): Promise<MaintenanceRecord> {
-    const [record] = await db.insert(maintenanceRecords).values(insertRecord).returning();
+    const [record] = await getDb().insert(maintenanceRecords).values(insertRecord).returning();
     return record;
   }
 
   async getFuelRecords(): Promise<(FuelRecord & { vehicle: Vehicle })[]> {
-    return await db.query.fuelRecords.findMany({
+    return await getDb().query.fuelRecords.findMany({
       with: {
         vehicle: true,
       },
@@ -161,63 +161,103 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFuelRecord(insertRecord: InsertFuel): Promise<FuelRecord> {
-    const [record] = await db.insert(fuelRecords).values(insertRecord).returning();
+    const [record] = await getDb().insert(fuelRecords).values(insertRecord).returning();
     return record;
   }
 
   async getUsers(): Promise<User[]> {
-    return await db.select().from(users);
+    return await getDb().select().from(users);
   }
 
   async getApprovers(): Promise<User[]> {
-    return await db.select().from(users).where(eq(users.isApprover, true));
+    return await getDb().select().from(users).where(eq(users.isApprover, true));
   }
 
   async updateUserApprover(id: number, isApprover: boolean): Promise<User> {
-    const [user] = await db.update(users).set({ isApprover }).where(eq(users.id, id)).returning();
+    const [user] = await getDb().update(users).set({ isApprover }).where(eq(users.id, id)).returning();
     return user;
   }
 
   async updateUserPassword(id: number, password: string): Promise<void> {
-    await db.update(users).set({ password }).where(eq(users.id, id));
+    await getDb().update(users).set({ password }).where(eq(users.id, id));
   }
 
   async updateUserEmail(id: number, email: string): Promise<User | undefined> {
-    const [user] = await db.update(users).set({ email }).where(eq(users.id, id)).returning();
+    const [user] = await getDb().update(users).set({ email }).where(eq(users.id, id)).returning();
     return user;
   }
 
   async getEmailSettings(): Promise<EmailSettings | undefined> {
-    const [settings] = await db.select().from(emailSettings).limit(1);
+    const [settings] = await getDb().select().from(emailSettings).limit(1);
     return settings;
   }
 
   async upsertEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings> {
     const existing = await this.getEmailSettings();
     if (existing) {
-      const [updated] = await db.update(emailSettings)
+      const [updated] = await getDb().update(emailSettings)
         .set({ ...settings, updatedAt: new Date() })
         .where(eq(emailSettings.id, existing.id))
         .returning();
       return updated;
     } else {
-      const [created] = await db.insert(emailSettings).values(settings).returning();
+      const [created] = await getDb().insert(emailSettings).values(settings).returning();
       return created;
     }
   }
 
   async getDepartments(): Promise<Department[]> {
-    return await db.select().from(departments);
+    return await getDb().select().from(departments);
   }
 
   async createDepartment(dept: InsertDepartment): Promise<Department> {
-    const [department] = await db.insert(departments).values(dept).returning();
+    const [department] = await getDb().insert(departments).values(dept).returning();
     return department;
   }
 
   async deleteDepartment(id: number): Promise<void> {
-    await db.delete(departments).where(eq(departments.id, id));
+    await getDb().delete(departments).where(eq(departments.id, id));
   }
 }
 
-export const storage = new DatabaseStorage();
+let _storage: DatabaseStorage | null = null;
+
+export function getStorage(): DatabaseStorage {
+  if (!_storage) {
+    _storage = new DatabaseStorage();
+  }
+  return _storage;
+}
+
+export const storage = {
+  get instance() { return getStorage(); },
+  getUser: (...args: Parameters<DatabaseStorage['getUser']>) => getStorage().getUser(...args),
+  getUserByUsername: (...args: Parameters<DatabaseStorage['getUserByUsername']>) => getStorage().getUserByUsername(...args),
+  createUser: (...args: Parameters<DatabaseStorage['createUser']>) => getStorage().createUser(...args),
+  getVehicles: () => getStorage().getVehicles(),
+  getVehicle: (...args: Parameters<DatabaseStorage['getVehicle']>) => getStorage().getVehicle(...args),
+  createVehicle: (...args: Parameters<DatabaseStorage['createVehicle']>) => getStorage().createVehicle(...args),
+  updateVehicle: (...args: Parameters<DatabaseStorage['updateVehicle']>) => getStorage().updateVehicle(...args),
+  deleteVehicle: (...args: Parameters<DatabaseStorage['deleteVehicle']>) => getStorage().deleteVehicle(...args),
+  getBookings: () => getStorage().getBookings(),
+  getBooking: (...args: Parameters<DatabaseStorage['getBooking']>) => getStorage().getBooking(...args),
+  createBooking: (...args: Parameters<DatabaseStorage['createBooking']>) => getStorage().createBooking(...args),
+  updateBooking: (...args: Parameters<DatabaseStorage['updateBooking']>) => getStorage().updateBooking(...args),
+  getMaintenanceRecords: () => getStorage().getMaintenanceRecords(),
+  createMaintenanceRecord: (...args: Parameters<DatabaseStorage['createMaintenanceRecord']>) => getStorage().createMaintenanceRecord(...args),
+  getFuelRecords: () => getStorage().getFuelRecords(),
+  createFuelRecord: (...args: Parameters<DatabaseStorage['createFuelRecord']>) => getStorage().createFuelRecord(...args),
+  getUsers: () => getStorage().getUsers(),
+  getApprovers: () => getStorage().getApprovers(),
+  updateUserRole: (...args: Parameters<DatabaseStorage['updateUserRole']>) => getStorage().updateUserRole(...args),
+  updateUserPermissions: (...args: Parameters<DatabaseStorage['updateUserPermissions']>) => getStorage().updateUserPermissions(...args),
+  updateUserApprover: (...args: Parameters<DatabaseStorage['updateUserApprover']>) => getStorage().updateUserApprover(...args),
+  updateUserPassword: (...args: Parameters<DatabaseStorage['updateUserPassword']>) => getStorage().updateUserPassword(...args),
+  updateUserEmail: (...args: Parameters<DatabaseStorage['updateUserEmail']>) => getStorage().updateUserEmail(...args),
+  getEmailSettings: () => getStorage().getEmailSettings(),
+  upsertEmailSettings: (...args: Parameters<DatabaseStorage['upsertEmailSettings']>) => getStorage().upsertEmailSettings(...args),
+  getDepartments: () => getStorage().getDepartments(),
+  createDepartment: (...args: Parameters<DatabaseStorage['createDepartment']>) => getStorage().createDepartment(...args),
+  deleteDepartment: (...args: Parameters<DatabaseStorage['deleteDepartment']>) => getStorage().deleteDepartment(...args),
+  get sessionStore() { return getStorage().sessionStore; },
+};
