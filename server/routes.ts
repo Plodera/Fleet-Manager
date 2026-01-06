@@ -17,6 +17,19 @@ async function hashPassword(password: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 
+// Helper to check if user has a specific permission
+function hasPermission(user: User, permission: string): boolean {
+  if (user.role === 'admin') return true;
+  try {
+    const permissions = typeof user.permissions === 'string' 
+      ? JSON.parse(user.permissions) 
+      : user.permissions;
+    return Array.isArray(permissions) && permissions.includes(permission);
+  } catch {
+    return false;
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -212,6 +225,11 @@ export async function registerRoutes(
 
   // Maintenance
   app.get(api.maintenance.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!hasPermission(user, 'view_maintenance')) {
+      return res.status(403).json({ message: "Access denied: missing view_maintenance permission" });
+    }
     const records = await storage.getMaintenanceRecords();
     res.json(records);
   });
@@ -232,6 +250,11 @@ export async function registerRoutes(
 
   // Fuel
   app.get(api.fuel.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!hasPermission(user, 'view_fuel')) {
+      return res.status(403).json({ message: "Access denied: missing view_fuel permission" });
+    }
     const records = await storage.getFuelRecords();
     res.json(records);
   });

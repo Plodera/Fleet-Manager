@@ -23,18 +23,41 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
 
-  const links = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/vehicles", label: "Vehicles", icon: Car },
-    { href: "/bookings", label: "Bookings", icon: CalendarDays },
-    { href: "/maintenance", label: "Maintenance", icon: Wrench },
-    { href: "/fuel", label: "Fuel Log", icon: Fuel },
-    { href: "/reports", label: "Reports", icon: FileText },
-    ...(user?.role === "admin" ? [
-      { href: "/users", label: "Users", icon: Users },
-      { href: "/settings", label: "Settings", icon: Settings }
-    ] : []),
+  // Parse user permissions from JSON string
+  const userPermissions: string[] = (() => {
+    if (!user?.permissions) return [];
+    if (Array.isArray(user.permissions)) return user.permissions;
+    try {
+      return JSON.parse(user.permissions as string);
+    } catch {
+      return [];
+    }
+  })();
+
+  // Check if user has a specific permission (admins have all permissions)
+  const hasPermission = (permission: string) => {
+    if (user?.role === "admin") return true;
+    return userPermissions.includes(permission);
+  };
+
+  const allLinks = [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard, permission: "view_dashboard" },
+    { href: "/vehicles", label: "Vehicles", icon: Car, permission: "view_vehicles" },
+    { href: "/bookings", label: "Bookings", icon: CalendarDays, permission: "view_bookings" },
+    { href: "/maintenance", label: "Maintenance", icon: Wrench, permission: "view_maintenance" },
+    { href: "/fuel", label: "Fuel Log", icon: Fuel, permission: "view_fuel" },
+    { href: "/reports", label: "Reports", icon: FileText, permission: "view_reports" },
+    { href: "/users", label: "Users", icon: Users, permission: "admin_only" },
+    { href: "/settings", label: "Settings", icon: Settings, permission: "admin_only" },
   ];
+
+  // Filter links based on permissions
+  const links = allLinks.filter(link => {
+    if (link.permission === "admin_only") {
+      return user?.role === "admin";
+    }
+    return hasPermission(link.permission);
+  });
 
   const NavContent = () => (
     <div className="flex flex-col h-full">

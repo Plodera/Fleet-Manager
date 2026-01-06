@@ -18,12 +18,29 @@ import Reports from "@/pages/Reports";
 import Auth from "@/pages/Auth";
 import NotFound from "@/pages/not-found";
 
-function PrivateRoute({ component: Component, adminOnly = false }: { component: React.ComponentType, adminOnly?: boolean }) {
+function PrivateRoute({ component: Component, adminOnly = false, requiredPermission }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return <div className="flex h-screen items-center justify-center text-primary">Loading...</div>;
   if (!user) return <Redirect to="/auth" />;
   if (adminOnly && user.role !== 'admin') return <Redirect to="/" />;
+  
+  // Check required permission (admins bypass permission checks)
+  if (requiredPermission && user.role !== 'admin') {
+    const userPermissions: string[] = (() => {
+      if (!user.permissions) return [];
+      if (Array.isArray(user.permissions)) return user.permissions;
+      try {
+        return JSON.parse(user.permissions as string);
+      } catch {
+        return [];
+      }
+    })();
+    
+    if (!userPermissions.includes(requiredPermission)) {
+      return <Redirect to="/" />;
+    }
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -43,19 +60,19 @@ function Router() {
       <Route path="/auth" component={Auth} />
       
       <Route path="/">
-        <PrivateRoute component={Dashboard} />
+        <PrivateRoute component={Dashboard} requiredPermission="view_dashboard" />
       </Route>
       <Route path="/vehicles">
-        <PrivateRoute component={Vehicles} />
+        <PrivateRoute component={Vehicles} requiredPermission="view_vehicles" />
       </Route>
       <Route path="/bookings">
-        <PrivateRoute component={Bookings} />
+        <PrivateRoute component={Bookings} requiredPermission="view_bookings" />
       </Route>
       <Route path="/maintenance">
-        <PrivateRoute component={Maintenance} />
+        <PrivateRoute component={Maintenance} requiredPermission="view_maintenance" />
       </Route>
       <Route path="/fuel">
-        <PrivateRoute component={Fuel} />
+        <PrivateRoute component={Fuel} requiredPermission="view_fuel" />
       </Route>
       <Route path="/users">
         <PrivateRoute component={Users} adminOnly />
@@ -64,7 +81,7 @@ function Router() {
         <PrivateRoute component={Settings} adminOnly />
       </Route>
       <Route path="/reports">
-        <PrivateRoute component={Reports} />
+        <PrivateRoute component={Reports} requiredPermission="view_reports" />
       </Route>
       
       <Route component={NotFound} />
