@@ -36,9 +36,11 @@ export interface IStorage {
   
   getUsers(): Promise<User[]>;
   getApprovers(): Promise<User[]>;
+  getDrivers(): Promise<User[]>;
   updateUserRole(id: number, role: string): Promise<User>;
   updateUserPermissions(id: number, permissions: string[]): Promise<User>;
   updateUserApprover(id: number, isApprover: boolean): Promise<User>;
+  updateUserDriver(id: number, isDriver: boolean): Promise<User>;
   updateUserPassword(id: number, password: string): Promise<void>;
   updateUserEmail(id: number, email: string): Promise<User | undefined>;
   updateUserProfile(id: number, data: { username?: string; fullName?: string }): Promise<User | undefined>;
@@ -175,8 +177,17 @@ export class DatabaseStorage implements IStorage {
     return await getDb().select().from(users).where(eq(users.isApprover, true));
   }
 
+  async getDrivers(): Promise<User[]> {
+    return await getDb().select().from(users).where(eq(users.isDriver, true));
+  }
+
   async updateUserApprover(id: number, isApprover: boolean): Promise<User> {
     const [user] = await getDb().update(users).set({ isApprover }).where(eq(users.id, id)).returning();
+    return user;
+  }
+
+  async updateUserDriver(id: number, isDriver: boolean): Promise<User> {
+    const [user] = await getDb().update(users).set({ isDriver }).where(eq(users.id, id)).returning();
     return user;
   }
 
@@ -264,9 +275,11 @@ export const storage = {
   createFuelRecord: (...args: Parameters<DatabaseStorage['createFuelRecord']>) => getStorage().createFuelRecord(...args),
   getUsers: () => getStorage().getUsers(),
   getApprovers: () => getStorage().getApprovers(),
+  getDrivers: () => getStorage().getDrivers(),
   updateUserRole: (...args: Parameters<DatabaseStorage['updateUserRole']>) => getStorage().updateUserRole(...args),
   updateUserPermissions: (...args: Parameters<DatabaseStorage['updateUserPermissions']>) => getStorage().updateUserPermissions(...args),
   updateUserApprover: (...args: Parameters<DatabaseStorage['updateUserApprover']>) => getStorage().updateUserApprover(...args),
+  updateUserDriver: (...args: Parameters<DatabaseStorage['updateUserDriver']>) => getStorage().updateUserDriver(...args),
   updateUserPassword: (...args: Parameters<DatabaseStorage['updateUserPassword']>) => getStorage().updateUserPassword(...args),
   updateUserEmail: (...args: Parameters<DatabaseStorage['updateUserEmail']>) => getStorage().updateUserEmail(...args),
   updateUserProfile: (...args: Parameters<DatabaseStorage['updateUserProfile']>) => getStorage().updateUserProfile(...args),

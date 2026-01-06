@@ -95,6 +95,26 @@ export function useUsers() {
     },
   });
 
+  const updateDriverMutation = useMutation({
+    mutationFn: async ({ userId, isDriver }: { userId: number; isDriver: boolean }) => {
+      const res = await fetch(api.users.updateDriver.path.replace(":id", String(userId)), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isDriver }),
+      });
+      if (!res.ok) throw new Error("Failed to update user driver status");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/drivers"] });
+      toast({ title: "Driver status updated", description: "User driver status has been changed" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to update driver status", description: error.message, variant: "destructive" });
+    },
+  });
+
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ userId, password }: { userId: number; password: string }) => {
       const res = await fetch(api.users.updatePassword.path.replace(":id", String(userId)), {
@@ -190,6 +210,8 @@ export function useUsers() {
     isUpdatingPermissions: updatePermissionsMutation.isPending,
     updateApprover: updateApproverMutation.mutate,
     isUpdatingApprover: updateApproverMutation.isPending,
+    updateDriver: updateDriverMutation.mutate,
+    isUpdatingDriver: updateDriverMutation.isPending,
     updatePassword: updatePasswordMutation.mutate,
     isUpdatingPassword: updatePasswordMutation.isPending,
     updateEmail: updateEmailMutation.mutate,

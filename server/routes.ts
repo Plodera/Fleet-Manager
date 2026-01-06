@@ -314,6 +314,19 @@ export async function registerRoutes(
     }
   });
 
+  app.put(api.users.updateDriver.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.users.updateDriver.input.parse(req.body);
+      const updatedUser = await storage.updateUserDriver(Number(req.params.id), input.isDriver);
+      res.json(updatedUser);
+    } catch (err) {
+      res.status(404).json({ message: "User not found" });
+    }
+  });
+
   // Update user password (admin only)
   app.put(api.users.updatePassword.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
@@ -402,6 +415,13 @@ export async function registerRoutes(
   app.get(api.approvers.list.path, async (req, res) => {
     const approvers = await storage.getApprovers();
     res.json(approvers);
+  });
+
+  // Drivers
+  app.get(api.drivers.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const drivers = await storage.getDrivers();
+    res.json(drivers);
   });
 
   // Departments

@@ -173,6 +173,15 @@ export const api = {
       },
     },
   },
+  drivers: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/drivers',
+      responses: {
+        200: z.array(z.custom<typeof users.$inferSelect>()),
+      },
+    },
+  },
   maintenance: {
     list: {
       method: 'GET' as const,
@@ -248,6 +257,15 @@ export const api = {
       method: 'PUT' as const,
       path: '/api/users/:id/approver',
       input: z.object({ isApprover: z.boolean() }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    updateDriver: {
+      method: 'PUT' as const,
+      path: '/api/users/:id/driver',
+      input: z.object({ isDriver: z.boolean() }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
         404: errorSchemas.notFound,

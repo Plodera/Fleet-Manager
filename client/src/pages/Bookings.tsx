@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
@@ -42,6 +42,15 @@ export default function Bookings() {
     },
   });
 
+  const { data: drivers } = useQuery({
+    queryKey: [api.drivers.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.drivers.list.path);
+      if (!res.ok) throw new Error("Failed to fetch drivers");
+      return api.drivers.list.responses[200].parse(await res.json());
+    },
+  });
+
   const availableVehicles = vehicles?.filter(v => v.status === "available");
 
   const form = useForm({
@@ -50,6 +59,7 @@ export default function Bookings() {
       userId: user?.id,
       vehicleId: undefined,
       approverId: undefined,
+      driveType: "self" as "self" | "driver",
       startTime: "",
       endTime: "",
       purpose: "",
@@ -305,6 +315,44 @@ export default function Bookings() {
                   )}
                 </div>
 
+                <FormField control={form.control} name="driveType" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Drive Type</FormLabel>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="driveType"
+                          value="self"
+                          checked={field.value === "self"}
+                          onChange={() => field.onChange("self")}
+                          className="w-4 h-4"
+                          data-testid="radio-self-driven"
+                        />
+                        <span className="text-sm">Self-driven</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="driveType"
+                          value="driver"
+                          checked={field.value === "driver"}
+                          onChange={() => field.onChange("driver")}
+                          className="w-4 h-4"
+                          data-testid="radio-with-driver"
+                        />
+                        <span className="text-sm">With assigned driver</span>
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {field.value === "self" 
+                        ? "You will drive the vehicle yourself" 
+                        : "A driver will be assigned when approved"}
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
                 <FormField control={form.control} name="approverId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Approver (Required)</FormLabel>
@@ -394,28 +442,45 @@ export default function Bookings() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Assign Driver (Optional)</label>
-              <Select 
-                value={selectedDriverId ? String(selectedDriverId) : "none"} 
-                onValueChange={(val) => setSelectedDriverId(val === "none" ? null : Number(val))}
-              >
-                <SelectTrigger data-testid="select-driver">
-                  <SelectValue placeholder="Select a driver" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No driver assigned</SelectItem>
-                  {users?.filter(u => u.role === 'staff' || u.role === 'admin').map(u => (
-                    <SelectItem key={u.id} value={String(u.id)}>
-                      {u.fullName} ({u.username})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Driver can mark the trip as completed when finished
-              </p>
-            </div>
+            {approvingBooking && (
+              <div className="bg-muted p-3 rounded-md">
+                <p className="text-sm">
+                  <span className="font-medium">Drive Type:</span>{" "}
+                  {(approvingBooking as any).driveType === "driver" ? "With assigned driver" : "Self-driven"}
+                </p>
+              </div>
+            )}
+            {approvingBooking && (approvingBooking as any).driveType === "driver" && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Assign Driver <span className="text-destructive">*</span>
+                </label>
+                <Select 
+                  value={selectedDriverId ? String(selectedDriverId) : "none"} 
+                  onValueChange={(val) => setSelectedDriverId(val === "none" ? null : Number(val))}
+                >
+                  <SelectTrigger data-testid="select-driver">
+                    <SelectValue placeholder="Select a driver" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Select a driver...</SelectItem>
+                    {drivers?.map(d => (
+                      <SelectItem key={d.id} value={String(d.id)}>
+                        {d.fullName} ({d.username})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Driver will be notified and can mark the trip as completed
+                </p>
+                {(!drivers || drivers.length === 0) && (
+                  <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                    No drivers available. Mark users as drivers in the Users page.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setApprovalDialogOpen(false)} data-testid="button-approval-dialog-close">
@@ -423,7 +488,7 @@ export default function Bookings() {
             </Button>
             <Button 
               onClick={handleConfirmApproval}
-              disabled={updateBookingStatus.isPending}
+              disabled={updateBookingStatus.isPending || (approvingBooking && (approvingBooking as any).driveType === "driver" && !selectedDriverId)}
               className="bg-green-600 hover:bg-green-700"
               data-testid="button-confirm-approval"
             >
@@ -467,6 +532,10 @@ export default function Bookings() {
                       {(booking as any).shareAllowed && (
                         <Badge variant="outline" className="text-xs ml-1">Shareable</Badge>
                       )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <UserIcon className="w-4 h-4" />
+                      <span>{(booking as any).driveType === "driver" ? "With driver" : "Self-driven"}</span>
                     </div>
                     <div className="hidden sm:inline text-muted-foreground/50">|</div>
                     <div>Requested by: <span className="text-foreground font-medium">{booking.user.fullName}</span></div>

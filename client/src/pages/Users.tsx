@@ -19,7 +19,7 @@ import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Ma
 import { useToast } from "@/hooks/use-toast";
 
 export default function Users() {
-  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser, updateProfile, isUpdatingProfile } = useUsers();
+  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updateDriver, isUpdatingDriver, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser, updateProfile, isUpdatingProfile } = useUsers();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -255,6 +255,7 @@ export default function Users() {
                 <TableHead>Role</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Approver</TableHead>
+                <TableHead>Driver</TableHead>
                 <TableHead>Permissions</TableHead>
                 {currentUser?.role === 'admin' && <TableHead>Actions</TableHead>}
               </TableRow>
@@ -262,7 +263,7 @@ export default function Users() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={currentUser?.role === 'admin' ? 8 : 7} className="h-24 text-center">Loading...</TableCell>
+                  <TableCell colSpan={currentUser?.role === 'admin' ? 9 : 8} className="h-24 text-center">Loading...</TableCell>
                 </TableRow>
               ) : users?.map((user) => {
                 const userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions || [];
@@ -306,6 +307,30 @@ export default function Users() {
                         <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
                           <CheckCircle className="w-3 h-3 mr-1" />
                           Approver
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {currentUser?.role === 'admin' ? (
+                      <Button
+                        size="sm"
+                        variant={(user as any).isDriver ? "default" : "outline"}
+                        onClick={() => updateDriver({ userId: user.id, isDriver: !(user as any).isDriver })}
+                        disabled={isUpdatingDriver}
+                        data-testid={`button-toggle-driver-${user.id}`}
+                        className={(user as any).isDriver ? "" : "border-muted-foreground/30"}
+                      >
+                        <User className="w-4 h-4 mr-1" />
+                        {(user as any).isDriver ? "Driver" : "Not Set"}
+                      </Button>
+                    ) : (
+                      (user as any).isDriver ? (
+                        <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">
+                          <User className="w-3 h-3 mr-1" />
+                          Driver
                         </Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">-</span>
