@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useVehicles } from "@/hooks/use-vehicles";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -17,6 +18,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Vehicles() {
   const { vehicles, isLoading, createVehicle, updateVehicle, deleteVehicle } = useVehicles();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -116,6 +119,7 @@ export default function Vehicles() {
           <p className="text-muted-foreground mt-1">Manage vehicles, track status, and view history.</p>
         </div>
         
+        {isAdmin && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
@@ -248,6 +252,7 @@ export default function Vehicles() {
             </Form>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
@@ -443,6 +448,7 @@ export default function Vehicles() {
                   </div>
                 </div>
               </CardContent>
+              {isAdmin && (
               <CardFooter className="p-6 pt-0 flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => {
                   if(confirm("Delete this vehicle?")) deleteVehicle.mutate(vehicle.id);
@@ -453,6 +459,7 @@ export default function Vehicles() {
                   <Pencil className="w-4 h-4 mr-2" /> Edit
                 </Button>
               </CardFooter>
+              )}
             </Card>
           ))}
           

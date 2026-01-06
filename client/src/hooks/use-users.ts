@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type InsertUser } from "@shared/routes";
+import { api } from "@shared/routes";
+import type { InsertUser } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export function useUsers() {
@@ -137,6 +138,25 @@ export function useUsers() {
     },
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await fetch(api.users.delete.path.replace(":id", String(userId)), {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to delete user");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      toast({ title: "User deleted", description: "User has been removed successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to delete user", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     users,
     isLoading,
@@ -152,5 +172,7 @@ export function useUsers() {
     isUpdatingPassword: updatePasswordMutation.isPending,
     updateEmail: updateEmailMutation.mutate,
     isUpdatingEmail: updateEmailMutation.isPending,
+    deleteUser: deleteUserMutation.mutate,
+    isDeletingUser: deleteUserMutation.isPending,
   };
 }

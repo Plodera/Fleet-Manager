@@ -122,7 +122,7 @@ export default function Dashboard() {
                 <CardDescription className="mt-1">Top 5 vehicles by fuel expense</CardDescription>
               </div>
               <Badge variant="secondary" className="font-mono">
-                ${totalFuelCost.toFixed(0)} total
+                Kz {totalFuelCost.toFixed(0)} total
               </Badge>
             </div>
           </CardHeader>
@@ -144,7 +144,7 @@ export default function Dashboard() {
                       tickLine={false} 
                       axisLine={false}
                       tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                      tickFormatter={(value) => `$${value}`}
+                      tickFormatter={(value) => `Kz ${value}`}
                     />
                     <Tooltip 
                       contentStyle={{ 
@@ -153,7 +153,7 @@ export default function Dashboard() {
                         backgroundColor: 'hsl(var(--card))',
                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' 
                       }}
-                      formatter={(value: number) => [`$${value.toFixed(2)}`, 'Cost']}
+                      formatter={(value: number) => [`Kz ${value.toFixed(2)}`, 'Cost']}
                     />
                     <Bar 
                       dataKey="cost" 

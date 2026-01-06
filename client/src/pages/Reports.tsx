@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { 
   FileText, Car, CalendarDays, Fuel, Wrench, TrendingUp, 
-  DollarSign, Activity, MapPin, Users
+  Activity, MapPin, Users
 } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
@@ -159,11 +159,11 @@ export default function Reports() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-blue-500" />
+                <Fuel className="w-5 h-5 text-blue-500" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Fuel Cost</p>
-                <p className="text-lg font-bold" data-testid="text-total-fuel-cost">${totalFuelCost.toFixed(2)}</p>
+                <p className="text-lg font-bold" data-testid="text-total-fuel-cost">Kz {totalFuelCost.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -176,7 +176,7 @@ export default function Reports() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Maintenance Cost</p>
-                <p className="text-lg font-bold" data-testid="text-total-maintenance-cost">${totalMaintenanceCost.toFixed(2)}</p>
+                <p className="text-lg font-bold" data-testid="text-total-maintenance-cost">Kz {totalMaintenanceCost.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -561,7 +561,7 @@ export default function Reports() {
                     <CardDescription>Top vehicles by fuel expense</CardDescription>
                   </div>
                   <Badge variant="secondary" className="font-mono">
-                    ${totalFuelCost.toFixed(0)} total
+                    Kz {totalFuelCost.toFixed(0)} total
                   </Badge>
                 </div>
               </CardHeader>
@@ -583,7 +583,7 @@ export default function Reports() {
                           tickLine={false} 
                           axisLine={false}
                           tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                          tickFormatter={(value) => `$${value}`}
+                          tickFormatter={(value) => `Kz ${value}`}
                         />
                         <Tooltip 
                           contentStyle={{ 
@@ -592,7 +592,7 @@ export default function Reports() {
                             backgroundColor: 'hsl(var(--card))',
                             boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' 
                           }}
-                          formatter={(value: number) => [`$${value.toFixed(2)}`, 'Cost']}
+                          formatter={(value: number) => [`Kz ${value.toFixed(2)}`, 'Cost']}
                         />
                         <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} />
                       </BarChart>
@@ -618,7 +618,7 @@ export default function Reports() {
                     <CardDescription>Costs breakdown by service type</CardDescription>
                   </div>
                   <Badge variant="secondary" className="font-mono">
-                    ${totalMaintenanceCost.toFixed(0)} total
+                    Kz {totalMaintenanceCost.toFixed(0)} total
                   </Badge>
                 </div>
               </CardHeader>
@@ -642,7 +642,7 @@ export default function Reports() {
                               <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Cost']} />
+                          <Tooltip formatter={(value: number) => [`Kz ${value.toFixed(2)}`, 'Cost']} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>

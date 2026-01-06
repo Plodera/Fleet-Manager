@@ -41,6 +41,7 @@ export interface IStorage {
   updateUserApprover(id: number, isApprover: boolean): Promise<User>;
   updateUserPassword(id: number, password: string): Promise<void>;
   updateUserEmail(id: number, email: string): Promise<User | undefined>;
+  deleteUser(id: number): Promise<void>;
 
   getEmailSettings(): Promise<EmailSettings | undefined>;
   upsertEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings>;
@@ -187,6 +188,10 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async deleteUser(id: number): Promise<void> {
+    await getDb().delete(users).where(eq(users.id, id));
+  }
+
   async getEmailSettings(): Promise<EmailSettings | undefined> {
     const [settings] = await getDb().select().from(emailSettings).limit(1);
     return settings;
@@ -254,6 +259,7 @@ export const storage = {
   updateUserApprover: (...args: Parameters<DatabaseStorage['updateUserApprover']>) => getStorage().updateUserApprover(...args),
   updateUserPassword: (...args: Parameters<DatabaseStorage['updateUserPassword']>) => getStorage().updateUserPassword(...args),
   updateUserEmail: (...args: Parameters<DatabaseStorage['updateUserEmail']>) => getStorage().updateUserEmail(...args),
+  deleteUser: (...args: Parameters<DatabaseStorage['deleteUser']>) => getStorage().deleteUser(...args),
   getEmailSettings: () => getStorage().getEmailSettings(),
   upsertEmailSettings: (...args: Parameters<DatabaseStorage['upsertEmailSettings']>) => getStorage().upsertEmailSettings(...args),
   getDepartments: () => getStorage().getDepartments(),

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { sendBookingNotification, sendBookingStatusUpdate } from "./email";
+import type { User } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
 
@@ -36,6 +37,8 @@ export async function registerRoutes(
 
   app.post(api.vehicles.create.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
     try {
       const input = api.vehicles.create.input.parse(req.body);
       const vehicle = await storage.createVehicle(input);
@@ -50,6 +53,8 @@ export async function registerRoutes(
 
   app.put(api.vehicles.update.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
     try {
       const input = api.vehicles.update.input.parse(req.body);
       const vehicle = await storage.updateVehicle(Number(req.params.id), input);
@@ -64,6 +69,8 @@ export async function registerRoutes(
 
   app.delete(api.vehicles.delete.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
     await storage.deleteVehicle(Number(req.params.id));
     res.sendStatus(204);
   });
@@ -297,6 +304,19 @@ export async function registerRoutes(
       }
       res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  // Delete user (admin only)
+  app.delete(api.users.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    const userId = Number(req.params.id);
+    if (userId === user.id) {
+      return res.status(400).json({ message: "Cannot delete your own account" });
+    }
+    await storage.deleteUser(userId);
+    res.sendStatus(204);
   });
 
   // Approvers

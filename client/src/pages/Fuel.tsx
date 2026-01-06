@@ -105,14 +105,14 @@ export default function Fuel() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="gallons" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Gallons</FormLabel>
+                      <FormLabel>Litres</FormLabel>
                       <FormControl><Input type="number" step="0.1" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="pricePerGallon" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Price/Gal ($)</FormLabel>
+                      <FormLabel>Price/L (Kz)</FormLabel>
                       <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -122,7 +122,7 @@ export default function Fuel() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="totalCost" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Total Cost ($)</FormLabel>
+                      <FormLabel>Total Cost (Kz)</FormLabel>
                       <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -151,8 +151,8 @@ export default function Fuel() {
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Vehicle</TableHead>
-              <TableHead>Gallons</TableHead>
-              <TableHead>Price/Gal</TableHead>
+              <TableHead>Litres</TableHead>
+              <TableHead>Price/L</TableHead>
               <TableHead>Odometer</TableHead>
               <TableHead className="text-right">Total Cost</TableHead>
             </TableRow>
@@ -171,10 +171,10 @@ export default function Fuel() {
                     <span className="text-xs text-muted-foreground">{record.vehicle.licensePlate}</span>
                   </div>
                 </TableCell>
-                <TableCell>{Number(record.gallons).toFixed(1)}</TableCell>
-                <TableCell>${Number(record.pricePerGallon).toFixed(2)}</TableCell>
+                <TableCell>{Number(record.gallons).toFixed(1)} L</TableCell>
+                <TableCell>Kz {Number(record.pricePerGallon).toFixed(2)}</TableCell>
                 <TableCell>{record.mileage.toLocaleString()}</TableCell>
-                <TableCell className="text-right font-medium text-foreground">${Number(record.totalCost).toFixed(2)}</TableCell>
+                <TableCell className="text-right font-medium text-foreground">Kz {Number(record.totalCost).toFixed(2)}</TableCell>
               </TableRow>
             ))}
             {records?.length === 0 && (

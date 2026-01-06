@@ -19,7 +19,7 @@ import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Ma
 import { useToast } from "@/hooks/use-toast";
 
 export default function Users() {
-  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail } = useUsers();
+  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser } = useUsers();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -499,6 +499,22 @@ export default function Users() {
                                 </div>
                               </DialogContent>
                             </Dialog>
+                            {user.id !== currentUser?.id && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete ${user.fullName}? This action cannot be undone.`)) {
+                                    deleteUser(user.id);
+                                  }
+                                }}
+                                disabled={isDeletingUser}
+                                data-testid={`button-delete-user-${user.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </>
                         )}
                       </div>
