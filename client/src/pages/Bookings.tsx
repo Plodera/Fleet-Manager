@@ -141,7 +141,7 @@ export default function Bookings() {
   const selectedVehicle = selectedVehicleId ? vehicles?.find(v => v.id === Number(selectedVehicleId)) : null;
   const selectedVehicleCapacity = selectedVehicle ? (selectedVehicle as any).capacity || 5 : 5;
 
-  // Reset shareAllowed and validate passengerCount when vehicle changes
+  // Reset shareAllowed, validate passengerCount, and set odometer when vehicle changes
   useEffect(() => {
     const currentPassengerCount = form.getValues('passengerCount');
     const currentShareAllowed = form.getValues('shareAllowed');
@@ -155,7 +155,12 @@ export default function Bookings() {
     if (currentPassengerCount > selectedVehicleCapacity) {
       form.setValue('passengerCount', selectedVehicleCapacity);
     }
-  }, [selectedVehicleId, selectedVehicleCapacity, form]);
+    
+    // Auto-fill odometer reading with vehicle's current mileage
+    if (selectedVehicle && selectedVehicle.currentMileage) {
+      form.setValue('mileage', selectedVehicle.currentMileage);
+    }
+  }, [selectedVehicleId, selectedVehicleCapacity, selectedVehicle, form]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
