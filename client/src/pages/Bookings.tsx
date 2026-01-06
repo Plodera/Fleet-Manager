@@ -228,8 +228,8 @@ export default function Bookings() {
                       <Input 
                         type="number" 
                         placeholder="Enter current odometer reading" 
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseInt(e.target.value, 10))}
                         data-testid="input-mileage"
                       />
                     </FormControl>
