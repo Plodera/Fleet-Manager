@@ -24,6 +24,7 @@ export const AVAILABLE_PERMISSIONS = [
 export const roleEnum = pgEnum("role", ["admin", "staff", "customer"]);
 export const vehicleStatusEnum = pgEnum("vehicle_status", ["available", "rented", "maintenance"]);
 export const bookingStatusEnum = pgEnum("booking_status", ["pending", "approved", "rejected", "completed", "cancelled"]);
+export const driveTypeEnum = pgEnum("drive_type", ["self", "driver"]);
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -34,8 +35,9 @@ export const users = pgTable("users", {
   email: text("email"),
   licenseNumber: text("license_number"),
   department: text("department"),
-  permissions: text("permissions").default('["view_dashboard","view_vehicles","view_bookings"]').notNull(), // JSON array stored as text
+  permissions: text("permissions").default('["view_dashboard","view_vehicles","view_bookings"]').notNull(),
   isApprover: boolean("is_approver").default(false).notNull(),
+  isDriver: boolean("is_driver").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -62,6 +64,7 @@ export const bookings = pgTable("bookings", {
   userId: integer("user_id").references(() => users.id).notNull(),
   approverId: integer("approver_id").references(() => users.id),
   driverId: integer("driver_id").references(() => users.id),
+  driveType: driveTypeEnum("drive_type").default("self").notNull(),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
   status: bookingStatusEnum("status").default("pending").notNull(),
@@ -174,6 +177,7 @@ export const insertBookingSchema = createInsertSchema(bookings)
     userId: z.coerce.number(),
     approverId: z.coerce.number().optional(),
     driverId: z.coerce.number().optional().nullable(),
+    driveType: z.enum(["self", "driver"]).default("self"),
     mileage: z.coerce.number(),
     startTime: z.coerce.date(),
     endTime: z.coerce.date(),
