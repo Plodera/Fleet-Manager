@@ -15,18 +15,32 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@shared/routes";
 
 export default function Bookings() {
-  const { bookings, isLoading, createBooking, updateBookingStatus, approvers } = useBookings();
+  const { bookings, isLoading, createBooking, updateBookingStatus, endTrip, approvers } = useBookings();
   const { vehicles } = useVehicles();
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelBookingId, setCancelBookingId] = useState<number | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [approvalBookingId, setApprovalBookingId] = useState<number | null>(null);
+  const [selectedDriverId, setSelectedDriverId] = useState<number | null>(null);
+
+  const { data: users } = useQuery({
+    queryKey: [api.users.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.users.list.path);
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return api.users.list.responses[200].parse(await res.json());
+    },
+  });
 
   const availableVehicles = vehicles?.filter(v => v.status === "available");
 
@@ -85,6 +99,33 @@ export default function Bookings() {
       );
     }
   };
+
+  const handleApproveClick = (bookingId: number) => {
+    setApprovalBookingId(bookingId);
+    setSelectedDriverId(null);
+    setApprovalDialogOpen(true);
+  };
+
+  const handleConfirmApproval = () => {
+    if (approvalBookingId) {
+      updateBookingStatus.mutate(
+        { id: approvalBookingId, status: 'approved', driverId: selectedDriverId },
+        {
+          onSuccess: () => {
+            setApprovalDialogOpen(false);
+            setApprovalBookingId(null);
+            setSelectedDriverId(null);
+          }
+        }
+      );
+    }
+  };
+
+  const handleEndTrip = (bookingId: number) => {
+    endTrip.mutate(bookingId);
+  };
+
+  const approvingBooking = bookings?.find(b => b.id === approvalBookingId);
 
   const selectedVehicleId = form.watch('vehicleId');
   const selectedVehicle = selectedVehicleId ? vehicles?.find(v => v.id === Number(selectedVehicleId)) : null;
@@ -337,6 +378,61 @@ export default function Bookings() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Check className="w-5 h-5 text-green-500" />
+              Approve Booking
+            </DialogTitle>
+            <DialogDescription>
+              {approvingBooking && (
+                <span>
+                  Approving booking for {approvingBooking.vehicle.make} {approvingBooking.vehicle.model}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Assign Driver (Optional)</label>
+              <Select 
+                value={selectedDriverId ? String(selectedDriverId) : "none"} 
+                onValueChange={(val) => setSelectedDriverId(val === "none" ? null : Number(val))}
+              >
+                <SelectTrigger data-testid="select-driver">
+                  <SelectValue placeholder="Select a driver" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No driver assigned</SelectItem>
+                  {users?.filter(u => u.role === 'staff' || u.role === 'admin').map(u => (
+                    <SelectItem key={u.id} value={String(u.id)}>
+                      {u.fullName} ({u.username})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Driver can mark the trip as completed when finished
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApprovalDialogOpen(false)} data-testid="button-approval-dialog-close">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfirmApproval}
+              disabled={updateBookingStatus.isPending}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="button-confirm-approval"
+            >
+              {updateBookingStatus.isPending ? "Approving..." : "Approve Booking"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-4">
         {isLoading ? (
           <div className="space-y-4">
@@ -380,6 +476,17 @@ export default function Bookings() {
                         <div>Approver: <span className="text-foreground font-medium">{booking.approver.fullName}</span></div>
                       </>
                     )}
+                    {(booking as any).driverId && users && (
+                      <>
+                        <div className="hidden sm:inline text-muted-foreground/50">|</div>
+                        <div className="flex items-center gap-1.5">
+                          <Car className="w-4 h-4" />
+                          Driver: <span className="text-foreground font-medium">
+                            {users.find(u => u.id === (booking as any).driverId)?.fullName || 'Unknown'}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                   {booking.status === 'cancelled' && booking.cancellationReason && (
                     <div className="mt-2 p-2 rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
@@ -397,7 +504,7 @@ export default function Bookings() {
                     size="sm" 
                     variant="outline" 
                     className="border-green-200 text-green-700"
-                    onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'approved' })}
+                    onClick={() => handleApproveClick(booking.id)}
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-approve-booking-${booking.id}`}
                   >
@@ -434,33 +541,46 @@ export default function Bookings() {
               )}
 
               {booking.status === 'approved' && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                  <span className="text-sm font-medium text-green-700 dark:text-green-300">Approved</span>
-                </div>
-              )}
-              
-              {booking.status === 'approved' && (booking.approverId === user?.id || user?.role === 'admin') && (
-                <div className="flex gap-2 flex-wrap">
-                  <Button 
-                    size="sm"
-                    variant="outline"
-                    onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'pending' })}
-                    disabled={updateBookingStatus.isPending}
-                    data-testid={`button-revert-pending-booking-${booking.id}`}
-                  >
-                    Set Pending
-                  </Button>
-                  <Button 
-                    size="sm"
-                    variant="outline"
-                    className="border-orange-200 text-orange-700"
-                    onClick={() => handleCancelClick(booking.id)}
-                    disabled={updateBookingStatus.isPending}
-                    data-testid={`button-cancel-approved-booking-${booking.id}`}
-                  >
-                    <Ban className="w-4 h-4 mr-1" /> Cancel
-                  </Button>
+                <div className="flex gap-2 flex-wrap items-center">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                    <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="text-sm font-medium text-green-700 dark:text-green-300">In Progress</span>
+                  </div>
+                  {((booking as any).driverId === user?.id || booking.approverId === user?.id || user?.role === 'admin') && (
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-200 text-blue-700"
+                      onClick={() => handleEndTrip(booking.id)}
+                      disabled={endTrip.isPending}
+                      data-testid={`button-end-trip-${booking.id}`}
+                    >
+                      <Flag className="w-4 h-4 mr-1" /> End Trip
+                    </Button>
+                  )}
+                  {(booking.approverId === user?.id || user?.role === 'admin') && (
+                    <>
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateBookingStatus.mutate({ id: booking.id, status: 'pending' })}
+                        disabled={updateBookingStatus.isPending}
+                        data-testid={`button-revert-pending-booking-${booking.id}`}
+                      >
+                        Set Pending
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        className="border-orange-200 text-orange-700"
+                        onClick={() => handleCancelClick(booking.id)}
+                        disabled={updateBookingStatus.isPending}
+                        data-testid={`button-cancel-approved-booking-${booking.id}`}
+                      >
+                        <Ban className="w-4 h-4 mr-1" /> Cancel
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
 

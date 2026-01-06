@@ -144,8 +144,19 @@ export const api = {
       path: '/api/bookings/:id/status',
       input: z.object({ 
         status: z.enum(['pending', 'approved', 'rejected', 'completed', 'cancelled']),
-        cancellationReason: z.string().optional()
+        cancellationReason: z.string().optional(),
+        driverId: z.number().optional().nullable()
       }),
+      responses: {
+        200: z.custom<typeof bookings.$inferSelect>(),
+        404: errorSchemas.notFound,
+        401: errorSchemas.unauthorized,
+      },
+    },
+    endTrip: {
+      method: 'PUT' as const,
+      path: '/api/bookings/:id/end-trip',
+      input: z.object({}),
       responses: {
         200: z.custom<typeof bookings.$inferSelect>(),
         404: errorSchemas.notFound,

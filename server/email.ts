@@ -82,13 +82,15 @@ export async function sendBookingStatusUpdate(
   requester: User,
   booking: Booking,
   vehicle: Vehicle,
-  status: "approved" | "rejected" | "pending",
+  status: "approved" | "rejected" | "pending" | "completed" | "cancelled",
   approver: User
 ): Promise<void> {
-  const statusMessages = {
+  const statusMessages: Record<string, string> = {
     approved: "has been APPROVED",
     rejected: "has been REJECTED",
-    pending: "is still PENDING"
+    pending: "is still PENDING",
+    completed: "has been marked as COMPLETED",
+    cancelled: "has been CANCELLED"
   };
 
   const emailContent: EmailContent = {

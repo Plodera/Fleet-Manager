@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type InsertBooking } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
+import { type InsertBooking } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
@@ -51,10 +52,11 @@ export function useBookings() {
   });
 
   const updateBookingStatus = useMutation({
-    mutationFn: async ({ id, status, cancellationReason }: { id: number, status: 'approved' | 'rejected' | 'pending' | 'cancelled' | 'completed', cancellationReason?: string }) => {
+    mutationFn: async ({ id, status, cancellationReason, driverId }: { id: number, status: 'approved' | 'rejected' | 'pending' | 'cancelled' | 'completed', cancellationReason?: string, driverId?: number | null }) => {
       const url = buildUrl(api.bookings.updateStatus.path, { id });
-      const body: { status: string; cancellationReason?: string } = { status };
+      const body: { status: string; cancellationReason?: string; driverId?: number | null } = { status };
       if (cancellationReason) body.cancellationReason = cancellationReason;
+      if (driverId !== undefined) body.driverId = driverId;
       const res = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -83,6 +85,30 @@ export function useBookings() {
     },
   });
 
+  const endTrip = useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.bookings.endTrip.path, { id });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to end trip");
+      }
+      return api.bookings.endTrip.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] });
+      toast({ title: "Trip ended", description: "Vehicle is now available for booking" });
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const { data: approvers } = useQuery({
     queryKey: [api.approvers.list.path],
     queryFn: async () => {
@@ -97,6 +123,7 @@ export function useBookings() {
     isLoading,
     createBooking,
     updateBookingStatus,
+    endTrip,
     approvers,
   };
 }

@@ -140,13 +140,21 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Only the assigned approver can change booking status" });
       }
       
-      const updateData: { status: string; cancellationReason?: string | null } = { status: input.status };
+      const updateData: { status: 'pending' | 'approved' | 'rejected' | 'completed' | 'cancelled'; cancellationReason?: string | null; driverId?: number | null } = { status: input.status };
       if (input.status === 'cancelled' && input.cancellationReason) {
         updateData.cancellationReason = input.cancellationReason;
       } else if (input.status !== 'cancelled') {
         updateData.cancellationReason = null;
       }
+      if (input.status === 'approved' && input.driverId !== undefined) {
+        updateData.driverId = input.driverId;
+      }
       const booking = await storage.updateBooking(bookingId, updateData);
+      
+      // If approved, update vehicle status to rented
+      if (input.status === 'approved') {
+        await storage.updateVehicle(existingBooking.vehicleId, { status: 'rented' });
+      }
       
       // Send email notification to requester about status change
       const requester = await storage.getUser(existingBooking.userId);
@@ -160,6 +168,44 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
+      throw err;
+    }
+  });
+
+  // End trip - driver or approver can complete the trip
+  app.put(api.bookings.endTrip.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const currentUser = req.user as User;
+    
+    try {
+      const bookingId = Number(req.params.id);
+      const existingBooking = await storage.getBooking(bookingId);
+      
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // Only the assigned driver, approver, or admin can end the trip
+      const isDriver = existingBooking.driverId === currentUser.id;
+      const isApprover = existingBooking.approverId === currentUser.id;
+      const isAdmin = currentUser.role === 'admin';
+      
+      if (!isDriver && !isApprover && !isAdmin) {
+        return res.status(401).json({ message: "Only the assigned driver or approver can end this trip" });
+      }
+      
+      if (existingBooking.status !== 'approved') {
+        return res.status(400).json({ message: "Only approved bookings can be marked as completed" });
+      }
+      
+      // Update booking status to completed
+      const booking = await storage.updateBooking(bookingId, { status: 'completed' });
+      
+      // Update vehicle status back to available
+      await storage.updateVehicle(existingBooking.vehicleId, { status: 'available' });
+      
+      res.json(booking);
+    } catch (err) {
       throw err;
     }
   });
