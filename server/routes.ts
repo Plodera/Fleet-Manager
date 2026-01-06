@@ -217,6 +217,13 @@ export async function registerRoutes(
       // Update vehicle status back to available
       await storage.updateVehicle(existingBooking.vehicleId, { status: 'available' });
       
+      // Send email notification to requester about trip completion
+      const requester = await storage.getUser(existingBooking.userId);
+      const vehicle = await storage.getVehicle(existingBooking.vehicleId);
+      if (requester && vehicle) {
+        await sendBookingStatusUpdate(requester, booking, vehicle, 'completed', currentUser);
+      }
+      
       res.json(booking);
     } catch (err) {
       throw err;
