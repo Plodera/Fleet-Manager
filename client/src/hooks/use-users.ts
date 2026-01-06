@@ -157,6 +157,28 @@ export function useUsers() {
     },
   });
 
+  const updateProfileMutation = useMutation({
+    mutationFn: async ({ userId, username, fullName }: { userId: number; username?: string; fullName?: string }) => {
+      const res = await fetch(api.users.updateProfile.path.replace(":id", String(userId)), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, fullName }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update profile");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      toast({ title: "Profile updated", description: "User profile has been updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to update profile", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     users,
     isLoading,
@@ -174,5 +196,7 @@ export function useUsers() {
     isUpdatingEmail: updateEmailMutation.isPending,
     deleteUser: deleteUserMutation.mutate,
     isDeletingUser: deleteUserMutation.isPending,
+    updateProfile: updateProfileMutation.mutate,
+    isUpdatingProfile: updateProfileMutation.isPending,
   };
 }

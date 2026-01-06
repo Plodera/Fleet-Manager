@@ -306,6 +306,32 @@ export async function registerRoutes(
     }
   });
 
+  // Update user profile (username/fullName - admin only)
+  app.put(api.users.updateProfile.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.users.updateProfile.input.parse(req.body);
+      if (input.username) {
+        const existingUser = await storage.getUserByUsername(input.username);
+        if (existingUser && existingUser.id !== Number(req.params.id)) {
+          return res.status(400).json({ message: "Username already taken" });
+        }
+      }
+      const updatedUser = await storage.updateUserProfile(Number(req.params.id), input);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(updatedUser);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Delete user (admin only)
   app.delete(api.users.delete.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

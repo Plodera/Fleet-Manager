@@ -260,6 +260,19 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    updateProfile: {
+      method: 'PUT' as const,
+      path: '/api/users/:id/profile',
+      input: z.object({ 
+        username: z.string().min(3, "Username must be at least 3 characters").optional(),
+        fullName: z.string().min(2, "Full name must be at least 2 characters").optional()
+      }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
     delete: {
       method: 'DELETE' as const,
       path: '/api/users/:id',

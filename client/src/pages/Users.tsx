@@ -15,11 +15,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, AVAILABLE_PERMISSIONS, type Department } from "@shared/schema";
-import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail, Building2, Trash2, Plus } from "lucide-react";
+import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail, Building2, Trash2, Plus, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Users() {
-  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser } = useUsers();
+  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser, updateProfile, isUpdatingProfile } = useUsers();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -32,6 +32,9 @@ export default function Users() {
   const [isDeptDialogOpen, setIsDeptDialogOpen] = useState(false);
   const [newDeptName, setNewDeptName] = useState("");
   const [newDeptDesc, setNewDeptDesc] = useState("");
+  const [editProfileUserId, setEditProfileUserId] = useState<number | null>(null);
+  const [editUsername, setEditUsername] = useState("");
+  const [editFullName, setEditFullName] = useState("");
 
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["/api/departments"],
@@ -376,6 +379,75 @@ export default function Users() {
                           </Select>
                         ) : (
                           <>
+                            <Dialog open={editProfileUserId === user.id} onOpenChange={(open) => {
+                              if (!open) {
+                                setEditProfileUserId(null);
+                                setEditUsername("");
+                                setEditFullName("");
+                              }
+                            }}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditProfileUserId(user.id);
+                                    setEditUsername(user.username);
+                                    setEditFullName(user.fullName);
+                                  }}
+                                  disabled={isUpdatingProfile}
+                                  data-testid={`button-edit-profile-${user.id}`}
+                                >
+                                  <User className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Edit Profile for {user.fullName}</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <label className="text-sm font-medium">Full Name</label>
+                                    <Input
+                                      placeholder="John Doe"
+                                      value={editFullName}
+                                      onChange={(e) => setEditFullName(e.target.value)}
+                                      data-testid={`input-edit-fullname-${user.id}`}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-medium">Username</label>
+                                    <Input
+                                      placeholder="johndoe"
+                                      value={editUsername}
+                                      onChange={(e) => setEditUsername(e.target.value)}
+                                      data-testid={`input-edit-username-${user.id}`}
+                                    />
+                                  </div>
+                                  <Button
+                                    onClick={() => {
+                                      const hasChanges = editUsername !== user.username || editFullName !== user.fullName;
+                                      if (!hasChanges) return;
+                                      updateProfile({ 
+                                        userId: user.id, 
+                                        username: editUsername !== user.username ? editUsername : undefined,
+                                        fullName: editFullName !== user.fullName ? editFullName : undefined
+                                      }, {
+                                        onSuccess: () => {
+                                          setEditProfileUserId(null);
+                                          setEditUsername("");
+                                          setEditFullName("");
+                                        }
+                                      });
+                                    }}
+                                    disabled={(editUsername === user.username && editFullName === user.fullName) || isUpdatingProfile}
+                                    data-testid={`button-confirm-profile-${user.id}`}
+                                  >
+                                    {isUpdatingProfile ? "Updating..." : "Update Profile"}
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
                             <Button
                               size="sm"
                               variant="ghost"

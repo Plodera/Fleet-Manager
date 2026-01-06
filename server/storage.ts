@@ -41,6 +41,7 @@ export interface IStorage {
   updateUserApprover(id: number, isApprover: boolean): Promise<User>;
   updateUserPassword(id: number, password: string): Promise<void>;
   updateUserEmail(id: number, email: string): Promise<User | undefined>;
+  updateUserProfile(id: number, data: { username?: string; fullName?: string }): Promise<User | undefined>;
   deleteUser(id: number): Promise<void>;
 
   getEmailSettings(): Promise<EmailSettings | undefined>;
@@ -188,6 +189,15 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserProfile(id: number, data: { username?: string; fullName?: string }): Promise<User | undefined> {
+    const updateData: Partial<{ username: string; fullName: string }> = {};
+    if (data.username) updateData.username = data.username;
+    if (data.fullName) updateData.fullName = data.fullName;
+    if (Object.keys(updateData).length === 0) return this.getUser(id);
+    const [user] = await getDb().update(users).set(updateData).where(eq(users.id, id)).returning();
+    return user;
+  }
+
   async deleteUser(id: number): Promise<void> {
     await getDb().delete(users).where(eq(users.id, id));
   }
@@ -259,6 +269,7 @@ export const storage = {
   updateUserApprover: (...args: Parameters<DatabaseStorage['updateUserApprover']>) => getStorage().updateUserApprover(...args),
   updateUserPassword: (...args: Parameters<DatabaseStorage['updateUserPassword']>) => getStorage().updateUserPassword(...args),
   updateUserEmail: (...args: Parameters<DatabaseStorage['updateUserEmail']>) => getStorage().updateUserEmail(...args),
+  updateUserProfile: (...args: Parameters<DatabaseStorage['updateUserProfile']>) => getStorage().updateUserProfile(...args),
   deleteUser: (...args: Parameters<DatabaseStorage['deleteUser']>) => getStorage().deleteUser(...args),
   getEmailSettings: () => getStorage().getEmailSettings(),
   upsertEmailSettings: (...args: Parameters<DatabaseStorage['upsertEmailSettings']>) => getStorage().upsertEmailSettings(...args),
