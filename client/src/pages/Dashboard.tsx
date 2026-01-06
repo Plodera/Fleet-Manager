@@ -177,7 +177,7 @@ export default function Dashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Activity className="w-4 h-4 text-primary" />
-              Fleet Status
+              Vehicle Status
             </CardTitle>
             <CardDescription>Current vehicle distribution</CardDescription>
           </CardHeader>

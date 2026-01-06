@@ -25,7 +25,7 @@ export function Sidebar() {
 
   const links = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/vehicles", label: "Fleet", icon: Car },
+    { href: "/vehicles", label: "Vehicles", icon: Car },
     { href: "/bookings", label: "Bookings", icon: CalendarDays },
     { href: "/maintenance", label: "Maintenance", icon: Wrench },
     { href: "/fuel", label: "Fuel Log", icon: Fuel },
