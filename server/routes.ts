@@ -341,8 +341,15 @@ export async function registerRoutes(
     if (userId === user.id) {
       return res.status(400).json({ message: "Cannot delete your own account" });
     }
-    await storage.deleteUser(userId);
-    res.sendStatus(204);
+    try {
+      await storage.deleteUser(userId);
+      res.sendStatus(204);
+    } catch (err: any) {
+      if (err.code === '23503') {
+        return res.status(400).json({ message: "Cannot delete user with existing bookings. Please reassign or delete their bookings first." });
+      }
+      throw err;
+    }
   });
 
   // Approvers
