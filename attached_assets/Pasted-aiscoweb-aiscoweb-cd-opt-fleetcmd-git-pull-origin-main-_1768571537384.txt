@@ -1,0 +1,68 @@
+aiscoweb@aiscoweb:~$ cd /opt/fleetcmd
+git pull origin main
+npm run build
+pm2 restart fleetcmd
+remote: Enumerating objects: 73, done.
+remote: Counting objects: 100% (73/73), done.
+remote: Compressing objects: 100% (14/14), done.
+remote: Total 56 (delta 42), reused 56 (delta 42), pack-reused 0 (from 0)
+Unpacking objects: 100% (56/56), 555.64 KiB | 622.00 KiB/s, done.
+From https://github.com/Plodera/Fleet-Manager
+ * branch            main       -> FETCH_HEAD
+   5cdaaf3..2308928  main       -> origin/main
+Updating 5cdaaf3..2308928
+Fast-forward
+ ...leetcmd-Check-current-git-sta_1768568077035.txt |  80 ++++
+ ...erver-on-socket-var-run-postg_1768567475053.txt |  44 ++
+ attached_assets/image_1767742485625.png            | Bin 0 -> 49315 bytes
+ attached_assets/image_1767742921788.png            | Bin 0 -> 101176 bytes
+ attached_assets/image_1768567803455.png            | Bin 0 -> 147770 bytes
+ attached_assets/image_1768567934369.png            | Bin 0 -> 27550 bytes
+ client/src/App.tsx                                 |   4 +
+ client/src/components/Sidebar.tsx                  |   4 +-
+ client/src/pages/Dashboard.tsx                     |  17 +-
+ client/src/pages/Reports.tsx                       |   5 +-
+ client/src/pages/SharedRides.tsx                   | 461 +++++++++++++++++++++
+ client/src/pages/Vehicles.tsx                      |  53 ++-
+ server/routes.ts                                   | 171 +++++++-
+ server/storage.ts                                  |  64 ++-
+ shared/routes.ts                                   |  52 ++-
+ shared/schema.ts                                   |   2 +-
+ 16 files changed, 923 insertions(+), 34 deletions(-)
+ create mode 100644 attached_assets/Pasted-aiscoweb-aiscoweb-cd-opt-fleetcmd-Check-current-git-sta_1768568077035.txt
+ create mode 100644 attached_assets/Pasted-psql-error-connection-to-server-on-socket-var-run-postg_1768567475053.txt
+ create mode 100644 attached_assets/image_1767742485625.png
+ create mode 100644 attached_assets/image_1767742921788.png
+ create mode 100644 attached_assets/image_1768567803455.png
+ create mode 100644 attached_assets/image_1768567934369.png
+ create mode 100644 client/src/pages/SharedRides.tsx
+
+> rest-express@1.0.0 build
+> tsx script/build.ts
+
+building client...
+vite v7.3.0 building client environment for production...
+✓ 2765 modules transformed.
+../dist/public/index.html                     2.06 kB │ gzip:   0.80 kB
+../dist/public/assets/index-CaGb3svb.css     76.59 kB │ gzip:  12.52 kB
+../dist/public/assets/index-D8viMfq6.js   1,042.96 kB │ gzip: 290.55 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 9.22s
+building server...
+
+  dist/index.cjs  1.4mb ⚠️
+
+⚡ Done in 135ms
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [fleetcmd](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 6    │ online    │ 0%       │ 18.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+aiscoweb@aiscoweb:/opt/fleetcmd$ 

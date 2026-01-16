@@ -80,7 +80,7 @@ export default function SharedRides() {
 
   const joinTrip = useMutation({
     mutationFn: async (data: { tripId: number; passengerCount: number; purpose: string }) => {
-      return apiRequest(`/api/shared-trips/${data.tripId}/join`, "POST", {
+      return apiRequest("POST", `/api/shared-trips/${data.tripId}/join`, {
         passengerCount: data.passengerCount,
         purpose: data.purpose,
       });
@@ -99,7 +99,7 @@ export default function SharedRides() {
   const createTrip = useMutation({
     mutationFn: async (data: any) => {
       // Only send fields the user controls - server derives capacity/approver/etc
-      return apiRequest(api.sharedTrips.create.path, "POST", {
+      return apiRequest("POST", api.sharedTrips.create.path, {
         vehicleId: data.vehicleId,
         startTime: new Date(data.startTime).toISOString(),
         endTime: new Date(data.endTime).toISOString(),
