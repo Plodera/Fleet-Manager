@@ -1,0 +1,44 @@
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "aiscoweb" does not exist
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "aiscoweb" does not exist
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  role "aiscoweb" does not exist
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [fleetcmd](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 2    │ online    │ 0%       │ 18.5mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 20 lines for [fleetcmd] process (change the value with --lines option)
+/home/aiscoweb/.pm2/logs/fleetcmd-error.log last 20 lines:
+0|fleetcmd | }
+0|fleetcmd | 
+0|fleetcmd | Node.js v20.19.6
+0|fleetcmd | node:internal/url:1487
+0|fleetcmd |     throw new ERR_INVALID_ARG_TYPE('path', ['string', 'URL'], path);
+0|fleetcmd |     ^
+0|fleetcmd | 
+0|fleetcmd | TypeError [ERR_INVALID_ARG_TYPE]: The "path" argument must be of type string or an instance of URL. Received undefined
+0|fleetcmd |     at fileURLToPath (node:internal/url:1487:11)
+0|fleetcmd |     at Object.<anonymous> (/opt/fleetcmd/dist/index.cjs:171:18793)
+0|fleetcmd |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+0|fleetcmd |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+0|fleetcmd |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+0|fleetcmd |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+0|fleetcmd |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+0|fleetcmd |     at node:internal/main/run_main_module:28:49 {
+0|fleetcmd |   code: 'ERR_INVALID_ARG_TYPE'
+0|fleetcmd | }
+0|fleetcmd | 
+0|fleetcmd | Node.js v20.19.6
+
+/home/aiscoweb/.pm2/logs/fleetcmd-out.log last 20 lines:
+0|fleetcmd | isApprover":false,"isDriver":false,"createdAt":"2026-01-06T08:58:37.866Z"},"approver":{"id":2,"username":"Pothula","password":"@1234","role":"staff","fullName":"Venu","email":"csclo@aisco.com.co","licenseNumber":"","department":"Procurement","permissions":"[\"view_dashboard\",\"view_vehicles\",\"view_bookings\",\"view_fuel\",\"view_maintenance\"]","isApprover":true,"isDriver":false,"createdAt":"2026-01-06T08:18:04.888Z"}},{"id":2,"vehicleId":3,"userId":1,"approverId":2,"driverId":null,"driveType":"self","startTime":"2026-01-07T19:00:00.000Z","endTime":"2026-01-07T21:00:00.000Z","status":"cancelled","purpose":"Meeting","destination":"Luanda","mileage":44552555,"cancellationReason":"no","passengerCount":5,"shareAllowed":false,"sharedTripId":null,"allocatedVehicleId":null,"createdAt":"2026-01-06T20:40:45.218Z","vehicle":{"id":3,"make":"Changan","model":"","year":2026,"licensePlate":"","vin":"","status":"available","currentMileage":0,"imageUrl":"https://inchcapelatam.sirv.com/Changan_pe/Grand-van-turismo/GRANDVANTURISMOBlanco.jpg","category":"van","capacity":5,"createdAt":"2026-01-06T08:23:41.074Z"},"user":{"id":1,"username":"admin","password":"865bc2a7770640ad76abf0667cd50cb7434ee34b1e134587bc71630bda94c4e01b707d3665b25dc84ee8e5bf04491a6b5c042bf7bda7b3b0a613c631a9780072.95dd6f5ca491aaefd409e2441ced439e","role":"admin","fullName":"Admin User","email":null,"licenseNumber":null,"department":"Management","permissions":"[\"view_dashboard\",\"view_vehicles\",\"view_bookings\",\"view_maintenance\",\"view_fuel\",\"manage_users\"]","isApprover":false,"isDriver":false,"createdAt":"2026-01-05T22:03:53.753Z"},"approver":{"id":2,"username":"Pothula","password":"@1234","role":"staff","fullName":"Venu","email":"csclo@aisco.com.co","licenseNumber":"","department":"Procurement","permissions":"[\"view_dashboard\",\"view_vehicles\",\"view_bookings\",\"view_fuel\",\"view_maintenance\"]","isApprover":true,"isDriver":false,"createdAt":"2026-01-06T08:18:04.888Z"}},{"id":4,"vehicleId":3,"userId":6,"approverId":2,"driverId":null,"driveType":"driver","startTime":"2026-01-08T11:31:00.000Z","endTime":"2026-01-08T17:31:00.000Z","status":"pending","purpose":"Deliver","destination":"Luanda","mileage":5242125,"cancellationReason":null,"passengerCount":1,"shareAllowed":false,"sharedTripId":null,"allocatedVehicleId":null,"createdAt":"2026-01-08T12:32:10.755Z","vehicle":{"id":3,"make":"Changan","model":"","year":2026,"licensePlate":"","vin":"","status":"available","currentMileage":0,"imageUrl":"https://inchcapelatam.sirv.com/Changan_pe/Grand-van-turismo/GRANDVANTURISMOBlanco.jpg","category":"van","capacity":5,"createdAt":"2026-01-06T08:23:41.074Z"},"user":{"id":6,"username":"jpaul","password":"@1234","role":"staff","fullName":"jpaul","email":"itmanager@aisco.com.co","licenseNumber":"","department":"ICT","permissions":"[\"view_dashboard\",\"view_vehicles\",\"view_bookings\"]","isApprover":false,"isDriver":false,"createdAt":"2026-01-08T12:29:50.103Z"},"approver":{"id":2,"username":"Pothula","password":"@1234","role":"staff","fullName":"Venu","email":"csclo@aisco.com.co","licenseNumber":"","department":"Procurement","permissions":"[\"view_dashboard\",\"view_vehicles\",\"view_bookings\",\"view_fuel\",\"view_maintenance\"]","isApprover":true,"isDriver":false,"createdAt":"2026-01-06T08:18:04.888Z"}}]
+0|fleetcmd | 1:32:20 PM [express] PUT /api/vehicles/3 200 in 50ms :: {"id":3,"make":"Changan","model":"","year":2026,"licensePlate":"","vin":"","status":"available","currentMileage":0,"imageUrl":"https://inchcapelatam.sirv.com/Changan_pe/Grand-van-turismo/GRANDVANTURISMOBlanco.jpg","category":"van","capacity":12,"createdAt":"2026-01-06T08:23:41.074Z"}
+0|fleetcmd | 1:32:20 PM [express] GET /api/vehicles 200 in 31ms :: [{"id":3,"make":"Changan","model":"","year":2026,"licensePlate":"","vin":"","status":"available","currentMileage":0,"imageUrl":"https://inchcapelatam.sirv.com/Changan_pe/Grand-van-turismo/GRANDVANTURISMOBlanco.jpg","category":"van","capacity":12,"createdAt":"2026-01-06T08:23:41.074Z"}]
+
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | 1:42:47 PM [express] serving on port 5000
+
