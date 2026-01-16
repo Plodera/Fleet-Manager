@@ -25,7 +25,7 @@ const joinTripSchema = z.object({
 });
 
 const createTripSchema = z.object({
-  vehicleId: z.coerce.number(),
+  vehicleId: z.coerce.number().positive("Vehicle is required"),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
   destination: z.string().min(1, "Destination is required"),
