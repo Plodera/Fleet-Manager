@@ -10,6 +10,7 @@ import { Sidebar } from "@/components/Sidebar";
 import Dashboard from "@/pages/Dashboard";
 import Vehicles from "@/pages/Vehicles";
 import Bookings from "@/pages/Bookings";
+import SharedRides from "@/pages/SharedRides";
 import Maintenance from "@/pages/Maintenance";
 import Fuel from "@/pages/Fuel";
 import Users from "@/pages/Users";
@@ -67,6 +68,9 @@ function Router() {
       </Route>
       <Route path="/bookings">
         <PrivateRoute component={Bookings} requiredPermission="view_bookings" />
+      </Route>
+      <Route path="/shared-rides">
+        <PrivateRoute component={SharedRides} requiredPermission="view_bookings" />
       </Route>
       <Route path="/maintenance">
         <PrivateRoute component={Maintenance} requiredPermission="view_maintenance" />

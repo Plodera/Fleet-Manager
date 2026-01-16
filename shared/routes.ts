@@ -6,12 +6,14 @@ import {
   insertMaintenanceSchema, 
   insertFuelSchema,
   insertDepartmentSchema,
+  insertSharedTripSchema,
   users,
   vehicles,
   bookings,
   maintenanceRecords,
   fuelRecords,
-  departments
+  departments,
+  sharedTrips
 } from './schema';
 
 export const errorSchemas = {
@@ -333,6 +335,54 @@ export const api = {
       path: '/api/departments/:id',
       responses: {
         204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  sharedTrips: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/shared-trips',
+      responses: {
+        200: z.array(z.custom<typeof sharedTrips.$inferSelect & { vehicle: typeof vehicles.$inferSelect; approver: typeof users.$inferSelect; passengers: Array<{ booking: typeof bookings.$inferSelect; user: typeof users.$inferSelect }> }>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/shared-trips/:id',
+      responses: {
+        200: z.custom<typeof sharedTrips.$inferSelect & { vehicle: typeof vehicles.$inferSelect; approver: typeof users.$inferSelect; passengers: Array<{ booking: typeof bookings.$inferSelect; user: typeof users.$inferSelect }> }>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/shared-trips',
+      input: insertSharedTripSchema,
+      responses: {
+        201: z.custom<typeof sharedTrips.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    join: {
+      method: 'POST' as const,
+      path: '/api/shared-trips/:id/join',
+      input: z.object({ 
+        passengerCount: z.coerce.number().min(1),
+        purpose: z.string().min(1)
+      }),
+      responses: {
+        201: z.custom<typeof bookings.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    updateStatus: {
+      method: 'PUT' as const,
+      path: '/api/shared-trips/:id/status',
+      input: z.object({ status: z.enum(['open', 'full', 'completed', 'cancelled']) }),
+      responses: {
+        200: z.custom<typeof sharedTrips.$inferSelect>(),
         404: errorSchemas.notFound,
       },
     },

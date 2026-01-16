@@ -527,6 +527,159 @@ export async function registerRoutes(
     }
   });
 
+  // Shared Trips
+  app.get(api.sharedTrips.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!hasPermission(user, 'view_bookings')) {
+      return res.status(403).json({ message: "Access denied: missing view_bookings permission" });
+    }
+    const trips = await storage.getSharedTrips();
+    res.json(trips);
+  });
+
+  app.get("/api/shared-trips/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!hasPermission(user, 'view_bookings')) {
+      return res.status(403).json({ message: "Access denied: missing view_bookings permission" });
+    }
+    const trip = await storage.getSharedTrip(Number(req.params.id));
+    if (!trip) return res.status(404).json({ message: "Shared trip not found" });
+    res.json(trip);
+  });
+
+  app.post(api.sharedTrips.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!user.isApprover && user.role !== 'admin') {
+      return res.status(403).send("Only approvers can create shared trips");
+    }
+    try {
+      const input = api.sharedTrips.create.input.parse(req.body);
+      
+      // Get vehicle to validate and set capacity from server
+      const vehicle = await storage.getVehicle(input.vehicleId);
+      if (!vehicle) {
+        return res.status(400).json({ message: "Vehicle not found" });
+      }
+      if (vehicle.capacity <= 5) {
+        return res.status(400).json({ message: "Vehicle must have more than 5 seats for shared trips" });
+      }
+      if (vehicle.status !== 'available') {
+        return res.status(400).json({ message: "Vehicle is not available" });
+      }
+      
+      // Server-side values override client values for security
+      const trip = await storage.createSharedTrip({
+        ...input,
+        approverId: user.id, // Always use current user as approver
+        totalCapacity: vehicle.capacity, // Derive from vehicle
+        reservedSeats: 0, // Always start at 0
+        status: 'open', // Always start as open
+      });
+      
+      res.status(201).json(trip);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.post("/api/shared-trips/:id/join", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const currentUser = req.user as User;
+    if (!hasPermission(currentUser, 'view_bookings')) {
+      return res.status(403).json({ message: "Access denied: missing view_bookings permission" });
+    }
+    
+    try {
+      const tripId = Number(req.params.id);
+      const input = api.sharedTrips.join.input.parse(req.body);
+      
+      const trip = await storage.getSharedTrip(tripId);
+      if (!trip) return res.status(404).json({ message: "Shared trip not found" });
+      
+      if (trip.status !== 'open') {
+        return res.status(400).json({ message: "This trip is no longer accepting passengers" });
+      }
+      
+      // Re-calculate available seats from current database state
+      const currentReservedSeats = trip.passengers?.reduce((sum, p) => sum + (p.booking.passengerCount || 1), 0) || 0;
+      const availableSeats = trip.totalCapacity - currentReservedSeats;
+      
+      if (input.passengerCount > availableSeats) {
+        return res.status(400).json({ message: `Only ${availableSeats} seats available` });
+      }
+      
+      // Check if user already joined this trip
+      const alreadyJoined = trip.passengers?.some(p => p.user.id === currentUser.id);
+      if (alreadyJoined) {
+        return res.status(400).json({ message: "You have already joined this trip" });
+      }
+      
+      // Create a booking linked to this shared trip (pending approval for normal workflow)
+      const booking = await storage.createBooking({
+        vehicleId: trip.vehicleId,
+        userId: currentUser.id,
+        approverId: trip.approverId,
+        startTime: trip.startTime,
+        endTime: trip.endTime,
+        destination: trip.destination || "",
+        purpose: input.purpose,
+        mileage: 0,
+        status: 'approved', // Pre-approved as part of shared trip
+        driveType: 'driver',
+        passengerCount: input.passengerCount,
+        shareAllowed: true,
+        sharedTripId: tripId,
+        allocatedVehicleId: trip.vehicleId,
+      });
+      
+      // Update reserved seats based on actual calculation
+      const newReservedSeats = currentReservedSeats + input.passengerCount;
+      const updateData: any = { reservedSeats: newReservedSeats };
+      if (newReservedSeats >= trip.totalCapacity) {
+        updateData.status = 'full';
+      }
+      await storage.updateSharedTrip(tripId, updateData);
+      
+      res.status(201).json(booking);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.put("/api/shared-trips/:id/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    
+    try {
+      const tripId = Number(req.params.id);
+      const input = api.sharedTrips.updateStatus.input.parse(req.body);
+      
+      const trip = await storage.getSharedTrip(tripId);
+      if (!trip) return res.status(404).json({ message: "Shared trip not found" });
+      
+      if (trip.approverId !== user.id && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only the trip organizer can update status" });
+      }
+      
+      const updated = await storage.updateSharedTrip(tripId, { status: input.status });
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

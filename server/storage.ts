@@ -1,9 +1,9 @@
 import { 
-  users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments,
+  users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
-  type Department, type InsertDepartment
+  type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq } from "drizzle-orm";
@@ -52,6 +52,11 @@ export interface IStorage {
   getDepartments(): Promise<Department[]>;
   createDepartment(dept: InsertDepartment): Promise<Department>;
   deleteDepartment(id: number): Promise<void>;
+
+  getSharedTrips(): Promise<(SharedTrip & { vehicle: Vehicle; approver: User; passengers: Array<{ booking: Booking; user: User }> })[]>;
+  getSharedTrip(id: number): Promise<(SharedTrip & { vehicle: Vehicle; approver: User; passengers: Array<{ booking: Booking; user: User }> }) | undefined>;
+  createSharedTrip(trip: InsertSharedTrip): Promise<SharedTrip>;
+  updateSharedTrip(id: number, updates: Partial<InsertSharedTrip>): Promise<SharedTrip>;
 
   sessionStore: session.Store;
 }
@@ -244,6 +249,57 @@ export class DatabaseStorage implements IStorage {
   async deleteDepartment(id: number): Promise<void> {
     await getDb().delete(departments).where(eq(departments.id, id));
   }
+
+  async getSharedTrips(): Promise<(SharedTrip & { vehicle: Vehicle; approver: User; passengers: Array<{ booking: Booking; user: User }> })[]> {
+    const trips = await getDb().select().from(sharedTrips);
+    const results = [];
+    
+    for (const trip of trips) {
+      const [vehicle] = await getDb().select().from(vehicles).where(eq(vehicles.id, trip.vehicleId));
+      const [approver] = await getDb().select().from(users).where(eq(users.id, trip.approverId));
+      
+      const tripBookings = await getDb().select().from(bookings).where(eq(bookings.sharedTripId, trip.id));
+      const passengers = [];
+      for (const b of tripBookings) {
+        const [u] = await getDb().select().from(users).where(eq(users.id, b.userId));
+        if (u) passengers.push({ booking: b, user: u });
+      }
+      
+      if (vehicle && approver) {
+        results.push({ ...trip, vehicle, approver, passengers });
+      }
+    }
+    
+    return results;
+  }
+
+  async getSharedTrip(id: number): Promise<(SharedTrip & { vehicle: Vehicle; approver: User; passengers: Array<{ booking: Booking; user: User }> }) | undefined> {
+    const [trip] = await getDb().select().from(sharedTrips).where(eq(sharedTrips.id, id));
+    if (!trip) return undefined;
+    
+    const [vehicle] = await getDb().select().from(vehicles).where(eq(vehicles.id, trip.vehicleId));
+    const [approver] = await getDb().select().from(users).where(eq(users.id, trip.approverId));
+    
+    const tripBookings = await getDb().select().from(bookings).where(eq(bookings.sharedTripId, trip.id));
+    const passengers = [];
+    for (const b of tripBookings) {
+      const [u] = await getDb().select().from(users).where(eq(users.id, b.userId));
+      if (u) passengers.push({ booking: b, user: u });
+    }
+    
+    if (!vehicle || !approver) return undefined;
+    return { ...trip, vehicle, approver, passengers };
+  }
+
+  async createSharedTrip(trip: InsertSharedTrip): Promise<SharedTrip> {
+    const [created] = await getDb().insert(sharedTrips).values(trip).returning();
+    return created;
+  }
+
+  async updateSharedTrip(id: number, updates: Partial<InsertSharedTrip>): Promise<SharedTrip> {
+    const [updated] = await getDb().update(sharedTrips).set(updates).where(eq(sharedTrips.id, id)).returning();
+    return updated;
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -289,5 +345,9 @@ export const storage = {
   getDepartments: () => getStorage().getDepartments(),
   createDepartment: (...args: Parameters<DatabaseStorage['createDepartment']>) => getStorage().createDepartment(...args),
   deleteDepartment: (...args: Parameters<DatabaseStorage['deleteDepartment']>) => getStorage().deleteDepartment(...args),
+  getSharedTrips: () => getStorage().getSharedTrips(),
+  getSharedTrip: (...args: Parameters<DatabaseStorage['getSharedTrip']>) => getStorage().getSharedTrip(...args),
+  createSharedTrip: (...args: Parameters<DatabaseStorage['createSharedTrip']>) => getStorage().createSharedTrip(...args),
+  updateSharedTrip: (...args: Parameters<DatabaseStorage['updateSharedTrip']>) => getStorage().updateSharedTrip(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

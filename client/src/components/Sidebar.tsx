@@ -10,7 +10,8 @@ import {
   Menu,
   X,
   Settings,
-  FileText
+  FileText,
+  UsersRound
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ export function Sidebar() {
     { href: "/", label: "Dashboard", icon: LayoutDashboard, permission: "view_dashboard" },
     { href: "/vehicles", label: "Vehicles", icon: Car, permission: "view_vehicles" },
     { href: "/bookings", label: "Bookings", icon: CalendarDays, permission: "view_bookings" },
+    { href: "/shared-rides", label: "Shared Rides", icon: UsersRound, permission: "view_bookings" },
     { href: "/maintenance", label: "Maintenance", icon: Wrench, permission: "view_maintenance" },
     { href: "/fuel", label: "Fuel Log", icon: Fuel, permission: "view_fuel" },
     { href: "/reports", label: "Reports", icon: FileText, permission: "view_reports" },
