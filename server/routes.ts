@@ -67,7 +67,17 @@ export async function registerRoutes(
   app.put(api.vehicles.update.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
-    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    
+    // Approvers can only update vehicle status (available/unavailable)
+    const isApproverStatusChange = user.isApprover && 
+      Object.keys(req.body).length === 1 && 
+      req.body.status && 
+      ['available', 'unavailable'].includes(req.body.status);
+    
+    if (user.role !== 'admin' && !isApproverStatusChange) {
+      return res.status(403).send("Admin access required");
+    }
+    
     try {
       const input = api.vehicles.update.input.parse(req.body);
       const vehicle = await storage.updateVehicle(Number(req.params.id), input);
