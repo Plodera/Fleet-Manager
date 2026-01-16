@@ -213,7 +213,7 @@ export default function SharedRides() {
                   <FormField control={createForm.control} name="vehicleId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Vehicle (6+ seats)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value ? String(field.value) : undefined}>
+                      <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value ? String(field.value) : undefined}>
                         <FormControl>
                           <SelectTrigger data-testid="select-vehicle">
                             <SelectValue placeholder="Choose a large vehicle" />
