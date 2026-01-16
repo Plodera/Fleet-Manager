@@ -22,7 +22,7 @@ export const AVAILABLE_PERMISSIONS = [
 ] as const;
 
 export const roleEnum = pgEnum("role", ["admin", "staff", "customer"]);
-export const vehicleStatusEnum = pgEnum("vehicle_status", ["available", "rented", "maintenance"]);
+export const vehicleStatusEnum = pgEnum("vehicle_status", ["available", "in_use", "maintenance", "unavailable"]);
 export const bookingStatusEnum = pgEnum("booking_status", ["pending", "approved", "rejected", "completed", "cancelled"]);
 export const driveTypeEnum = pgEnum("drive_type", ["self", "driver"]);
 

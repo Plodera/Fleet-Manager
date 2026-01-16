@@ -20,6 +20,7 @@ export default function Vehicles() {
   const { vehicles, isLoading, createVehicle, updateVehicle, deleteVehicle } = useVehicles();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const canManageAvailability = isAdmin || user?.isApprover;
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -105,10 +106,11 @@ export default function Vehicles() {
     setIsEditDialogOpen(true);
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     available: "bg-green-100 text-green-700 hover:bg-green-100/80 border-green-200",
-    rented: "bg-blue-100 text-blue-700 hover:bg-blue-100/80 border-blue-200",
-    maintenance: "bg-red-100 text-red-700 hover:bg-red-100/80 border-red-200"
+    in_use: "bg-blue-100 text-blue-700 hover:bg-blue-100/80 border-blue-200",
+    maintenance: "bg-amber-100 text-amber-700 hover:bg-amber-100/80 border-amber-200",
+    unavailable: "bg-gray-100 text-gray-700 hover:bg-gray-100/80 border-gray-200"
   };
 
   return (
@@ -222,8 +224,9 @@ export default function Vehicles() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="rented">Rented</SelectItem>
+                        <SelectItem value="in_use">In Use</SelectItem>
                         <SelectItem value="maintenance">Maintenance</SelectItem>
+                        <SelectItem value="unavailable">Unavailable</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -355,8 +358,9 @@ export default function Vehicles() {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="available">Available</SelectItem>
-                      <SelectItem value="rented">Rented</SelectItem>
+                      <SelectItem value="in_use">In Use</SelectItem>
                       <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="unavailable">Unavailable</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -418,8 +422,8 @@ export default function Vehicles() {
                   alt={`${vehicle.make} ${vehicle.model}`}
                   className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500"
                 />
-                <Badge className={`absolute top-4 right-4 capitalize shadow-sm ${statusColors[vehicle.status as keyof typeof statusColors]}`}>
-                  {vehicle.status}
+                <Badge className={`absolute top-4 right-4 shadow-sm ${statusColors[vehicle.status] || statusColors.available}`}>
+                  {vehicle.status === 'in_use' ? 'In Use' : vehicle.status === 'unavailable' ? 'Unavailable' : vehicle.status.charAt(0).toUpperCase() + vehicle.status.slice(1)}
                 </Badge>
               </div>
               <CardContent className="p-6">
@@ -448,16 +452,33 @@ export default function Vehicles() {
                   </div>
                 </div>
               </CardContent>
-              {isAdmin && (
+              {(isAdmin || canManageAvailability) && (
               <CardFooter className="p-6 pt-0 flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => {
-                  if(confirm("Delete this vehicle?")) deleteVehicle.mutate(vehicle.id);
-                }} data-testid={`button-delete-vehicle-${vehicle.id}`}>
-                  Delete
-                </Button>
-                <Button variant="outline" className="flex-1" onClick={() => openEditDialog(vehicle)} data-testid={`button-edit-vehicle-${vehicle.id}`}>
-                  <Pencil className="w-4 h-4 mr-2" /> Edit
-                </Button>
+                {canManageAvailability && vehicle.status !== 'in_use' && vehicle.status !== 'maintenance' && (
+                  <Button 
+                    variant={vehicle.status === 'available' ? 'destructive' : 'default'}
+                    className="flex-1"
+                    onClick={() => {
+                      const newStatus = vehicle.status === 'available' ? 'unavailable' : 'available';
+                      updateVehicle.mutate({ id: vehicle.id, status: newStatus });
+                    }}
+                    data-testid={`button-toggle-availability-${vehicle.id}`}
+                  >
+                    {vehicle.status === 'available' ? 'Mark Unavailable' : 'Mark Available'}
+                  </Button>
+                )}
+                {isAdmin && (
+                  <>
+                    <Button variant="outline" onClick={() => {
+                      if(confirm("Delete this vehicle?")) deleteVehicle.mutate(vehicle.id);
+                    }} data-testid={`button-delete-vehicle-${vehicle.id}`}>
+                      Delete
+                    </Button>
+                    <Button variant="outline" onClick={() => openEditDialog(vehicle)} data-testid={`button-edit-vehicle-${vehicle.id}`}>
+                      <Pencil className="w-4 h-4 mr-2" /> Edit
+                    </Button>
+                  </>
+                )}
               </CardFooter>
               )}
             </Card>

@@ -34,7 +34,7 @@ export default function Dashboard() {
   }
 
   const totalVehicles = vehicles?.length || 0;
-  const activeRentals = vehicles?.filter(v => v.status === "rented").length || 0;
+  const vehiclesInUse = vehicles?.filter(v => v.status === "in_use").length || 0;
   const availableVehicles = vehicles?.filter(v => v.status === "available").length || 0;
   const pendingBookings = bookings?.filter(b => b.status === "pending").length || 0;
   const vehiclesInMaintenance = vehicles?.filter(v => v.status === "maintenance").length || 0;
@@ -56,10 +56,13 @@ export default function Dashboard() {
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 5);
 
+  const vehiclesUnavailable = vehicles?.filter(v => v.status === "unavailable").length || 0;
+  
   const vehicleStatusData = [
     { name: 'Available', value: availableVehicles, color: '#10b981' },
-    { name: 'In Use', value: activeRentals, color: '#3b82f6' },
-    { name: 'Maintenance', value: vehiclesInMaintenance, color: '#f59e0b' }
+    { name: 'In Use', value: vehiclesInUse, color: '#3b82f6' },
+    { name: 'Maintenance', value: vehiclesInMaintenance, color: '#f59e0b' },
+    { name: 'Unavailable', value: vehiclesUnavailable, color: '#6b7280' }
   ].filter(item => item.value > 0);
 
   const bookingStatusData = [
@@ -85,12 +88,12 @@ export default function Dashboard() {
           data-testid="card-total-vehicles"
         />
         <StatsCard 
-          title="Active Rentals" 
-          value={activeRentals}
-          description="Currently in use"
+          title="In Use" 
+          value={vehiclesInUse}
+          description="Currently booked"
           icon={CalendarCheck}
           variant="success"
-          data-testid="card-active-rentals"
+          data-testid="card-in-use"
         />
         <StatsCard 
           title="In Maintenance" 

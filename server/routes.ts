@@ -164,9 +164,9 @@ export async function registerRoutes(
       }
       const booking = await storage.updateBooking(bookingId, updateData);
       
-      // If approved, update vehicle status to rented
+      // If approved, update vehicle status to in_use
       if (input.status === 'approved') {
-        await storage.updateVehicle(existingBooking.vehicleId, { status: 'rented' });
+        await storage.updateVehicle(existingBooking.vehicleId, { status: 'in_use' });
       }
       
       // Send email notification to requester about status change
@@ -711,7 +711,7 @@ export async function registerRoutes(
       year: 2022,
       licensePlate: "XYZ-9876",
       vin: "0987654321GFEDCBA",
-      status: "rented",
+      status: "in_use",
       currentMileage: 25000,
       imageUrl: "https://images.unsplash.com/photo-1550565118-3a1400d7834a?w=800&auto=format&fit=crop&q=60"
     });
