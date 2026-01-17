@@ -199,7 +199,7 @@ export default function Reports() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Mileage</p>
-                <p className="text-lg font-bold" data-testid="text-total-mileage">{totalMileage.toLocaleString()} mi</p>
+                <p className="text-lg font-bold" data-testid="text-total-mileage">{totalMileage.toLocaleString()} km</p>
               </div>
             </div>
           </CardContent>
@@ -448,7 +448,7 @@ export default function Reports() {
                     </div>
                     <div className="p-2 rounded bg-muted/30">
                       <p className="text-muted-foreground text-xs">Mileage</p>
-                      <p className="font-semibold">{vehicle.mileage.toLocaleString()} mi</p>
+                      <p className="font-semibold">{vehicle.mileage.toLocaleString()} km</p>
                     </div>
                     <div className="p-2 rounded bg-muted/30">
                       <p className="text-muted-foreground text-xs">Fuel Cost</p>
