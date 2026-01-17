@@ -131,6 +131,7 @@ export default function SharedRides() {
   };
 
   const onCreateSubmit = (data: any) => {
+    console.log("Form data being submitted:", data, "vehicleId type:", typeof data.vehicleId);
     createTrip.mutate(data);
   };
 

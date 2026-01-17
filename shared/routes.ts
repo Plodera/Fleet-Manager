@@ -358,7 +358,13 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/shared-trips',
-      input: insertSharedTripSchema,
+      input: z.object({
+        vehicleId: z.coerce.number().positive("Vehicle is required"),
+        startTime: z.coerce.date(),
+        endTime: z.coerce.date(),
+        destination: z.string().min(1, "Destination is required"),
+        notes: z.string().nullable().optional(),
+      }),
       responses: {
         201: z.custom<typeof sharedTrips.$inferSelect>(),
         400: errorSchemas.validation,
