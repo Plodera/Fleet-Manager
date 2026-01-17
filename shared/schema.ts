@@ -73,6 +73,8 @@ export const bookings = pgTable("bookings", {
   mileage: integer("mileage").notNull(),
   cancellationReason: text("cancellation_reason"),
   passengerCount: integer("passenger_count").default(1).notNull(),
+  passengerName: text("passenger_name"),
+  passengerPhone: text("passenger_phone"),
   shareAllowed: boolean("share_allowed").default(false).notNull(),
   sharedTripId: integer("shared_trip_id"),
   allocatedVehicleId: integer("allocated_vehicle_id").references(() => vehicles.id),
