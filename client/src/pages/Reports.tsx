@@ -1,9 +1,11 @@
 import { useVehicles } from "@/hooks/use-vehicles";
 import { useBookings } from "@/hooks/use-bookings";
 import { useMaintenance as useMaintenanceHook, useFuel as useFuelHook } from "@/hooks/use-records";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -22,6 +24,14 @@ export default function Reports() {
   const { bookings, isLoading: loadingBookings } = useBookings();
   const { records: maintenance, isLoading: loadingMaintenance } = useMaintenanceHook();
   const { records: fuel, isLoading: loadingFuel } = useFuelHook();
+  const { data: sharedTripsReport, isLoading: loadingSharedTrips, error: sharedTripsError } = useQuery({
+    queryKey: ['/api/shared-trips/report'],
+    queryFn: async () => {
+      const res = await fetch('/api/shared-trips/report', { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch shared trips report");
+      return res.json();
+    },
+  });
 
   if (loadingVehicles || loadingBookings || loadingMaintenance || loadingFuel) {
     return (
@@ -215,6 +225,7 @@ export default function Reports() {
           <TabsTrigger value="vehicles" data-testid="tab-vehicles">Vehicles</TabsTrigger>
           <TabsTrigger value="bookings" data-testid="tab-bookings">Bookings</TabsTrigger>
           <TabsTrigger value="costs" data-testid="tab-costs">Costs</TabsTrigger>
+          <TabsTrigger value="shared-trips" data-testid="tab-shared-trips">Shared Trips</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -730,6 +741,92 @@ export default function Reports() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="shared-trips" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Shared Trips Report
+              </CardTitle>
+              <CardDescription>
+                History of all shared trips with passenger details
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingSharedTrips ? (
+                <div className="flex justify-center py-8">
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : sharedTripsError ? (
+                <p className="text-destructive text-center py-8">Failed to load shared trips report</p>
+              ) : sharedTripsReport?.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No shared trips recorded yet</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Destination</TableHead>
+                        <TableHead>Vehicle</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Organizer</TableHead>
+                        <TableHead>Passengers</TableHead>
+                        <TableHead>Capacity</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sharedTripsReport?.map((trip: any) => (
+                        <TableRow key={trip.id} data-testid={`row-shared-trip-${trip.id}`}>
+                          <TableCell className="whitespace-nowrap">
+                            {format(new Date(trip.startTime), 'MMM dd, yyyy')}
+                          </TableCell>
+                          <TableCell>{trip.destination}</TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{trip.vehicle}</div>
+                              <div className="text-xs text-muted-foreground">{trip.licensePlate}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              trip.status === 'completed' ? 'default' : 
+                              trip.status === 'open' ? 'secondary' : 
+                              trip.status === 'cancelled' ? 'destructive' : 'outline'
+                            }>
+                              {trip.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{trip.organizer}</TableCell>
+                          <TableCell>
+                            {trip.passengers?.length > 0 ? (
+                              <div className="space-y-1">
+                                {trip.passengers.map((p: any, idx: number) => (
+                                  <div key={idx} className="text-sm">
+                                    <span className="font-medium">{p.name}</span>
+                                    <span className="text-muted-foreground"> ({p.phone})</span>
+                                    <span className="text-xs text-muted-foreground"> - {p.seats} seat(s)</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">No passengers</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium">{trip.reservedSeats}</span>
+                            <span className="text-muted-foreground">/{trip.totalCapacity}</span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -548,6 +548,40 @@ export async function registerRoutes(
     res.json(trips);
   });
 
+  app.get("/api/shared-trips/report", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!hasPermission(user, 'view_reports') && user.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied: missing view_reports permission" });
+    }
+    
+    try {
+      const trips = await storage.getSharedTrips();
+      const report = trips.map(trip => ({
+        id: trip.id,
+        destination: trip.destination,
+        startTime: trip.startTime,
+        endTime: trip.endTime,
+        status: trip.status,
+        vehicle: `${trip.vehicle.make} ${trip.vehicle.model}`,
+        licensePlate: trip.vehicle.licensePlate,
+        totalCapacity: trip.totalCapacity,
+        reservedSeats: trip.reservedSeats,
+        organizer: trip.approver.fullName,
+        passengers: trip.passengers.map(p => ({
+          name: p.booking.passengerName || p.user.fullName,
+          phone: p.booking.passengerPhone || 'N/A',
+          seats: p.booking.passengerCount,
+          purpose: p.booking.purpose,
+        })),
+        createdAt: trip.createdAt,
+      }));
+      res.json(report);
+    } catch (err) {
+      throw err;
+    }
+  });
+
   app.get("/api/shared-trips/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
@@ -688,6 +722,26 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
+      throw err;
+    }
+  });
+
+  app.delete("/api/shared-trips/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    
+    try {
+      const tripId = Number(req.params.id);
+      const trip = await storage.getSharedTrip(tripId);
+      if (!trip) return res.status(404).json({ message: "Shared trip not found" });
+      
+      if (trip.approverId !== user.id && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only the trip organizer or admin can delete this trip" });
+      }
+      
+      await storage.deleteSharedTrip(tripId);
+      res.json({ message: "Shared trip deleted successfully" });
+    } catch (err) {
       throw err;
     }
   });

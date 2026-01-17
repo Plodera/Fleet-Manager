@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, MapPin, Calendar, Clock, Car, Plus, UserPlus, Check } from "lucide-react";
+import { Users, MapPin, Calendar, Clock, Car, Plus, UserPlus, Check, Trash2, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@shared/routes";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -116,6 +116,32 @@ export default function SharedRides() {
       queryClient.invalidateQueries({ queryKey: [api.sharedTrips.list.path] });
       setCreateDialogOpen(false);
       createForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteTrip = useMutation({
+    mutationFn: async (tripId: number) => {
+      return apiRequest("DELETE", `/api/shared-trips/${tripId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Shared trip deleted" });
+      queryClient.invalidateQueries({ queryKey: [api.sharedTrips.list.path] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const endTrip = useMutation({
+    mutationFn: async (tripId: number) => {
+      return apiRequest("PUT", `/api/shared-trips/${tripId}/status`, { status: 'completed' });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Trip marked as completed" });
+      queryClient.invalidateQueries({ queryKey: [api.sharedTrips.list.path] });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -456,7 +482,7 @@ export default function SharedRides() {
                   <p className="text-xs text-muted-foreground italic">{trip.notes}</p>
                 )}
 
-                <div className="pt-2">
+                <div className="pt-2 space-y-2">
                   {alreadyJoined ? (
                     <Badge className="w-full justify-center py-2 bg-green-100 text-green-700 border-green-200">
                       <Check className="w-4 h-4 mr-1" /> You're on this trip
@@ -474,6 +500,37 @@ export default function SharedRides() {
                     <Button className="w-full" disabled variant="secondary">
                       {trip.status === 'full' ? 'Trip Full' : trip.status === 'completed' ? 'Completed' : 'Unavailable'}
                     </Button>
+                  )}
+                  
+                  {(user?.role === 'admin' || trip.approverId === user?.id) && trip.status !== 'completed' && trip.status !== 'cancelled' && (
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => endTrip.mutate(trip.id)}
+                        disabled={endTrip.isPending}
+                        data-testid={`button-end-trip-${trip.id}`}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        End Trip
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          if (confirm('Are you sure you want to delete this trip? This will also remove all bookings.')) {
+                            deleteTrip.mutate(trip.id);
+                          }
+                        }}
+                        disabled={deleteTrip.isPending}
+                        data-testid={`button-delete-trip-${trip.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
                   )}
                 </div>
               </CardContent>

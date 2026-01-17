@@ -57,6 +57,7 @@ export interface IStorage {
   getSharedTrip(id: number): Promise<(SharedTrip & { vehicle: Vehicle; approver: User; passengers: Array<{ booking: Booking; user: User }> }) | undefined>;
   createSharedTrip(trip: InsertSharedTrip): Promise<SharedTrip>;
   updateSharedTrip(id: number, updates: Partial<InsertSharedTrip>): Promise<SharedTrip>;
+  deleteSharedTrip(id: number): Promise<void>;
 
   sessionStore: session.Store;
 }
@@ -300,6 +301,11 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await getDb().update(sharedTrips).set(updates).where(eq(sharedTrips.id, id)).returning();
     return updated;
   }
+
+  async deleteSharedTrip(id: number): Promise<void> {
+    await getDb().delete(bookings).where(eq(bookings.sharedTripId, id));
+    await getDb().delete(sharedTrips).where(eq(sharedTrips.id, id));
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -349,5 +355,6 @@ export const storage = {
   getSharedTrip: (...args: Parameters<DatabaseStorage['getSharedTrip']>) => getStorage().getSharedTrip(...args),
   createSharedTrip: (...args: Parameters<DatabaseStorage['createSharedTrip']>) => getStorage().createSharedTrip(...args),
   updateSharedTrip: (...args: Parameters<DatabaseStorage['updateSharedTrip']>) => getStorage().updateSharedTrip(...args),
+  deleteSharedTrip: (...args: Parameters<DatabaseStorage['deleteSharedTrip']>) => getStorage().deleteSharedTrip(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

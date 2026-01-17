@@ -394,6 +394,21 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/shared-trips/:id',
+      responses: {
+        200: z.object({ message: z.string() }),
+        404: errorSchemas.notFound,
+      },
+    },
+    report: {
+      method: 'GET' as const,
+      path: '/api/shared-trips/report',
+      responses: {
+        200: z.array(z.any()),
+      },
+    },
   }
 };
 
