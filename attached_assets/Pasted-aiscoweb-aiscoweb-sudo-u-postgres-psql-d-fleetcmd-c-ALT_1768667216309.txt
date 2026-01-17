@@ -1,0 +1,67 @@
+aiscoweb@aiscoweb:~$ sudo -u postgres psql -d fleetcmd -c "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS passenger_name TEXT; ALTER TABLE bookings ADD COLUMN IF NOT EXISTS passenger_phone TEXT;"
+pm2 restart fleetcmd
+[sudo] password for aiscoweb: 
+ALTER TABLE
+ALTER TABLE
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [fleetcmd](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 22   │ online    │ 0%       │ 18.5mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+aiscoweb@aiscoweb:~$ cd /opt/fleetcmd
+git pull origin main
+npm run build
+pm2 restart fleetcmd
+remote: Enumerating objects: 33, done.
+remote: Counting objects: 100% (33/33), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 21 (delta 16), reused 21 (delta 16), pack-reused 0 (from 0)
+Unpacking objects: 100% (21/21), 102.75 KiB | 164.00 KiB/s, done.
+From https://github.com/Plodera/Fleet-Manager
+ * branch            main       -> FETCH_HEAD
+   68c96ba..e609726  main       -> origin/main
+Updating 68c96ba..e609726
+Fast-forward
+ ...leetcmd-git-pull-origin-main-_1768666267265.txt | 159 +++++++++++++++++++++
+ attached_assets/image_1768666133639.png            | Bin 0 -> 105287 bytes
+ client/src/pages/Reports.tsx                       |  97 +++++++++++++
+ client/src/pages/SharedRides.tsx                   |  61 +++++++-
+ server/routes.ts                                   |  54 +++++++
+ server/storage.ts                                  |   7 +
+ shared/routes.ts                                   |  15 ++
+ 7 files changed, 391 insertions(+), 2 deletions(-)
+ create mode 100644 attached_assets/Pasted-aiscoweb-aiscoweb-cd-opt-fleetcmd-git-pull-origin-main-_1768666267265.txt
+ create mode 100644 attached_assets/image_1768666133639.png
+
+> rest-express@1.0.0 build
+> tsx script/build.ts
+
+building client...
+vite v7.3.0 building client environment for production...
+✓ 2765 modules transformed.
+../dist/public/index.html                     2.06 kB │ gzip:   0.80 kB
+../dist/public/assets/index-DXzVFyvH.css     76.64 kB │ gzip:  12.53 kB
+../dist/public/assets/index-Cdpk8p1q.js   1,048.07 kB │ gzip: 291.49 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 8.95s
+building server...
+
+  dist/index.cjs  1.4mb ⚠️
+
+⚡ Done in 133ms
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [fleetcmd](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 23   │ online    │ 0%       │ 18.5mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+aiscoweb@aiscoweb:/opt/fleetcmd$ 
