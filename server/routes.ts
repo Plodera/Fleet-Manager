@@ -643,6 +643,8 @@ export async function registerRoutes(
         status: 'approved', // Pre-approved as part of shared trip
         driveType: 'driver',
         passengerCount: input.passengerCount,
+        passengerName: input.passengerName,
+        passengerPhone: input.passengerPhone,
         shareAllowed: true,
         sharedTripId: tripId,
         allocatedVehicleId: trip.vehicleId,

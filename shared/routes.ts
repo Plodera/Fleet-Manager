@@ -375,7 +375,9 @@ export const api = {
       path: '/api/shared-trips/:id/join',
       input: z.object({ 
         passengerCount: z.coerce.number().min(1),
-        purpose: z.string().min(1)
+        purpose: z.string().min(1),
+        passengerName: z.string().min(1, "Name is required"),
+        passengerPhone: z.string().min(1, "Phone number is required"),
       }),
       responses: {
         201: z.custom<typeof bookings.$inferSelect>(),

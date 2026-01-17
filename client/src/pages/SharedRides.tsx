@@ -22,6 +22,8 @@ import { z } from "zod";
 const joinTripSchema = z.object({
   passengerCount: z.coerce.number().min(1, "At least 1 passenger required"),
   purpose: z.string().min(1, "Purpose is required"),
+  passengerName: z.string().min(1, "Name is required"),
+  passengerPhone: z.string().min(1, "Phone number is required"),
 });
 
 const createTripSchema = z.object({
@@ -64,6 +66,8 @@ export default function SharedRides() {
     defaultValues: {
       passengerCount: 1,
       purpose: "",
+      passengerName: "",
+      passengerPhone: "",
     },
   });
 
@@ -330,6 +334,26 @@ export default function SharedRides() {
                   <FormLabel>Purpose of Travel</FormLabel>
                   <FormControl>
                     <Input placeholder="Meeting, Training, etc..." {...field} data-testid="input-purpose" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={joinForm.control} name="passengerName" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Your Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Full name" {...field} data-testid="input-passenger-name" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={joinForm.control} name="passengerPhone" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="+244 XXX XXX XXX" {...field} data-testid="input-passenger-phone" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
