@@ -212,7 +212,7 @@ export default function Reports() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Fuel Used</p>
-                <p className="text-lg font-bold" data-testid="text-total-gallons">{totalGallons.toFixed(1)} gal</p>
+                <p className="text-lg font-bold" data-testid="text-total-liters">{totalGallons.toFixed(1)} L</p>
               </div>
             </div>
           </CardContent>
