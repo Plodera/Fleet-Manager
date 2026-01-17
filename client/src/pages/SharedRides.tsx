@@ -50,6 +50,15 @@ export default function SharedRides() {
     },
   });
 
+  const { data: allBookings } = useQuery({
+    queryKey: ['/api/bookings'],
+    queryFn: async () => {
+      const res = await fetch('/api/bookings');
+      if (!res.ok) throw new Error("Failed to fetch bookings");
+      return res.json();
+    },
+  });
+
   const { data: vehicles } = useQuery({
     queryKey: [api.vehicles.list.path],
     queryFn: async () => {
@@ -502,36 +511,49 @@ export default function SharedRides() {
                     </Button>
                   )}
                   
-                  {(user?.role === 'admin' || user?.isApprover) && trip.status !== 'completed' && trip.status !== 'cancelled' && (
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => endTrip.mutate(trip.id)}
-                        disabled={endTrip.isPending}
-                        data-testid={`button-end-trip-${trip.id}`}
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        End Trip
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this trip? This will also remove all bookings.')) {
-                            deleteTrip.mutate(trip.id);
-                          }
-                        }}
-                        disabled={deleteTrip.isPending}
-                        data-testid={`button-delete-trip-${trip.id}`}
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Delete
-                      </Button>
-                    </div>
-                  )}
+                  {trip.status !== 'completed' && trip.status !== 'cancelled' && (() => {
+                    const tripBookings = allBookings?.filter((b: any) => b.sharedTripId === trip.id) || [];
+                    const isDriver = tripBookings.some((b: any) => b.driverId === user?.id);
+                    const canEndTrip = user?.role === 'admin' || user?.isApprover || isDriver;
+                    const canDelete = user?.role === 'admin' || user?.isApprover;
+                    
+                    if (!canEndTrip && !canDelete) return null;
+                    
+                    return (
+                      <div className="flex gap-2">
+                        {canEndTrip && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => endTrip.mutate(trip.id)}
+                            disabled={endTrip.isPending}
+                            data-testid={`button-end-trip-${trip.id}`}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            End Trip
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this trip? This will also remove all bookings.')) {
+                                deleteTrip.mutate(trip.id);
+                              }
+                            }}
+                            disabled={deleteTrip.isPending}
+                            data-testid={`button-delete-trip-${trip.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </CardContent>
             </Card>

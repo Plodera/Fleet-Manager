@@ -712,8 +712,13 @@ export async function registerRoutes(
       const trip = await storage.getSharedTrip(tripId);
       if (!trip) return res.status(404).json({ message: "Shared trip not found" });
       
-      if (user.role !== 'admin' && !user.isApprover) {
-        return res.status(403).json({ message: "Only approvers or admins can update trip status" });
+      // Check if user is the driver of any booking in this trip
+      const allBookings = await storage.getBookings();
+      const tripBookings = allBookings.filter(b => b.sharedTripId === tripId);
+      const isDriver = tripBookings.some(b => b.driverId === user.id);
+      
+      if (user.role !== 'admin' && !user.isApprover && !isDriver) {
+        return res.status(403).json({ message: "Only approvers, admins, or the assigned driver can update trip status" });
       }
       
       const updated = await storage.updateSharedTrip(tripId, { status: input.status });
