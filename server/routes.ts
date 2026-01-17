@@ -712,8 +712,8 @@ export async function registerRoutes(
       const trip = await storage.getSharedTrip(tripId);
       if (!trip) return res.status(404).json({ message: "Shared trip not found" });
       
-      if (trip.approverId !== user.id && user.role !== 'admin') {
-        return res.status(403).json({ message: "Only the trip organizer can update status" });
+      if (user.role !== 'admin' && !user.isApprover) {
+        return res.status(403).json({ message: "Only approvers or admins can update trip status" });
       }
       
       const updated = await storage.updateSharedTrip(tripId, { status: input.status });
@@ -735,8 +735,8 @@ export async function registerRoutes(
       const trip = await storage.getSharedTrip(tripId);
       if (!trip) return res.status(404).json({ message: "Shared trip not found" });
       
-      if (trip.approverId !== user.id && user.role !== 'admin') {
-        return res.status(403).json({ message: "Only the trip organizer or admin can delete this trip" });
+      if (user.role !== 'admin' && !user.isApprover) {
+        return res.status(403).json({ message: "Only approvers or admins can delete trips" });
       }
       
       await storage.deleteSharedTrip(tripId);

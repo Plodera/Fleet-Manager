@@ -502,7 +502,7 @@ export default function SharedRides() {
                     </Button>
                   )}
                   
-                  {(user?.role === 'admin' || trip.approverId === user?.id) && trip.status !== 'completed' && trip.status !== 'cancelled' && (
+                  {(user?.role === 'admin' || user?.isApprover) && trip.status !== 'completed' && trip.status !== 'cancelled' && (
                     <div className="flex gap-2">
                       <Button 
                         variant="outline" 
