@@ -161,7 +161,7 @@ export default function Reports() {
           <FileText className="w-6 h-6 text-primary" />
           Reports
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">Comprehensive fleet analytics and insights</p>
+        <p className="text-muted-foreground text-sm mt-1">Comprehensive vehicle analytics and insights</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -1,10 +1,10 @@
 # VMS - Aisco Vehicle Management System
 
 ## Overview
-A fleet management and booking system for organizational vehicles with user authentication, booking approval workflow, and role-based access control.
+A vehicle management and booking system for organizational vehicles with user authentication, booking approval workflow, and role-based access control.
 
 ## Features
-- Vehicle Management: CRUD operations for fleet vehicles
+- Vehicle Management: CRUD operations for vehicles
 - Booking System: Reservation and scheduling with approval workflow
 - Maintenance Tracking & Fuel Monitoring
 - User Authentication with role-based access (admin, staff, customer)

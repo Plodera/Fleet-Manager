@@ -70,7 +70,7 @@ const translations = {
     // Dashboard
     dashboard: {
       title: "Dashboard",
-      overview: "Overview of your fleet management system",
+      overview: "Overview of your vehicle management system",
       totalVehicles: "Total Vehicles",
       inUse: "In Use",
       inMaintenance: "In Maintenance",
@@ -305,7 +305,7 @@ const translations = {
     // Dashboard
     dashboard: {
       title: "Painel",
-      overview: "Visão geral do sistema de gestão de frota",
+      overview: "Visão geral do sistema de gestão de veículos",
       totalVehicles: "Total de Veículos",
       inUse: "Em Uso",
       inMaintenance: "Em Manutenção",
@@ -487,17 +487,17 @@ const LanguageContext = createContext<LanguageContextType | null>(null);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
-    const saved = localStorage.getItem("fleetcmd-language");
+    const saved = localStorage.getItem("vms-language");
     return (saved as Language) || "en";
   });
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
-    localStorage.setItem("fleetcmd-language", lang);
+    localStorage.setItem("vms-language", lang);
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem("fleetcmd-language");
+    const saved = localStorage.getItem("vms-language");
     if (saved && (saved === "en" || saved === "pt")) {
       setLanguageState(saved);
     }
