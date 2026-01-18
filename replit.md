@@ -11,7 +11,16 @@ A fleet management and booking system for organizational vehicles with user auth
 - User Permissions System: Granular access control
 - Analytics Dashboard
 - Booking Approval Workflow: Designate approvers, bookings require approval before use
+- Driver Dashboard: Dedicated view for drivers showing only their assigned trips with Start/End Trip actions
 - Bilingual Support: English/Portuguese for navigation, buttons, and status labels
+
+## Driver Dashboard
+Drivers have a dedicated dashboard (`/driver-dashboard`) that shows only their assigned trips:
+- **Restricted Access**: Only users marked as drivers can access this page
+- **Simplified Navigation**: Drivers only see Dashboard and My Trips in the sidebar (Vehicles, Bookings, and other pages are hidden)
+- **Assigned Trips View**: Shows only trips where the driver is assigned with approved or in-progress status
+- **Trip Actions**: Start Trip (with odometer input) and End Trip (with odometer input)
+- **Bilingual Support**: Full English/Portuguese translations
 
 ## Bilingual Support
 The system supports comprehensive English and Portuguese translations across all major pages:
@@ -34,6 +43,7 @@ The system supports comprehensive English and Portuguese translations across all
 - `t.vehicles.*` - Vehicles page (80+ keys)
 - `t.bookings.*` - Bookings page (40+ keys)
 - `t.sharedRides.*` - Shared Rides page (30+ keys)
+- `t.driverDashboard.*` - Driver Dashboard page (20+ keys)
 
 Language selection is available in the sidebar footer and preference is saved to localStorage.
 
