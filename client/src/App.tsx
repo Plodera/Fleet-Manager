@@ -21,13 +21,19 @@ import Auth from "@/pages/Auth";
 import NotFound from "@/pages/not-found";
 import BookingPrintView from "@/pages/BookingPrintView";
 import SharedRidePrintView from "@/pages/SharedRidePrintView";
+import DriverDashboard from "@/pages/DriverDashboard";
 
-function PrivateRoute({ component: Component, adminOnly = false, requiredPermission }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string }) {
+function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return <div className="flex h-screen items-center justify-center text-primary">Loading...</div>;
   if (!user) return <Redirect to="/auth" />;
   if (adminOnly && user.role !== 'admin') return <Redirect to="/" />;
+  
+  // Driver-only route check
+  if (driverOnly && !user.isDriver) {
+    return <Redirect to="/" />;
+  }
   
   // Check required permission (admins bypass permission checks)
   if (requiredPermission && user.role !== 'admin') {
@@ -90,6 +96,9 @@ function Router() {
       
       <Route path="/">
         <PrivateRoute component={Dashboard} requiredPermission="view_dashboard" />
+      </Route>
+      <Route path="/driver-dashboard">
+        <PrivateRoute component={DriverDashboard} driverOnly />
       </Route>
       <Route path="/vehicles">
         <PrivateRoute component={Vehicles} requiredPermission="view_vehicles" />
