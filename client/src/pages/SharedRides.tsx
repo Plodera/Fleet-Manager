@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, MapPin, Calendar, Clock, Car, Plus, UserPlus, Check, Trash2, CheckCircle } from "lucide-react";
+import { Users, MapPin, Calendar, Clock, Car, Plus, UserPlus, Check, Trash2, CheckCircle, Play } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@shared/routes";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -92,10 +92,12 @@ export default function SharedRides() {
   });
 
   const joinTrip = useMutation({
-    mutationFn: async (data: { tripId: number; passengerCount: number; purpose: string }) => {
+    mutationFn: async (data: { tripId: number; passengerCount: number; purpose: string; passengerName: string; passengerPhone: string }) => {
       return apiRequest("POST", `/api/shared-trips/${data.tripId}/join`, {
         passengerCount: data.passengerCount,
         purpose: data.purpose,
+        passengerName: data.passengerName,
+        passengerPhone: data.passengerPhone,
       });
     },
     onSuccess: () => {
@@ -144,6 +146,19 @@ export default function SharedRides() {
     },
   });
 
+  const startTrip = useMutation({
+    mutationFn: async (tripId: number) => {
+      return apiRequest("PUT", `/api/shared-trips/${tripId}/status`, { status: 'in_progress' });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Trip started" });
+      queryClient.invalidateQueries({ queryKey: [api.sharedTrips.list.path] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const endTrip = useMutation({
     mutationFn: async (tripId: number) => {
       return apiRequest("PUT", `/api/shared-trips/${tripId}/status`, { status: 'completed' });
@@ -178,7 +193,8 @@ export default function SharedRides() {
     switch (status) {
       case 'open': return <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">Open</Badge>;
       case 'full': return <Badge className="bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800">Full</Badge>;
-      case 'completed': return <Badge className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">Completed</Badge>;
+      case 'in_progress': return <Badge className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">In Progress</Badge>;
+      case 'completed': return <Badge className="bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800">Completed</Badge>;
       case 'cancelled': return <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">Cancelled</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
@@ -514,14 +530,27 @@ export default function SharedRides() {
                   {trip.status !== 'completed' && trip.status !== 'cancelled' && (() => {
                     const tripBookings = allBookings?.filter((b: any) => b.sharedTripId === trip.id) || [];
                     const isDriver = tripBookings.some((b: any) => b.driverId === user?.id);
-                    const canEndTrip = user?.role === 'admin' || user?.isApprover || isDriver;
+                    const canManageTrip = user?.role === 'admin' || user?.isApprover || isDriver;
                     const canDelete = user?.role === 'admin' || user?.isApprover;
                     
-                    if (!canEndTrip && !canDelete) return null;
+                    if (!canManageTrip && !canDelete) return null;
                     
                     return (
                       <div className="flex gap-2">
-                        {canEndTrip && (
+                        {canManageTrip && (trip.status === 'open' || trip.status === 'full') && (
+                          <Button 
+                            variant="default" 
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => startTrip.mutate(trip.id)}
+                            disabled={startTrip.isPending}
+                            data-testid={`button-start-trip-${trip.id}`}
+                          >
+                            <Play className="w-4 h-4 mr-1" />
+                            Start Trip
+                          </Button>
+                        )}
+                        {canManageTrip && trip.status === 'in_progress' && (
                           <Button 
                             variant="outline" 
                             size="sm"

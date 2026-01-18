@@ -158,12 +158,37 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Booking not found" });
       }
       
-      // Only the assigned approver or admin can change status
-      if (existingBooking.approverId !== currentUser.id && currentUser.role !== 'admin') {
-        return res.status(401).json({ message: "Only the assigned approver can change booking status" });
+      // Check authorization based on action type
+      const isAdmin = currentUser.role === 'admin';
+      const isApprover = existingBooking.approverId === currentUser.id || currentUser.isApprover;
+      const isDriver = (existingBooking as any).driverId === currentUser.id;
+      
+      // For starting a trip (in_progress), allow driver, approver, or admin
+      if (input.status === 'in_progress') {
+        if (!isAdmin && !isApprover && !isDriver) {
+          return res.status(403).json({ message: "Only the driver, approver, or admin can start a trip" });
+        }
+        // Can only start from approved status
+        if (existingBooking.status !== 'approved') {
+          return res.status(400).json({ message: "Can only start a trip that has been approved" });
+        }
+      } else if (input.status === 'completed') {
+        // For completing a trip, allow driver, approver, or admin
+        if (!isAdmin && !isApprover && !isDriver) {
+          return res.status(403).json({ message: "Only the driver, approver, or admin can complete a trip" });
+        }
+        // Can only complete from in_progress or approved status (backward compatibility)
+        if (existingBooking.status !== 'in_progress' && existingBooking.status !== 'approved') {
+          return res.status(400).json({ message: "Can only complete a trip that is in progress or approved" });
+        }
+      } else {
+        // For other status changes, only approver or admin
+        if (!isAdmin && !isApprover) {
+          return res.status(403).json({ message: "Only the assigned approver or admin can change booking status" });
+        }
       }
       
-      const updateData: { status: 'pending' | 'approved' | 'rejected' | 'completed' | 'cancelled'; cancellationReason?: string | null; driverId?: number | null } = { status: input.status };
+      const updateData: { status: 'pending' | 'approved' | 'rejected' | 'in_progress' | 'completed' | 'cancelled'; cancellationReason?: string | null; driverId?: number | null } = { status: input.status };
       if (input.status === 'cancelled' && input.cancellationReason) {
         updateData.cancellationReason = input.cancellationReason;
       } else if (input.status !== 'cancelled') {
@@ -217,8 +242,8 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Only the assigned driver or approver can end this trip" });
       }
       
-      if (existingBooking.status !== 'approved') {
-        return res.status(400).json({ message: "Only approved bookings can be marked as completed" });
+      if (existingBooking.status !== 'approved' && existingBooking.status !== 'in_progress') {
+        return res.status(400).json({ message: "Only approved or in-progress bookings can be marked as completed" });
       }
       
       // Update booking status to completed
@@ -719,6 +744,17 @@ export async function registerRoutes(
       
       if (user.role !== 'admin' && !user.isApprover && !isDriver) {
         return res.status(403).json({ message: "Only approvers, admins, or the assigned driver can update trip status" });
+      }
+      
+      // Validate state transitions
+      if (input.status === 'in_progress') {
+        if (trip.status !== 'open' && trip.status !== 'full') {
+          return res.status(400).json({ message: "Can only start a trip that is open or full" });
+        }
+      } else if (input.status === 'completed') {
+        if (trip.status !== 'in_progress' && trip.status !== 'open' && trip.status !== 'full') {
+          return res.status(400).json({ message: "Can only complete a trip that is in progress" });
+        }
       }
       
       const updated = await storage.updateSharedTrip(tripId, { status: input.status });

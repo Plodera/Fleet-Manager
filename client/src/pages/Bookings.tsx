@@ -15,14 +15,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon, Play } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 
 export default function Bookings() {
-  const { bookings, isLoading, createBooking, updateBookingStatus, endTrip, approvers } = useBookings();
+  const { bookings, isLoading, createBooking, updateBookingStatus, startTrip, endTrip, approvers } = useBookings();
   const { vehicles } = useVehicles();
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -129,6 +129,10 @@ export default function Bookings() {
         }
       );
     }
+  };
+
+  const handleStartTrip = (bookingId: number) => {
+    startTrip.mutate(bookingId);
   };
 
   const handleEndTrip = (bookingId: number) => {
@@ -618,18 +622,17 @@ export default function Bookings() {
                 <div className="flex gap-2 flex-wrap items-center">
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
                     <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-sm font-medium text-green-700 dark:text-green-300">In Progress</span>
+                    <span className="text-sm font-medium text-green-700 dark:text-green-300">Approved</span>
                   </div>
-                  {((booking as any).driverId === user?.id || booking.approverId === user?.id || user?.role === 'admin') && (
+                  {((booking as any).driverId === user?.id || booking.approverId === user?.id || user?.role === 'admin' || user?.isApprover) && (
                     <Button 
                       size="sm"
-                      variant="outline"
-                      className="border-blue-200 text-blue-700"
-                      onClick={() => handleEndTrip(booking.id)}
-                      disabled={endTrip.isPending}
-                      data-testid={`button-end-trip-${booking.id}`}
+                      variant="default"
+                      onClick={() => handleStartTrip(booking.id)}
+                      disabled={startTrip.isPending}
+                      data-testid={`button-start-trip-${booking.id}`}
                     >
-                      <Flag className="w-4 h-4 mr-1" /> End Trip
+                      <Play className="w-4 h-4 mr-1" /> Start Trip
                     </Button>
                   )}
                   {(booking.approverId === user?.id || user?.role === 'admin') && (
@@ -654,6 +657,27 @@ export default function Bookings() {
                         <Ban className="w-4 h-4 mr-1" /> Cancel
                       </Button>
                     </>
+                  )}
+                </div>
+              )}
+
+              {booking.status === 'in_progress' && (
+                <div className="flex gap-2 flex-wrap items-center">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                    <Car className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">In Progress</span>
+                  </div>
+                  {((booking as any).driverId === user?.id || booking.approverId === user?.id || user?.role === 'admin' || user?.isApprover) && (
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-200 text-blue-700"
+                      onClick={() => handleEndTrip(booking.id)}
+                      disabled={endTrip.isPending}
+                      data-testid={`button-end-trip-${booking.id}`}
+                    >
+                      <Flag className="w-4 h-4 mr-1" /> End Trip
+                    </Button>
                   )}
                 </div>
               )}
