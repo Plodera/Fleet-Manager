@@ -120,6 +120,46 @@ Transport Management System
   await sendEmail(emailContent);
 }
 
+export async function sendTripStatusToApprover(
+  approver: User,
+  booking: Booking,
+  vehicle: Vehicle,
+  requester: User,
+  driver: User | null,
+  status: "started" | "completed",
+  odometer: number
+): Promise<void> {
+  const statusMessages: Record<string, string> = {
+    started: "has STARTED",
+    completed: "has been COMPLETED"
+  };
+
+  const emailContent: EmailContent = {
+    to: approver.email || "no-email@example.com",
+    subject: `Trip ${status.charAt(0).toUpperCase() + status.slice(1)}: ${vehicle.make} ${vehicle.model}`,
+    body: `
+Dear ${approver.fullName},
+
+A trip you approved ${statusMessages[status]}.
+
+Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})
+Requester: ${requester.fullName}
+Driver: ${driver?.fullName || "Self-drive"}
+Purpose: ${booking.purpose}
+Destination: ${booking.destination || "Not specified"}
+${status === "started" ? `Start Odometer: ${odometer} km` : `End Odometer: ${odometer} km`}
+Scheduled: ${new Date(booking.startTime).toLocaleString()} - ${new Date(booking.endTime).toLocaleString()}
+
+${status === "completed" && booking.startOdometer ? `Trip Distance: ${odometer - booking.startOdometer} km` : ""}
+
+Thank you,
+Vehicle Management System
+    `.trim()
+  };
+
+  await sendEmail(emailContent);
+}
+
 export async function sendTestEmail(to: string): Promise<{ success: boolean; error?: string }> {
   const settings = await storage.getEmailSettings();
   

@@ -6,7 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
-import { sendBookingNotification, sendBookingStatusUpdate } from "./email";
+import { sendBookingNotification, sendBookingStatusUpdate, sendTripStatusToApprover } from "./email";
 import type { User } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
@@ -258,6 +258,18 @@ export async function registerRoutes(
         startOdometer: startOdometer
       });
       
+      // Send email notification to approver about trip start
+      if (existingBooking.approverId) {
+        const approver = await storage.getUser(existingBooking.approverId);
+        const requester = await storage.getUser(existingBooking.userId);
+        const vehicle = await storage.getVehicle(existingBooking.vehicleId);
+        const driver = existingBooking.driverId ? await storage.getUser(existingBooking.driverId) ?? null : null;
+        
+        if (approver && requester && vehicle) {
+          await sendTripStatusToApprover(approver, booking, vehicle, requester, driver, 'started', startOdometer);
+        }
+      }
+      
       res.json(booking);
     } catch (err) {
       throw err;
@@ -315,6 +327,16 @@ export async function registerRoutes(
       const vehicle = await storage.getVehicle(existingBooking.vehicleId);
       if (requester && vehicle) {
         await sendBookingStatusUpdate(requester, booking, vehicle, 'completed', currentUser);
+      }
+      
+      // Send email notification to approver about trip completion
+      if (existingBooking.approverId) {
+        const approver = await storage.getUser(existingBooking.approverId);
+        const driver = existingBooking.driverId ? await storage.getUser(existingBooking.driverId) ?? null : null;
+        
+        if (approver && requester && vehicle) {
+          await sendTripStatusToApprover(approver, booking, vehicle, requester, driver, 'completed', endOdometer);
+        }
       }
       
       res.json(booking);
