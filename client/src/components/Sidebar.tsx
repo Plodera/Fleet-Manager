@@ -11,18 +11,21 @@ import {
   X,
   Settings,
   FileText,
-  UsersRound
+  UsersRound,
+  Globe
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
+import { useLanguage } from "@/lib/i18n";
 
 export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const { language, setLanguage, t } = useLanguage();
 
   // Parse user permissions from JSON string
   const userPermissions: string[] = (() => {
@@ -42,15 +45,15 @@ export function Sidebar() {
   };
 
   const allLinks = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard, permission: "view_dashboard" },
-    { href: "/vehicles", label: "Vehicles", icon: Car, permission: "view_vehicles" },
-    { href: "/bookings", label: "Bookings", icon: CalendarDays, permission: "view_bookings" },
-    { href: "/shared-rides", label: "Shared Rides", icon: UsersRound, permission: "view_bookings" },
-    { href: "/maintenance", label: "Maintenance", icon: Wrench, permission: "view_maintenance" },
-    { href: "/fuel", label: "Fuel Log", icon: Fuel, permission: "view_fuel" },
-    { href: "/reports", label: "Reports", icon: FileText, permission: "view_reports" },
-    { href: "/users", label: "Users", icon: Users, permission: "admin_only" },
-    { href: "/settings", label: "Settings", icon: Settings, permission: "admin_only" },
+    { href: "/", label: t.nav.dashboard, icon: LayoutDashboard, permission: "view_dashboard" },
+    { href: "/vehicles", label: t.nav.vehicles, icon: Car, permission: "view_vehicles" },
+    { href: "/bookings", label: t.nav.bookings, icon: CalendarDays, permission: "view_bookings" },
+    { href: "/shared-rides", label: t.nav.sharedRides, icon: UsersRound, permission: "view_bookings" },
+    { href: "/maintenance", label: t.nav.maintenance, icon: Wrench, permission: "view_maintenance" },
+    { href: "/fuel", label: t.nav.fuel, icon: Fuel, permission: "view_fuel" },
+    { href: "/reports", label: t.nav.reports, icon: FileText, permission: "view_reports" },
+    { href: "/users", label: t.nav.users, icon: Users, permission: "admin_only" },
+    { href: "/settings", label: t.nav.settings, icon: Settings, permission: "admin_only" },
   ];
 
   // Filter links based on permissions
@@ -96,13 +99,35 @@ export function Sidebar() {
           <p className="text-sm font-semibold text-foreground">{user?.fullName}</p>
           <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
         </div>
+        <div className="flex gap-2 mb-3">
+          <Button 
+            variant={language === "en" ? "default" : "outline"} 
+            size="sm"
+            className="flex-1 gap-1"
+            onClick={() => setLanguage("en")}
+            data-testid="button-lang-en"
+          >
+            <Globe className="w-3 h-3" />
+            EN
+          </Button>
+          <Button 
+            variant={language === "pt" ? "default" : "outline"} 
+            size="sm"
+            className="flex-1 gap-1"
+            onClick={() => setLanguage("pt")}
+            data-testid="button-lang-pt"
+          >
+            <Globe className="w-3 h-3" />
+            PT
+          </Button>
+        </div>
         <Button 
           variant="outline" 
           className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
           onClick={() => logout()}
         >
           <LogOut className="w-4 h-4" />
-          Sign Out
+          {t.nav.logout}
         </Button>
       </div>
     </div>
