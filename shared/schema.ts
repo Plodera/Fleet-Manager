@@ -23,7 +23,7 @@ export const AVAILABLE_PERMISSIONS = [
 
 export const roleEnum = pgEnum("role", ["admin", "staff", "customer"]);
 export const vehicleStatusEnum = pgEnum("vehicle_status", ["available", "in_use", "maintenance", "unavailable"]);
-export const bookingStatusEnum = pgEnum("booking_status", ["pending", "approved", "rejected", "completed", "cancelled"]);
+export const bookingStatusEnum = pgEnum("booking_status", ["pending", "approved", "rejected", "in_progress", "completed", "cancelled"]);
 export const driveTypeEnum = pgEnum("drive_type", ["self", "driver"]);
 
 export const users = pgTable("users", {
@@ -124,7 +124,7 @@ export const departments = pgTable("departments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const sharedTripStatusEnum = pgEnum("shared_trip_status", ["open", "full", "completed", "cancelled"]);
+export const sharedTripStatusEnum = pgEnum("shared_trip_status", ["open", "full", "in_progress", "completed", "cancelled"]);
 
 export const sharedTrips = pgTable("shared_trips", {
   id: serial("id").primaryKey(),
