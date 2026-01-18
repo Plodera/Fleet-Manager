@@ -220,6 +220,109 @@ export async function registerRoutes(
     }
   });
 
+  // Start trip - driver enters start odometer and begins trip
+  app.patch("/api/bookings/:id/start", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const currentUser = req.user as User;
+    
+    try {
+      const bookingId = Number(req.params.id);
+      const { startOdometer } = req.body;
+      
+      if (typeof startOdometer !== 'number' || startOdometer < 0) {
+        return res.status(400).json({ message: "Valid start odometer reading is required" });
+      }
+      
+      const existingBooking = await storage.getBooking(bookingId);
+      
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // Only the assigned driver, approver, or admin can start the trip
+      const isDriver = existingBooking.driverId === currentUser.id;
+      const isApprover = existingBooking.approverId === currentUser.id;
+      const isAdmin = currentUser.role === 'admin';
+      
+      if (!isDriver && !isApprover && !isAdmin) {
+        return res.status(403).json({ message: "Only the assigned driver or approver can start this trip" });
+      }
+      
+      if (existingBooking.status !== 'approved') {
+        return res.status(400).json({ message: "Only approved bookings can be started" });
+      }
+      
+      // Update booking with start odometer and change status to in_progress
+      const booking = await storage.updateBooking(bookingId, { 
+        status: 'in_progress',
+        startOdometer: startOdometer
+      });
+      
+      res.json(booking);
+    } catch (err) {
+      throw err;
+    }
+  });
+
+  // End trip - driver enters end odometer and completes trip
+  app.patch("/api/bookings/:id/end", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const currentUser = req.user as User;
+    
+    try {
+      const bookingId = Number(req.params.id);
+      const { endOdometer } = req.body;
+      
+      if (typeof endOdometer !== 'number' || endOdometer < 0) {
+        return res.status(400).json({ message: "Valid end odometer reading is required" });
+      }
+      
+      const existingBooking = await storage.getBooking(bookingId);
+      
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // Only the assigned driver, approver, or admin can end the trip
+      const isDriver = existingBooking.driverId === currentUser.id;
+      const isApprover = existingBooking.approverId === currentUser.id;
+      const isAdmin = currentUser.role === 'admin';
+      
+      if (!isDriver && !isApprover && !isAdmin) {
+        return res.status(403).json({ message: "Only the assigned driver or approver can end this trip" });
+      }
+      
+      if (existingBooking.status !== 'in_progress') {
+        return res.status(400).json({ message: "Only in-progress trips can be completed" });
+      }
+      
+      // Validate end odometer is greater than start odometer
+      if (existingBooking.startOdometer && endOdometer < existingBooking.startOdometer) {
+        return res.status(400).json({ message: "End odometer must be greater than start odometer" });
+      }
+      
+      // Update booking with end odometer and change status to completed
+      const booking = await storage.updateBooking(bookingId, { 
+        status: 'completed',
+        endOdometer: endOdometer
+      });
+      
+      // Update vehicle status back to available
+      await storage.updateVehicle(existingBooking.vehicleId, { status: 'available' });
+      
+      // Send email notification to requester about trip completion
+      const requester = await storage.getUser(existingBooking.userId);
+      const vehicle = await storage.getVehicle(existingBooking.vehicleId);
+      if (requester && vehicle) {
+        await sendBookingStatusUpdate(requester, booking, vehicle, 'completed', currentUser);
+      }
+      
+      res.json(booking);
+    } catch (err) {
+      throw err;
+    }
+  });
+
   // End trip - driver or approver can complete the trip
   app.put(api.bookings.endTrip.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

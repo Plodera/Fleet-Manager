@@ -71,6 +71,8 @@ export const bookings = pgTable("bookings", {
   purpose: text("purpose").notNull(),
   destination: text("destination"),
   mileage: integer("mileage").notNull(),
+  startOdometer: integer("start_odometer"),
+  endOdometer: integer("end_odometer"),
   cancellationReason: text("cancellation_reason"),
   passengerCount: integer("passenger_count").default(1).notNull(),
   passengerName: text("passenger_name"),
