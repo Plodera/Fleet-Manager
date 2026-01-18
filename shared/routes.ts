@@ -145,7 +145,7 @@ export const api = {
       method: 'PUT' as const,
       path: '/api/bookings/:id/status',
       input: z.object({ 
-        status: z.enum(['pending', 'approved', 'rejected', 'completed', 'cancelled']),
+        status: z.enum(['pending', 'approved', 'rejected', 'in_progress', 'completed', 'cancelled']),
         cancellationReason: z.string().optional(),
         driverId: z.number().optional().nullable()
       }),
@@ -388,7 +388,7 @@ export const api = {
     updateStatus: {
       method: 'PUT' as const,
       path: '/api/shared-trips/:id/status',
-      input: z.object({ status: z.enum(['open', 'full', 'completed', 'cancelled']) }),
+      input: z.object({ status: z.enum(['open', 'full', 'in_progress', 'completed', 'cancelled']) }),
       responses: {
         200: z.custom<typeof sharedTrips.$inferSelect>(),
         404: errorSchemas.notFound,

@@ -52,7 +52,7 @@ export function useBookings() {
   });
 
   const updateBookingStatus = useMutation({
-    mutationFn: async ({ id, status, cancellationReason, driverId }: { id: number, status: 'approved' | 'rejected' | 'pending' | 'cancelled' | 'completed', cancellationReason?: string, driverId?: number | null }) => {
+    mutationFn: async ({ id, status, cancellationReason, driverId }: { id: number, status: 'approved' | 'rejected' | 'pending' | 'in_progress' | 'cancelled' | 'completed', cancellationReason?: string, driverId?: number | null }) => {
       const url = buildUrl(api.bookings.updateStatus.path, { id });
       const body: { status: string; cancellationReason?: string; driverId?: number | null } = { status };
       if (cancellationReason) body.cancellationReason = cancellationReason;
@@ -75,10 +75,35 @@ export function useBookings() {
         approved: 'Booking approved successfully',
         rejected: 'Booking rejected',
         pending: 'Booking set to pending',
+        in_progress: 'Trip started',
         cancelled: 'Booking cancelled',
         completed: 'Booking marked as completed'
       };
       toast({ title: "Status updated", description: messages[status] });
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const startTrip = useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.bookings.updateStatus.path, { id });
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to start trip");
+      }
+      return api.bookings.updateStatus.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] });
+      toast({ title: "Trip started", description: "The trip is now in progress" });
     },
     onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -123,6 +148,7 @@ export function useBookings() {
     isLoading,
     createBooking,
     updateBookingStatus,
+    startTrip,
     endTrip,
     approvers,
   };
