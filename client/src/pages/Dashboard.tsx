@@ -8,12 +8,14 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n";
 
 export default function Dashboard() {
   const { vehicles, isLoading: loadingVehicles } = useVehicles();
   const { bookings, isLoading: loadingBookings } = useBookings();
   const { records: maintenance, isLoading: loadingMaintenance } = useMaintenanceHook();
   const { records: fuel, isLoading: loadingFuel } = useFuelHook();
+  const { t } = useLanguage();
 
   if (loadingVehicles || loadingBookings || loadingMaintenance || loadingFuel) {
     return (
@@ -59,54 +61,54 @@ export default function Dashboard() {
   const vehiclesUnavailable = vehicles?.filter(v => v.status === "unavailable").length || 0;
   
   const vehicleStatusData = [
-    { name: 'Available', value: availableVehicles, color: '#10b981' },
-    { name: 'In Use', value: vehiclesInUse, color: '#3b82f6' },
-    { name: 'Maintenance', value: vehiclesInMaintenance, color: '#f59e0b' },
-    { name: 'Unavailable', value: vehiclesUnavailable, color: '#6b7280' }
+    { name: t.status.available, value: availableVehicles, color: '#10b981' },
+    { name: t.status.in_use, value: vehiclesInUse, color: '#3b82f6' },
+    { name: t.status.maintenance, value: vehiclesInMaintenance, color: '#f59e0b' },
+    { name: t.status.unavailable, value: vehiclesUnavailable, color: '#6b7280' }
   ].filter(item => item.value > 0);
 
   const bookingStatusData = [
-    { status: 'Pending', count: pendingBookings, dotColor: 'bg-amber-500' },
-    { status: 'Approved', count: approvedBookings, dotColor: 'bg-emerald-500' },
-    { status: 'Completed', count: completedBookings, dotColor: 'bg-blue-500' }
+    { status: t.status.pending, count: pendingBookings, dotColor: 'bg-amber-500' },
+    { status: t.status.approved, count: approvedBookings, dotColor: 'bg-emerald-500' },
+    { status: t.status.completed, count: completedBookings, dotColor: 'bg-blue-500' }
   ];
 
   return (
     <div className="p-6 space-y-6 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-dashboard-title">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">Overview of your fleet management system</p>
+        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-dashboard-title">{t.dashboard.title}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t.dashboard.overview}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard 
-          title="Total Vehicles" 
+          title={t.dashboard.totalVehicles}
           value={totalVehicles}
-          description={`${availableVehicles} available`}
+          description={`${availableVehicles} ${t.dashboard.available}`}
           icon={Car}
           variant="primary"
           data-testid="card-total-vehicles"
         />
         <StatsCard 
-          title="In Use" 
+          title={t.dashboard.inUse}
           value={vehiclesInUse}
-          description="Currently booked"
+          description={t.dashboard.currentlyBooked}
           icon={CalendarCheck}
           variant="success"
           data-testid="card-in-use"
         />
         <StatsCard 
-          title="In Maintenance" 
+          title={t.dashboard.inMaintenance}
           value={vehiclesInMaintenance}
-          description={vehiclesInMaintenance > 0 ? "Requires attention" : "All clear"}
+          description={vehiclesInMaintenance > 0 ? t.dashboard.requiresAttention : t.dashboard.allClear}
           icon={Wrench}
           variant={vehiclesInMaintenance > 0 ? "warning" : "default"}
           data-testid="card-maintenance"
         />
         <StatsCard 
-          title="Pending Approval" 
+          title={t.dashboard.pendingApproval}
           value={pendingBookings}
-          description={pendingBookings > 0 ? "Action needed" : "No pending"}
+          description={pendingBookings > 0 ? t.dashboard.actionNeeded : t.dashboard.noPending}
           icon={AlertCircle}
           variant={pendingBookings > 0 ? "danger" : "default"}
           data-testid="card-pending"
@@ -120,12 +122,12 @@ export default function Dashboard() {
               <div>
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <Fuel className="w-4 h-4 text-primary" />
-                  Fuel Cost by Vehicle
+                  {t.dashboard.fuelCostByVehicle}
                 </CardTitle>
-                <CardDescription className="mt-1">Top 5 vehicles by fuel expense</CardDescription>
+                <CardDescription className="mt-1">{t.dashboard.top5Vehicles}</CardDescription>
               </div>
               <Badge variant="secondary" className="font-mono">
-                Kz {totalFuelCost.toFixed(0)} total
+                Kz {totalFuelCost.toFixed(0)} {t.dashboard.total}
               </Badge>
             </div>
           </CardHeader>
@@ -169,7 +171,7 @@ export default function Dashboard() {
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                   <Fuel className="w-10 h-10 mb-2 opacity-20" />
-                  <p className="text-sm">No fuel records yet</p>
+                  <p className="text-sm">{t.dashboard.noFuelRecords}</p>
                 </div>
               )}
             </div>
@@ -180,9 +182,9 @@ export default function Dashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Activity className="w-4 h-4 text-primary" />
-              Vehicle Status
+              {t.dashboard.vehicleStatus}
             </CardTitle>
-            <CardDescription>Current vehicle distribution</CardDescription>
+            <CardDescription>{t.dashboard.currentDistribution}</CardDescription>
           </CardHeader>
           <CardContent>
             {vehicleStatusData.length > 0 ? (
@@ -222,7 +224,7 @@ export default function Dashboard() {
             ) : (
               <div className="flex flex-col items-center justify-center h-52 text-muted-foreground">
                 <Car className="w-10 h-10 mb-2 opacity-20" />
-                <p className="text-sm">No vehicles registered</p>
+                <p className="text-sm">{t.dashboard.noVehiclesRegistered}</p>
               </div>
             )}
           </CardContent>
@@ -234,9 +236,9 @@ export default function Dashboard() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" />
-              Booking Overview
+              {t.dashboard.bookingOverview}
             </CardTitle>
-            <CardDescription>Current booking status breakdown</CardDescription>
+            <CardDescription>{t.dashboard.bookingStatusBreakdown}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
@@ -252,7 +254,7 @@ export default function Dashboard() {
             </div>
             <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/10">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Completion Rate</span>
+                <span className="text-sm text-muted-foreground">{t.dashboard.completionRate}</span>
                 <span className="text-lg font-bold text-primary">{bookingCompletionRate}%</span>
               </div>
               <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
@@ -269,9 +271,9 @@ export default function Dashboard() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Clock className="w-4 h-4 text-primary" />
-              Recent Bookings
+              {t.dashboard.recentBookings}
             </CardTitle>
-            <CardDescription>Latest booking activity</CardDescription>
+            <CardDescription>{t.dashboard.latestActivity}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -305,14 +307,14 @@ export default function Dashboard() {
                     }
                     className="flex-shrink-0"
                   >
-                    {booking.status}
+                    {t.status[booking.status as keyof typeof t.status] || booking.status}
                   </Badge>
                 </div>
               ))}
               {(!bookings || bookings.length === 0) && (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                   <CalendarCheck className="w-10 h-10 mb-2 opacity-20" />
-                  <p className="text-sm">No bookings yet</p>
+                  <p className="text-sm">{t.dashboard.noBookingsYet}</p>
                 </div>
               )}
             </div>
