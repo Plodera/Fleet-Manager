@@ -41,7 +41,7 @@ export default function Settings() {
       smtpUser: "",
       smtpPass: "",
       smtpSecure: true,
-      fromName: "FleetCmd",
+      fromName: "VMS",
       fromEmail: "",
       enabled: false,
     },
@@ -211,7 +211,7 @@ export default function Settings() {
                     <FormItem>
                       <FormLabel>From Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="FleetCmd" {...field} data-testid="input-from-name" />
+                        <Input placeholder="VMS" {...field} data-testid="input-from-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

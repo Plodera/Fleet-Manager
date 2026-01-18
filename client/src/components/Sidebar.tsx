@@ -85,7 +85,7 @@ export function Sidebar() {
             <Car className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-lg tracking-tight text-foreground">FleetCmD</h1>
+            <h1 className="font-display font-bold text-lg tracking-tight text-foreground">VMS</h1>
             <p className="text-xs text-muted-foreground">Aisco Transport Mgmt</p>
           </div>
         </div>
