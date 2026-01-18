@@ -11,6 +11,16 @@ A fleet management and booking system for organizational vehicles with user auth
 - User Permissions System: Granular access control
 - Analytics Dashboard
 - Booking Approval Workflow: Designate approvers, bookings require approval before use
+- Bilingual Support: English/Portuguese for navigation, buttons, and status labels
+
+## Bilingual Support
+The system supports English and Portuguese languages for essential UI elements:
+- Navigation menu items
+- Button labels (Approve, Reject, Start Trip, End Trip, Export, etc.)
+- Status badges (Pending, Approved, In Progress, Completed, etc.)
+- Common labels and messages
+
+Language selection is available in the sidebar footer and preference is saved to localStorage.
 
 ## Email Notifications
 The system supports SMTP email notifications configured through the Settings page (admin only):

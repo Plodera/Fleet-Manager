@@ -20,11 +20,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { useLanguage } from "@/lib/i18n";
 
 export default function Bookings() {
   const { bookings, isLoading, createBooking, updateBookingStatus, startTrip, endTrip, approvers } = useBookings();
   const { vehicles } = useVehicles();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelBookingId, setCancelBookingId] = useState<number | null>(null);
@@ -168,11 +170,12 @@ export default function Bookings() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'approved': return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">Approved</Badge>;
-      case 'pending': return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800">Pending</Badge>;
-      case 'rejected': return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">Rejected</Badge>;
-      case 'completed': return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">Completed</Badge>;
-      case 'cancelled': return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800">Cancelled</Badge>;
+      case 'approved': return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">{t.status.approved}</Badge>;
+      case 'pending': return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800">{t.status.pending}</Badge>;
+      case 'rejected': return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">{t.status.rejected}</Badge>;
+      case 'in_progress': return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">{t.status.in_progress}</Badge>;
+      case 'completed': return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-slate-200 dark:bg-slate-900/30 dark:text-slate-400 dark:border-slate-800">{t.status.completed}</Badge>;
+      case 'cancelled': return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800">{t.status.cancelled}</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
   };
@@ -586,7 +589,7 @@ export default function Bookings() {
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-approve-booking-${booking.id}`}
                   >
-                    <Check className="w-4 h-4 mr-1" /> Approve
+                    <Check className="w-4 h-4 mr-1" /> {t.buttons.approve}
                   </Button>
                   <Button 
                     size="sm" 
@@ -596,7 +599,7 @@ export default function Bookings() {
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-reject-booking-${booking.id}`}
                   >
-                    <X className="w-4 h-4 mr-1" /> Reject
+                    <X className="w-4 h-4 mr-1" /> {t.buttons.reject}
                   </Button>
                   <Button 
                     size="sm" 
@@ -606,7 +609,7 @@ export default function Bookings() {
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-cancel-booking-${booking.id}`}
                   >
-                    <Ban className="w-4 h-4 mr-1" /> Cancel
+                    <Ban className="w-4 h-4 mr-1" /> {t.buttons.cancel}
                   </Button>
                 </div>
               )}
@@ -622,7 +625,7 @@ export default function Bookings() {
                 <div className="flex gap-2 flex-wrap items-center">
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
                     <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-sm font-medium text-green-700 dark:text-green-300">Approved</span>
+                    <span className="text-sm font-medium text-green-700 dark:text-green-300">{t.status.approved}</span>
                   </div>
                   {((booking as any).driverId === user?.id || booking.approverId === user?.id || user?.role === 'admin' || user?.isApprover) && (
                     <Button 
@@ -632,7 +635,7 @@ export default function Bookings() {
                       disabled={startTrip.isPending}
                       data-testid={`button-start-trip-${booking.id}`}
                     >
-                      <Play className="w-4 h-4 mr-1" /> Start Trip
+                      <Play className="w-4 h-4 mr-1" /> {t.buttons.startTrip}
                     </Button>
                   )}
                   {(booking.approverId === user?.id || user?.role === 'admin') && (
@@ -654,7 +657,7 @@ export default function Bookings() {
                         disabled={updateBookingStatus.isPending}
                         data-testid={`button-cancel-approved-booking-${booking.id}`}
                       >
-                        <Ban className="w-4 h-4 mr-1" /> Cancel
+                        <Ban className="w-4 h-4 mr-1" /> {t.buttons.cancel}
                       </Button>
                     </>
                   )}
@@ -665,7 +668,7 @@ export default function Bookings() {
                 <div className="flex gap-2 flex-wrap items-center">
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
                     <Car className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">In Progress</span>
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{t.status.in_progress}</span>
                   </div>
                   {((booking as any).driverId === user?.id || booking.approverId === user?.id || user?.role === 'admin' || user?.isApprover) && (
                     <Button 
@@ -676,7 +679,7 @@ export default function Bookings() {
                       disabled={endTrip.isPending}
                       data-testid={`button-end-trip-${booking.id}`}
                     >
-                      <Flag className="w-4 h-4 mr-1" /> End Trip
+                      <Flag className="w-4 h-4 mr-1" /> {t.buttons.endTrip}
                     </Button>
                   )}
                 </div>
@@ -685,7 +688,7 @@ export default function Bookings() {
               {booking.status === 'cancelled' && !booking.cancellationReason && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
                   <Ban className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                  <span className="text-sm font-medium text-orange-700 dark:text-orange-300">Cancelled</span>
+                  <span className="text-sm font-medium text-orange-700 dark:text-orange-300">{t.status.cancelled}</span>
                 </div>
               )}
 
@@ -699,7 +702,7 @@ export default function Bookings() {
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-reapprove-booking-${booking.id}`}
                   >
-                    <Check className="w-4 h-4 mr-1" /> Approve
+                    <Check className="w-4 h-4 mr-1" /> {t.buttons.approve}
                   </Button>
                   <Button 
                     size="sm"
@@ -708,7 +711,7 @@ export default function Bookings() {
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-set-pending-cancelled-${booking.id}`}
                   >
-                    Set Pending
+                    {t.buttons.setPending}
                   </Button>
                 </div>
               )}
@@ -719,7 +722,7 @@ export default function Bookings() {
                 onClick={() => window.open(`/bookings/${booking.id}/print`, '_blank')}
                 data-testid={`button-print-booking-${booking.id}`}
               >
-                <Printer className="w-4 h-4 mr-1" /> Export
+                <Printer className="w-4 h-4 mr-1" /> {t.buttons.export}
               </Button>
             </CardContent>
           </Card>

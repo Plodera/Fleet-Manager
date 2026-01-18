@@ -15,10 +15,12 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Car, Gauge, Calendar, Pencil, Image, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage } from "@/lib/i18n";
 
 export default function Vehicles() {
   const { vehicles, isLoading, createVehicle, updateVehicle, deleteVehicle } = useVehicles();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const isAdmin = user?.role === 'admin';
   const canManageAvailability = isAdmin || user?.isApprover;
   const [search, setSearch] = useState("");
@@ -423,7 +425,7 @@ export default function Vehicles() {
                   className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500"
                 />
                 <Badge className={`absolute top-4 right-4 shadow-sm ${statusColors[vehicle.status] || statusColors.available}`}>
-                  {vehicle.status === 'in_use' ? 'In Use' : vehicle.status === 'unavailable' ? 'Unavailable' : vehicle.status.charAt(0).toUpperCase() + vehicle.status.slice(1)}
+                  {t.status[vehicle.status as keyof typeof t.status] || vehicle.status}
                 </Badge>
               </div>
               <CardContent className="p-6">

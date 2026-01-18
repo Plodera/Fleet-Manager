@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { api } from "@shared/routes";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/i18n";
 import { z } from "zod";
 
 const joinTripSchema = z.object({
@@ -37,6 +38,7 @@ const createTripSchema = z.object({
 export default function SharedRides() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
@@ -191,11 +193,11 @@ export default function SharedRides() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'open': return <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">Open</Badge>;
-      case 'full': return <Badge className="bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800">Full</Badge>;
-      case 'in_progress': return <Badge className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">In Progress</Badge>;
-      case 'completed': return <Badge className="bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800">Completed</Badge>;
-      case 'cancelled': return <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">Cancelled</Badge>;
+      case 'open': return <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">{t.status.open}</Badge>;
+      case 'full': return <Badge className="bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800">{t.status.full}</Badge>;
+      case 'in_progress': return <Badge className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">{t.status.in_progress}</Badge>;
+      case 'completed': return <Badge className="bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800">{t.status.completed}</Badge>;
+      case 'cancelled': return <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">{t.status.cancelled}</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
   };
@@ -519,11 +521,11 @@ export default function SharedRides() {
                       data-testid={`button-join-trip-${trip.id}`}
                     >
                       <UserPlus className="w-4 h-4 mr-2" />
-                      Join Trip ({availableSeats} seats left)
+                      {t.buttons.joinTrip} ({availableSeats} seats left)
                     </Button>
                   ) : (
                     <Button className="w-full" disabled variant="secondary">
-                      {trip.status === 'full' ? 'Trip Full' : trip.status === 'completed' ? 'Completed' : 'Unavailable'}
+                      {trip.status === 'full' ? t.status.full : trip.status === 'completed' ? t.status.completed : t.status.unavailable}
                     </Button>
                   )}
                   
@@ -547,7 +549,7 @@ export default function SharedRides() {
                             data-testid={`button-start-trip-${trip.id}`}
                           >
                             <Play className="w-4 h-4 mr-1" />
-                            Start Trip
+                            {t.buttons.startTrip}
                           </Button>
                         )}
                         {canManageTrip && trip.status === 'in_progress' && (
@@ -560,7 +562,7 @@ export default function SharedRides() {
                             data-testid={`button-end-trip-${trip.id}`}
                           >
                             <CheckCircle className="w-4 h-4 mr-1" />
-                            End Trip
+                            {t.buttons.endTrip}
                           </Button>
                         )}
                         {canDelete && (
@@ -577,7 +579,7 @@ export default function SharedRides() {
                             data-testid={`button-delete-trip-${trip.id}`}
                           >
                             <Trash2 className="w-4 h-4 mr-1" />
-                            Delete
+                            {t.buttons.delete}
                           </Button>
                         )}
                         <Button 
@@ -588,7 +590,7 @@ export default function SharedRides() {
                           data-testid={`button-print-trip-${trip.id}`}
                         >
                           <Printer className="w-4 h-4 mr-1" />
-                          Export
+                          {t.buttons.export}
                         </Button>
                       </div>
                     );
