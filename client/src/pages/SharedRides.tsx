@@ -247,8 +247,8 @@ export default function SharedRides() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">Shared Rides</h1>
-          <p className="text-muted-foreground mt-1">View available seats and join shared trips.</p>
+          <h1 className="text-3xl font-bold font-display tracking-tight">{t.sharedRides.title}</h1>
+          <p className="text-muted-foreground mt-1">{t.sharedRides.subtitle}</p>
         </div>
         
         {canCreateTrip && (
@@ -256,31 +256,31 @@ export default function SharedRides() {
             <DialogTrigger asChild>
               <Button className="shadow-lg shadow-primary/25" data-testid="button-create-shared-trip">
                 <Plus className="w-4 h-4 mr-2" />
-                Create Shared Trip
+                {t.sharedRides.createSharedTrip}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create Shared Trip</DialogTitle>
+                <DialogTitle>{t.sharedRides.createSharedTrip}</DialogTitle>
                 <DialogDescription>
-                  Create a shared trip that others can join.
+                  {t.sharedRides.createDescription}
                 </DialogDescription>
               </DialogHeader>
               <Form {...createForm}>
                 <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-4">
                   <FormField control={createForm.control} name="vehicleId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Vehicle (6+ seats)</FormLabel>
+                      <FormLabel>{t.sharedRides.vehicleLarge}</FormLabel>
                       <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value ? String(field.value) : undefined}>
                         <FormControl>
                           <SelectTrigger data-testid="select-vehicle">
-                            <SelectValue placeholder="Choose a large vehicle" />
+                            <SelectValue placeholder={t.sharedRides.chooseLargeVehicle} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {largeVehicles.map((v: any) => (
                             <SelectItem key={v.id} value={String(v.id)}>
-                              {v.make} {v.model} ({v.licensePlate}) - {v.capacity} seats
+                              {v.make} {v.model} ({v.licensePlate}) - {v.capacity} {t.vehicles.seats}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -292,7 +292,7 @@ export default function SharedRides() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField control={createForm.control} name="startTime" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Departure Time</FormLabel>
+                        <FormLabel>{t.sharedRides.departureTime}</FormLabel>
                         <FormControl>
                           <Input type="datetime-local" {...field} data-testid="input-start-time" />
                         </FormControl>
@@ -301,7 +301,7 @@ export default function SharedRides() {
                     )} />
                     <FormField control={createForm.control} name="endTime" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Return Time</FormLabel>
+                        <FormLabel>{t.sharedRides.returnTime}</FormLabel>
                         <FormControl>
                           <Input type="datetime-local" {...field} data-testid="input-end-time" />
                         </FormControl>
@@ -312,9 +312,9 @@ export default function SharedRides() {
 
                   <FormField control={createForm.control} name="destination" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Destination</FormLabel>
+                      <FormLabel>{t.sharedRides.destination}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Where is the trip going?" {...field} data-testid="input-destination" />
+                        <Input placeholder={t.sharedRides.destinationPlaceholder} {...field} data-testid="input-destination" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -322,16 +322,16 @@ export default function SharedRides() {
 
                   <FormField control={createForm.control} name="notes" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Notes (Optional)</FormLabel>
+                      <FormLabel>{t.sharedRides.notesOptional}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Any additional notes..." {...field} data-testid="input-notes" />
+                        <Input placeholder={t.sharedRides.notesPlaceholder} {...field} data-testid="input-notes" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
 
                   <Button type="submit" className="w-full" disabled={createTrip.isPending} data-testid="button-submit-create">
-                    {createTrip.isPending ? "Creating..." : "Create Shared Trip"}
+                    {createTrip.isPending ? t.sharedRides.creating : t.sharedRides.createSharedTrip}
                   </Button>
                 </form>
               </Form>
@@ -345,12 +345,12 @@ export default function SharedRides() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-primary" />
-              Join Shared Trip
+              {t.sharedRides.joinSharedTrip}
             </DialogTitle>
             <DialogDescription>
               {selectedTrip && (
                 <span>
-                  Join trip to {selectedTrip.destination} on {format(new Date(selectedTrip.startTime), 'MMM dd, yyyy')}
+                  {t.sharedRides.joinTripTo} {selectedTrip.destination} {t.sharedRides.on} {format(new Date(selectedTrip.startTime), 'MMM dd, yyyy')}
                 </span>
               )}
             </DialogDescription>
@@ -360,15 +360,15 @@ export default function SharedRides() {
               {selectedTrip && (
                 <div className="bg-muted p-3 rounded-md space-y-2">
                   <p className="text-sm">
-                    <span className="font-medium">Available seats:</span>{" "}
-                    {selectedTrip.totalCapacity - selectedTrip.reservedSeats} of {selectedTrip.totalCapacity}
+                    <span className="font-medium">{t.sharedRides.availableSeats}:</span>{" "}
+                    {selectedTrip.totalCapacity - selectedTrip.reservedSeats} {t.sharedRides.of} {selectedTrip.totalCapacity}
                   </p>
                 </div>
               )}
               
               <FormField control={joinForm.control} name="passengerCount" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Number of Seats Needed</FormLabel>
+                  <FormLabel>{t.sharedRides.seatsNeeded}</FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 
@@ -384,9 +384,9 @@ export default function SharedRides() {
 
               <FormField control={joinForm.control} name="purpose" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purpose of Travel</FormLabel>
+                  <FormLabel>{t.sharedRides.purposeOfTravel}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Meeting, Training, etc..." {...field} data-testid="input-purpose" />
+                    <Input placeholder={t.sharedRides.purposePlaceholder} {...field} data-testid="input-purpose" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -394,9 +394,9 @@ export default function SharedRides() {
 
               <FormField control={joinForm.control} name="passengerName" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Your Name</FormLabel>
+                  <FormLabel>{t.sharedRides.yourName}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Full name" {...field} data-testid="input-passenger-name" />
+                    <Input placeholder={t.sharedRides.fullName} {...field} data-testid="input-passenger-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -404,7 +404,7 @@ export default function SharedRides() {
 
               <FormField control={joinForm.control} name="passengerPhone" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Phone Number</FormLabel>
+                  <FormLabel>{t.sharedRides.phoneNumber}</FormLabel>
                   <FormControl>
                     <Input placeholder="+244 XXX XXX XXX" {...field} data-testid="input-passenger-phone" />
                   </FormControl>
@@ -414,10 +414,10 @@ export default function SharedRides() {
 
               <DialogFooter>
                 <Button variant="outline" type="button" onClick={() => setJoinDialogOpen(false)} data-testid="button-cancel-join">
-                  Cancel
+                  {t.buttons.cancel}
                 </Button>
                 <Button type="submit" disabled={joinTrip.isPending} data-testid="button-confirm-join">
-                  {joinTrip.isPending ? "Joining..." : "Join Trip"}
+                  {joinTrip.isPending ? t.sharedRides.joining : t.buttons.joinTrip}
                 </Button>
               </DialogFooter>
             </form>
@@ -433,9 +433,9 @@ export default function SharedRides() {
         ) : sharedTrips?.length === 0 ? (
           <div className="col-span-full text-center py-12">
             <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">No shared trips available</h3>
+            <h3 className="text-lg font-medium">{t.sharedRides.noSharedTrips}</h3>
             <p className="text-muted-foreground">
-              {canCreateTrip ? "Create a new shared trip to get started." : "Check back later for available trips."}
+              {canCreateTrip ? t.sharedRides.createToStart : t.sharedRides.checkBackLater}
             </p>
           </div>
         ) : sharedTrips?.map((trip: any) => {
@@ -463,7 +463,7 @@ export default function SharedRides() {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <MapPin className="w-4 h-4" />
-                    <span>{trip.destination || "No destination set"}</span>
+                    <span>{trip.destination || t.sharedRides.noDestination}</span>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Calendar className="w-4 h-4" />
@@ -479,11 +479,11 @@ export default function SharedRides() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium flex items-center gap-1.5">
                       <Users className="w-4 h-4" />
-                      Seats
+                      {t.sharedRides.seats}
                     </span>
                     <span className="text-sm">
                       <span className="font-semibold text-primary">{availableSeats}</span>
-                      <span className="text-muted-foreground"> of {trip.totalCapacity} available</span>
+                      <span className="text-muted-foreground"> {t.sharedRides.of} {trip.totalCapacity} {t.sharedRides.available}</span>
                     </span>
                   </div>
                   <SeatVisualization 
@@ -494,7 +494,7 @@ export default function SharedRides() {
 
                 {trip.passengers?.length > 0 && (
                   <div className="pt-2 border-t">
-                    <p className="text-xs text-muted-foreground mb-1.5">Passengers:</p>
+                    <p className="text-xs text-muted-foreground mb-1.5">{t.sharedRides.passengers}:</p>
                     <div className="flex flex-wrap gap-1">
                       {trip.passengers.map((p: any, idx: number) => (
                         <Badge key={idx} variant="secondary" className="text-xs">
@@ -512,7 +512,7 @@ export default function SharedRides() {
                 <div className="pt-2 space-y-2">
                   {alreadyJoined ? (
                     <Badge className="w-full justify-center py-2 bg-green-100 text-green-700 border-green-200">
-                      <Check className="w-4 h-4 mr-1" /> You're on this trip
+                      <Check className="w-4 h-4 mr-1" /> {t.bookings.youreOnThisTrip}
                     </Badge>
                   ) : isOpen ? (
                     <Button 
@@ -521,7 +521,7 @@ export default function SharedRides() {
                       data-testid={`button-join-trip-${trip.id}`}
                     >
                       <UserPlus className="w-4 h-4 mr-2" />
-                      {t.buttons.joinTrip} ({availableSeats} seats left)
+                      {t.buttons.joinTrip} ({availableSeats} {t.sharedRides.seatsLeft})
                     </Button>
                   ) : (
                     <Button className="w-full" disabled variant="secondary">

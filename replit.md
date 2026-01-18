@@ -14,11 +14,26 @@ A fleet management and booking system for organizational vehicles with user auth
 - Bilingual Support: English/Portuguese for navigation, buttons, and status labels
 
 ## Bilingual Support
-The system supports English and Portuguese languages for essential UI elements:
-- Navigation menu items
-- Button labels (Approve, Reject, Start Trip, End Trip, Export, etc.)
-- Status badges (Pending, Approved, In Progress, Completed, etc.)
-- Common labels and messages
+The system supports comprehensive English and Portuguese translations across all major pages:
+
+### Translation Coverage:
+- **Navigation**: All sidebar menu items (Dashboard, Vehicles, Bookings, Shared Rides, etc.)
+- **Buttons**: Save, Cancel, Delete, Edit, Approve, Reject, Start Trip, End Trip, Export, etc.
+- **Status Badges**: Pending, Approved, In Progress, Completed, Available, In Use, etc.
+- **Dashboard**: All cards, charts, and overview sections
+- **Vehicles Page**: Page title/subtitle, form labels (make, model, year, mileage, license plate, VIN, category, capacity), dialog titles, category options (Car, Van, Bus, Truck), search placeholder, empty states
+- **Bookings Page**: Page title/subtitle, all form fields (vehicle, odometer, times, destination, purpose, passengers, drive type, approver), cancel/approve dialogs, driver assignment interface
+- **Shared Rides Page**: Page title/subtitle, create/join trip forms, seat visualization, trip cards, passenger information fields, status messages
+
+### Translation Keys Structure:
+- `t.nav.*` - Navigation items
+- `t.buttons.*` - Common button labels
+- `t.status.*` - Status badge labels
+- `t.labels.*` - Common labels
+- `t.dashboard.*` - Dashboard page
+- `t.vehicles.*` - Vehicles page (80+ keys)
+- `t.bookings.*` - Bookings page (40+ keys)
+- `t.sharedRides.*` - Shared Rides page (30+ keys)
 
 Language selection is available in the sidebar footer and preference is saved to localStorage.
 

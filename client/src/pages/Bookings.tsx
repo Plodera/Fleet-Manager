@@ -186,33 +186,33 @@ export default function Bookings() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">Bookings</h1>
-          <p className="text-muted-foreground mt-1">Manage reservations and requests.</p>
+          <h1 className="text-3xl font-bold font-display tracking-tight">{t.bookings.title}</h1>
+          <p className="text-muted-foreground mt-1">{t.bookings.subtitle}</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="shadow-lg shadow-primary/25" data-testid="button-new-booking">New Booking</Button>
+            <Button className="shadow-lg shadow-primary/25" data-testid="button-new-booking">{t.bookings.newBooking}</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Request Vehicle</DialogTitle>
+              <DialogTitle>{t.bookings.requestVehicle}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="vehicleId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Select Vehicle</FormLabel>
+                    <FormLabel>{t.bookings.selectVehicle}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="select-vehicle">
-                          <SelectValue placeholder="Choose an available vehicle" />
+                          <SelectValue placeholder={t.bookings.chooseVehicle} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {availableVehicles?.map(v => (
                           <SelectItem key={v.id} value={String(v.id)}>
-                            {v.make} {v.model} ({v.licensePlate}) - {(v as any).capacity || 5} seats
+                            {v.make} {v.model} ({v.licensePlate}) - {(v as any).capacity || 5} {t.vehicles.seats}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -223,18 +223,18 @@ export default function Bookings() {
 
                 {selectedVehicle && (
                   <div className="bg-muted p-3 rounded-md">
-                    <p className="text-sm font-medium text-muted-foreground">Current Mileage</p>
-                    <p className="text-lg font-semibold">{selectedVehicle.currentMileage?.toLocaleString() || 0} miles</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.bookings.currentMileage}</p>
+                    <p className="text-lg font-semibold">{selectedVehicle.currentMileage?.toLocaleString() || 0} km</p>
                   </div>
                 )}
 
                 <FormField control={form.control} name="mileage" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Odometer Reading (Current Mileage)</FormLabel>
+                    <FormLabel>{t.bookings.odometerReading}</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
-                        placeholder="Enter current odometer reading" 
+                        placeholder={t.bookings.enterOdometer}
                         value={field.value || ""}
                         onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseInt(e.target.value, 10))}
                         data-testid="input-mileage"
@@ -247,7 +247,7 @@ export default function Bookings() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="startTime" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Start Time</FormLabel>
+                      <FormLabel>{t.bookings.startTime}</FormLabel>
                       <FormControl>
                         <Input type="datetime-local" {...field} data-testid="input-start-time" />
                       </FormControl>
@@ -256,7 +256,7 @@ export default function Bookings() {
                   )} />
                   <FormField control={form.control} name="endTime" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>End Time</FormLabel>
+                      <FormLabel>{t.bookings.endTime}</FormLabel>
                       <FormControl>
                         <Input type="datetime-local" {...field} data-testid="input-end-time" />
                       </FormControl>
@@ -267,16 +267,16 @@ export default function Bookings() {
 
                 <FormField control={form.control} name="destination" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Destination</FormLabel>
-                    <FormControl><Input placeholder="City, Location..." {...field} data-testid="input-destination" /></FormControl>
+                    <FormLabel>{t.bookings.destination}</FormLabel>
+                    <FormControl><Input placeholder={t.bookings.destinationPlaceholder} {...field} data-testid="input-destination" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
 
                 <FormField control={form.control} name="purpose" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Purpose</FormLabel>
-                    <FormControl><Input placeholder="Client meeting, Delivery..." {...field} data-testid="input-purpose" /></FormControl>
+                    <FormLabel>{t.bookings.purpose}</FormLabel>
+                    <FormControl><Input placeholder={t.bookings.purposePlaceholder} {...field} data-testid="input-purpose" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -284,7 +284,7 @@ export default function Bookings() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="passengerCount" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Number of Passengers</FormLabel>
+                      <FormLabel>{t.bookings.numberOfPassengers}</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -298,7 +298,7 @@ export default function Bookings() {
                       </FormControl>
                       {selectedVehicle && (
                         <p className="text-xs text-muted-foreground">
-                          Vehicle capacity: {(selectedVehicle as any).capacity || 5} passengers
+                          {t.bookings.vehicleCapacity}: {(selectedVehicle as any).capacity || 5} {t.bookings.passengers}
                         </p>
                       )}
                       <FormMessage />
@@ -316,11 +316,11 @@ export default function Bookings() {
                             data-testid="checkbox-share-allowed"
                           />
                           <label htmlFor="shareAllowed" className="text-sm font-medium cursor-pointer">
-                            Allow car sharing
+                            {t.bookings.allowCarSharing}
                           </label>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Let approver combine trips with others going the same way
+                          {t.bookings.sharingDescription}
                         </p>
                       </FormItem>
                     )} />
@@ -329,7 +329,7 @@ export default function Bookings() {
 
                 <FormField control={form.control} name="driveType" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Drive Type</FormLabel>
+                    <FormLabel>{t.bookings.driveType}</FormLabel>
                     <div className="flex gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -341,7 +341,7 @@ export default function Bookings() {
                           className="w-4 h-4"
                           data-testid="radio-self-driven"
                         />
-                        <span className="text-sm">Self-driven</span>
+                        <span className="text-sm">{t.bookings.selfDriven}</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -353,13 +353,13 @@ export default function Bookings() {
                           className="w-4 h-4"
                           data-testid="radio-with-driver"
                         />
-                        <span className="text-sm">With assigned driver</span>
+                        <span className="text-sm">{t.bookings.withDriver}</span>
                       </label>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       {field.value === "self" 
-                        ? "You will drive the vehicle yourself" 
-                        : "A driver will be assigned when approved"}
+                        ? t.bookings.selfDrivenDesc
+                        : t.bookings.driverAssignedDesc}
                     </p>
                     <FormMessage />
                   </FormItem>
@@ -367,11 +367,11 @@ export default function Bookings() {
 
                 <FormField control={form.control} name="approverId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Approver (Required)</FormLabel>
+                    <FormLabel>{t.bookings.approver}</FormLabel>
                     <Select onValueChange={(val) => field.onChange(val ? Number(val) : undefined)} defaultValue={field.value ? String(field.value) : undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="select-approver">
-                          <SelectValue placeholder="Select approver" />
+                          <SelectValue placeholder={t.bookings.selectApprover} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -387,7 +387,7 @@ export default function Bookings() {
                 )} />
 
                 <Button type="submit" className="w-full" disabled={createBooking.isPending} data-testid="button-submit-booking">
-                  {createBooking.isPending ? "Submitting..." : "Submit Request"}
+                  {createBooking.isPending ? t.bookings.submitting : t.bookings.submitRequest}
                 </Button>
               </form>
             </Form>
@@ -400,21 +400,21 @@ export default function Bookings() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-orange-500" />
-              Cancel Booking
+              {t.bookings.cancelBooking}
             </DialogTitle>
             <DialogDescription>
               {cancellingBooking && (
                 <span>
-                  Cancelling booking for {cancellingBooking.vehicle.make} {cancellingBooking.vehicle.model}
+                  {t.bookings.cancellingFor} {cancellingBooking.vehicle.make} {cancellingBooking.vehicle.model}
                 </span>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Reason for cancellation <span className="text-destructive">*</span></label>
+              <label className="text-sm font-medium mb-2 block">{t.bookings.cancelReason} <span className="text-destructive">*</span></label>
               <Textarea
-                placeholder="Please provide a reason for cancelling this booking..."
+                placeholder={t.bookings.cancelPlaceholder}
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 className="min-h-24"
@@ -424,7 +424,7 @@ export default function Bookings() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelDialogOpen(false)} data-testid="button-cancel-dialog-close">
-              Go Back
+              {t.bookings.goBack}
             </Button>
             <Button 
               variant="destructive" 
@@ -432,7 +432,7 @@ export default function Bookings() {
               disabled={!cancelReason.trim() || updateBookingStatus.isPending}
               data-testid="button-confirm-cancel"
             >
-              {updateBookingStatus.isPending ? "Cancelling..." : "Confirm Cancellation"}
+              {updateBookingStatus.isPending ? t.bookings.cancelling : t.bookings.confirmCancellation}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -443,12 +443,12 @@ export default function Bookings() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Check className="w-5 h-5 text-green-500" />
-              Approve Booking
+              {t.bookings.approveBooking}
             </DialogTitle>
             <DialogDescription>
               {approvingBooking && (
                 <span>
-                  Approving booking for {approvingBooking.vehicle.make} {approvingBooking.vehicle.model}
+                  {t.bookings.approvingFor} {approvingBooking.vehicle.make} {approvingBooking.vehicle.model}
                 </span>
               )}
             </DialogDescription>
@@ -457,25 +457,25 @@ export default function Bookings() {
             {approvingBooking && (
               <div className="bg-muted p-3 rounded-md">
                 <p className="text-sm">
-                  <span className="font-medium">Drive Type:</span>{" "}
-                  {(approvingBooking as any).driveType === "driver" ? "With assigned driver" : "Self-driven"}
+                  <span className="font-medium">{t.bookings.driveType}:</span>{" "}
+                  {(approvingBooking as any).driveType === "driver" ? t.bookings.withDriver : t.bookings.selfDriven}
                 </p>
               </div>
             )}
             {approvingBooking && (approvingBooking as any).driveType === "driver" && (
               <div>
                 <label className="text-sm font-medium mb-2 block">
-                  Assign Driver <span className="text-destructive">*</span>
+                  {t.bookings.assignDriver} <span className="text-destructive">*</span>
                 </label>
                 <Select 
                   value={selectedDriverId ? String(selectedDriverId) : "none"} 
                   onValueChange={(val) => setSelectedDriverId(val === "none" ? null : Number(val))}
                 >
                   <SelectTrigger data-testid="select-driver">
-                    <SelectValue placeholder="Select a driver" />
+                    <SelectValue placeholder={t.bookings.selectDriver} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Select a driver...</SelectItem>
+                    <SelectItem value="none">{t.bookings.selectDriver}...</SelectItem>
                     {drivers?.map(d => (
                       <SelectItem key={d.id} value={String(d.id)}>
                         {d.fullName} ({d.username})
@@ -484,11 +484,11 @@ export default function Bookings() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Driver will be notified and can mark the trip as completed
+                  {t.bookings.driverNotification}
                 </p>
                 {(!drivers || drivers.length === 0) && (
                   <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                    No drivers available. Mark users as drivers in the Users page.
+                    {t.bookings.noDrivers}
                   </p>
                 )}
               </div>
@@ -496,7 +496,7 @@ export default function Bookings() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setApprovalDialogOpen(false)} data-testid="button-approval-dialog-close">
-              Cancel
+              {t.buttons.cancel}
             </Button>
             <Button 
               onClick={handleConfirmApproval}
@@ -504,7 +504,7 @@ export default function Bookings() {
               className="bg-green-600 hover:bg-green-700"
               data-testid="button-confirm-approval"
             >
-              {updateBookingStatus.isPending ? "Approving..." : "Approve Booking"}
+              {updateBookingStatus.isPending ? t.bookings.approving : t.bookings.approveBooking}
             </Button>
           </DialogFooter>
         </DialogContent>
