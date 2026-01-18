@@ -776,8 +776,12 @@ export async function registerRoutes(
       const trip = await storage.getSharedTrip(tripId);
       if (!trip) return res.status(404).json({ message: "Shared trip not found" });
       
+      // Drivers cannot delete trips, even if they are also approvers
       if (user.role !== 'admin' && !user.isApprover) {
         return res.status(403).json({ message: "Only approvers or admins can delete trips" });
+      }
+      if (user.isDriver) {
+        return res.status(403).json({ message: "Drivers cannot delete trips" });
       }
       
       await storage.deleteSharedTrip(tripId);

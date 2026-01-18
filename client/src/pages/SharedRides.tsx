@@ -533,7 +533,8 @@ export default function SharedRides() {
                     const tripBookings = allBookings?.filter((b: any) => b.sharedTripId === trip.id) || [];
                     const isDriver = tripBookings.some((b: any) => b.driverId === user?.id);
                     const canManageTrip = user?.role === 'admin' || user?.isApprover || isDriver;
-                    const canDelete = user?.role === 'admin' || user?.isApprover;
+                    // Drivers cannot delete - only admins and approvers who are NOT drivers
+                    const canDelete = (user?.role === 'admin' || user?.isApprover) && !user?.isDriver;
                     
                     if (!canManageTrip && !canDelete) return null;
                     
