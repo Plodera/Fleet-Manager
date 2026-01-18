@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon, Play } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon, Play, Printer } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
@@ -712,6 +712,15 @@ export default function Bookings() {
                   </Button>
                 </div>
               )}
+
+              <Button 
+                size="sm"
+                variant="ghost"
+                onClick={() => window.open(`/bookings/${booking.id}/print`, '_blank')}
+                data-testid={`button-print-booking-${booking.id}`}
+              >
+                <Printer className="w-4 h-4 mr-1" /> Export
+              </Button>
             </CardContent>
           </Card>
         ))}

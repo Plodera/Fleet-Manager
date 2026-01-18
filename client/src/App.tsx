@@ -18,6 +18,8 @@ import Settings from "@/pages/Settings";
 import Reports from "@/pages/Reports";
 import Auth from "@/pages/Auth";
 import NotFound from "@/pages/not-found";
+import BookingPrintView from "@/pages/BookingPrintView";
+import SharedRidePrintView from "@/pages/SharedRidePrintView";
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string }) {
   const { user, isLoading } = useAuth();
@@ -55,6 +57,31 @@ function PrivateRoute({ component: Component, adminOnly = false, requiredPermiss
   );
 }
 
+function PrintRoute({ component: Component, requiredPermission }: { component: React.ComponentType, requiredPermission?: string }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) return <div className="flex h-screen items-center justify-center text-primary">Loading...</div>;
+  if (!user) return <Redirect to="/auth" />;
+  
+  if (requiredPermission && user.role !== 'admin') {
+    const userPermissions: string[] = (() => {
+      if (!user.permissions) return [];
+      if (Array.isArray(user.permissions)) return user.permissions;
+      try {
+        return JSON.parse(user.permissions as string);
+      } catch {
+        return [];
+      }
+    })();
+    
+    if (!userPermissions.includes(requiredPermission)) {
+      return <Redirect to="/" />;
+    }
+  }
+
+  return <Component />;
+}
+
 function Router() {
   return (
     <Switch>
@@ -86,6 +113,13 @@ function Router() {
       </Route>
       <Route path="/reports">
         <PrivateRoute component={Reports} requiredPermission="view_reports" />
+      </Route>
+      
+      <Route path="/bookings/:id/print">
+        <PrintRoute component={BookingPrintView} requiredPermission="view_bookings" />
+      </Route>
+      <Route path="/shared-rides/:id/print">
+        <PrintRoute component={SharedRidePrintView} requiredPermission="view_bookings" />
       </Route>
       
       <Route component={NotFound} />

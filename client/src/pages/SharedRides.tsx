@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, MapPin, Calendar, Clock, Car, Plus, UserPlus, Check, Trash2, CheckCircle, Play } from "lucide-react";
+import { Users, MapPin, Calendar, Clock, Car, Plus, UserPlus, Check, Trash2, CheckCircle, Play, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { api } from "@shared/routes";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -580,6 +580,16 @@ export default function SharedRides() {
                             Delete
                           </Button>
                         )}
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => window.open(`/shared-rides/${trip.id}/print`, '_blank')}
+                          data-testid={`button-print-trip-${trip.id}`}
+                        >
+                          <Printer className="w-4 h-4 mr-1" />
+                          Export
+                        </Button>
                       </div>
                     );
                   })()}
