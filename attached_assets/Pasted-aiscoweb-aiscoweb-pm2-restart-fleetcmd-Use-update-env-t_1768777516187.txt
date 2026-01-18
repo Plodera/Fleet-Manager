@@ -1,0 +1,96 @@
+aiscoweb@aiscoweb:~$ pm2 restart fleetcmd
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [fleetcmd](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 42   │ online    │ 0%       │ 18.7mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+aiscoweb@aiscoweb:~$ pm2 logs fleetcmd --lines 50
+[TAILING] Tailing last 50 lines for [fleetcmd] process (change the value with --lines option)
+/home/aiscoweb/.pm2/logs/fleetcmd-error.log last 50 lines:
+0|fleetcmd | te(x.raw(`savepoint ${i}`));try{let n=await e(r);return await r.execute(x.raw(`release savepoint ${i}`)),n}catch(n){throw await r.execute(x.raw(`rollback to savepoint ${i}`)),n}}}});function Do(t,e={}){let i=new vi({casing:e.casing}),r;e.logger===!0?r=new fs:e.logger!==!1&&(r=e.logger);let n;if(e.schema){let c=Ul(e.schema,zl);n={fullSchema:e.schema,schema:c.tables,tableNamesMap:c.tableNamesMap}}let a=new qp(t,i,{logger:r}).createSession(n),o=new Dp(i,a,n);return o.$client=t,o}function Ev(...t){if(typeof t[0]=="string"){let e=new dn.Pool({connectionString:t[0]});return Do(e,t[1])}if(Pl(t[0])){let{connection:e,client:i,...r}=t[0];if(i)return Do(i,r);let n=typeof e=="string"?new dn.Pool({connectionString:e}):new dn.Pool(e);return Do(n,r)}return Do(t[0],t[1])}var qp,Dp,W2=S(()=>{Ip();A();hs();mo();po();cs();oe();Sv();qp=class{constructor(e,i,r={}){this.client=e,this.dialect=i,this.options=r}static[v]="NodePgDriver";createSession(e){return new qo(this.client,this.dialect,e,{logger:this.options.logger})}},Dp=class extends or{static[v]="NodePgDatabase"};(t=>{function e(i){return Do({},i)}t.mock=e})(Ev||(Ev={}))});var K2={};yr(K2,{NodePgDatabase:()=>Dp,NodePgDriver:()=>qp,NodePgPreparedQuery:()=>Op,NodePgSession:()=>qo,NodePgTransaction:()=>jp,drizzle:()=>Ev});var Z2=S(()=>{W2();Sv()});var At,Rp,Ro,Mp,kv=S(()=>{At=require("@neondatabase/serverless");A();hs();ip();tp();De();oe();Rp=class extends ps{constructor(e,i,r,n,s,a,o,c){super({sql:i,params:r}),this.client=e,this.params=r,this.logger=n,this.fields=s,this._isResponseInArrayMode=o,this.customResultMapper=c,this.rawQueryConfig={name:a,text:i,types:{getTypeParser:(l,p)=>l===At.types.builtins.TIMESTAMPTZ?u=>u:l===At.types.builtins.TIMESTAMP?u=>u:l===At.types.builtins.DATE?u=>u:l===At.types.builtins.INTERVAL?u=>u:At.types.getTypeParser(l,p)}},this.queryConfig={name:a,text:i,rowMode:"array",types:{getTypeParser:(l,p)=>l===At.types.builtins.TIMESTAMPTZ?u=>u:l===At.types.builtins.TIMESTAMP?u=>u:l===At.types.builtins.DATE?u=>u:l===At.types.builtins.INTERVAL?u=>u:At.types.getTypeParser(l,p)}}}static[v]="NeonPreparedQuery";rawQueryConfig;queryConfig;async execute(e={}){let i=Lr(this.params,e);this.logger.logQuery(this.rawQueryConfig.text,i);let{fields:r,client:n,rawQueryConfig:s,queryConfig:a,joinsNotNullableMap:o,customResultMapper:c}=this;if(!r&&!c)return n.query(s,i);let l=await n.query(a,i);return c?c(l.rows):l.rows.map(p=>Cl(r,p,o))}all(e={}){let i=Lr(this.params,e);return this.logger.logQuery(this.rawQueryConfig.text,i),this.client.query(this.rawQueryConfig,i).then(r=>r.rows)}values(e={}){let i=Lr(this.params,e);return this.logger.logQuery(this.rawQueryConfig.text,i),this.client.query(this.queryConfig,i).then(r=>r.rows)}isResponseInArrayMode(){return this._isResponseInArrayMode}},Ro=class t extends us{constructor(e,i,r,n={}){super(i),this.client=e,this.schema=r,this.options=n,this.logger=n.logger??new ms}static[v]="NeonSession";logger;prepareQuery(e,i,r,n,s){return new Rp(this.client,e.sql,e.params,this.logger,i,r,n,s)}async query(e,i){return this.logger.logQuery(e,i),await this.client.query({rowMode:"array",text:e,values:i})}async queryObjects(e,i){return this.client.query(e,i)}async count(e){let i=await this.execute(e);return Number(i.rows[0].count)}async transaction(e,i={}){let r=this.client instanceof At.Pool?new t(await this.client.connect(),this.dialect,this.schema,this.options):this,n=new Mp(this.dialect,r,this.schema);await n.execute(x`begin ${n.getTransactionConfigSQL(i)}`);try{let s=await e(n);return await n.execute(x`commit`),s}catch(s){throw await n.execute(x`rollback`),s}finally{this.client instanceof At.Pool&&r.client.release()}}},Mp=class t extends ds{static[v]="NeonTransaction";async transaction(e){let i=`sp${this.nestedIndex+1}`,r=new t(this.dialect,this.session,this.schema,this.nestedIndex+1);await r.execute(x.raw(`savepoint ${i}`));try{let n=await e(r);return await r.execute(x.raw(`release savepoint ${i}`)),n}catch(n){throw await r.execute(x.raw(`rollback to savepoint ${i}`)),n}}}});function Mo(t,e={}){let i=new vi({casing:e.casing}),r;e.logger===!0?r=new fs:e.logger!==!1&&(r=e.logger);let n;if(e.schema){let c=Ul(e.schema,zl);n={fullSchema:e.schema,schema:c.tables,tableNamesMap:c.tableNamesMap}}let a=new Lp(t,i,{logger:r}).createSession(n),o=new Bp(i,a,n);return o.$client=t,o}function Tv(...t){if(typeof t[0]=="string"){let e=new qs.Pool({connectionString:t[0]});return Mo(e,t[1])}if(Pl(t[0])){let{connection:e,client:i,ws:r,...n}=t[0];if(r&&(qs.neonConfig.webSocketConstructor=r),i)return Mo(i,n);let s=typeof e=="string"?new qs.Pool({connectionString:e}):new qs.Pool(e);return Mo(s,n)}return Mo(t[0],t[1])}var qs,Lp,Bp,X2=S(()=>{qs=require("@neondatabase/serverless");A();hs();mo();po();cs();oe();kv();Lp=class{constructor(e,i,r={}){this.client=e,this.dialect=i,this.options=r}static[v]="NeonDriver";createSession(e){return new Ro(this.client,this.dialect,e,{logger:this.options.logger})}},Bp=class extends or{static[v]="NeonServerlessDatabase"};(t=>{function e(i){return Mo({},i)}t.mock=e})(Tv||(Tv={}))});var J2={};yr(J2,{NeonDatabase:()=>Bp,NeonDriver:()=>Lp,NeonPreparedQuery:()=>Rp,NeonSession:()=>Ro,NeonTransaction:()=>Mp,drizzle:()=>Tv});var Y2=S(()=>{X2();kv()});var rC=g((aae,iC)=>{"use strict";var{Duplex:GF}=require("stream");function eC(t){t.emit("close")}function WF(){!this.destroyed&&this._writableState.finished&&this.destroy()}function tC(t){this.removeListener("error",tC),this.destroy(),this.listenerCount("error")===0&&this.emit("error",t)}function KF(t,e){let i=!0,r=new GF({...e,autoDestroy:!1,emitClose:!1,objectMode:!1,writableObjectMode:!1});return t.on("message",function(s,a){let o=!a&&r._readableState.objectMode?s.toString():s;r.push(o)||t.pause()}),t.once("error",function(s){r.destroyed||(i=!1,r.destroy(s))}),t.once("close",function(){r.destroyed||r.push(null)}),r._destroy=function(n,s){if(t.readyState===t.CLOSED){s(n),process.nextTick(eC,r);return}let a=!1;t.once("error",function(c){a=!0,s(c)}),t.once("close",function(){a||s(n),process.nextTick(eC,r)}),i&&t.terminate()},r._final=function(n){if(t.readyState===t.CONNECTING){t.once("open",function(){r._final(n)});return}t._socket!==null&&(t._socket._writableState.finished?(n(),r._readableState.endEmitted&&r.destroy()):(t._socket.once("finish",function(){n()}),t.close()))},r._read=function(){t.isPaused&&t.resume()},r._write=function(n,s,a){if(t.readyState===t.CONNECTING){t.once("open",function(){r._write(n,s,a)});return}t.send(n,a)},r.on("end",WF),r.on("error",tC),r}iC.exports=KF});var zi=g((oae,aC)=>{"use strict";var nC=["nodebuffer","arraybuffer","fragments"],sC=typeof Blob<"u";sC&&nC.push("blob");aC.exports={BINARY_TYPES:nC,EMPTY_BUFFER:Buffer.alloc(0),GUID:"258EAFA5-E914-47DA-95CA-C5AB0DC85B11",hasBlob:sC,kForOnEventAttribute:Symbol("kIsForOnEventAttribute"),kListener:Symbol("kListener"),kStatusCode:Symbol("status-code"),kWebSocket:Symbol("websocket"),NOOP:()=>{}}});var _C=g((cae,wC)=>{var pC=require("fs"),Fi=require("path"),uC=require("os"),dC=typeof __webpack_require__=="function"?__non_webpack_require__:require,ZF=process.config&&process.config.variables||{},XF=!!process.env.PREBUILDS_ONLY,oC=process.versions.modules,Cv=e$()?"electron":YF()?"node-webkit":"node",Av=process.env.npm_config_arch||uC.arch(),Pv=process.env.npm_config_platform||uC.platform(),fC=process.env.LIBC||(t$(Pv)?"musl":"glibc"),Nv=process.env.ARM_VERSION||(Av==="arm64"?"8":ZF.arm_version)||"",mC=(process.versions.uv||"").split(".")[0];wC.exports=wi;function wi(t){return dC(wi.resolve(t))}wi.resolve=wi.path=function(t){t=Fi.resolve(t||".");try{var e=dC(Fi.join(t,"package.json")).name.toUpperCase().replace(/-/g,"_");process.env[e+"_PREBUILD"]&&(t=process.env[e+"_PREBUILD"])}catch{}if(!XF){var i=cC(Fi.join(t,"build/Release"),lC);if(i)return i;var r=cC(Fi.join(t,"build/Debug"),lC);if(r)return r}var n=o(t);if(n)return n;var s=o(Fi.dirname(process.execPath));if(s)return s;var a=["platform="+Pv,"arch="+Av,"runtime="+Cv,"abi="+oC,"uv="+mC,Nv?"armv="+Nv:"","libc="+fC,"node="+process.versions.node,process.versions.electron?"electron="+process.versions.electron:"",typeof __webpack_require__=="function"?"webpack=true":""].filter(Boolean).join(" ");throw new Error("No native build was found for "+a+`
+0|fleetcmd |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+0|fleetcmd | 
+0|fleetcmd | error: column "start_odometer" does not exist
+0|fleetcmd |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd |     at async _x.getSharedTrips (/opt/fleetcmd/dist/index.cjs:84:13048)
+0|fleetcmd |     at async /opt/fleetcmd/dist/index.cjs:188:22202 {
+0|fleetcmd |   length: 115,
+0|fleetcmd |   severity: 'ERROR',
+0|fleetcmd |   code: '42703',
+0|fleetcmd |   detail: undefined,
+0|fleetcmd |   hint: undefined,
+0|fleetcmd |   position: '154',
+0|fleetcmd |   internalPosition: undefined,
+0|fleetcmd |   internalQuery: undefined,
+0|fleetcmd |   where: undefined,
+0|fleetcmd |   schema: undefined,
+0|fleetcmd |   table: undefined,
+0|fleetcmd |   column: undefined,
+0|fleetcmd |   dataType: undefined,
+0|fleetcmd |   constraint: undefined,
+0|fleetcmd |   file: 'parse_relation.c',
+0|fleetcmd |   line: '3722',
+0|fleetcmd |   routine: 'errorMissingColumn'
+0|fleetcmd | }
+0|fleetcmd | 
+0|fleetcmd | Node.js v20.20.0
+
+/home/aiscoweb/.pm2/logs/fleetcmd-out.log last 50 lines:
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+0|fleetcmd | 11:59:40 PM [express] serving on port 5000
+0|fleetcmd | 11:59:40 PM [express] GET /api/vehicles 304 in 28ms :: [{"id":3,"make":"Changan","model":"","year":2026,"licensePlate":"","vin":"","status":"available","currentMileage":0,"imageUrl":"https://inchcapelatam.sirv.com/Changan_pe/Grand-van-turismo/GRANDVANTURISMOBlanco.jpg","category":"van","capacity":12,"createdAt":"2026-01-06T08:23:41.074Z"}]
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+0|fleetcmd | 11:59:41 PM [express] serving on port 5000
+0|fleetcmd | 11:59:43 PM [express] POST /api/logout 200 in 41ms
+0|fleetcmd | 11:59:52 PM [express] POST /api/login 200 in 83ms :: {"id":1,"username":"admin","password":"865bc2a7770640ad76abf0667cd50cb7434ee34b1e134587bc71630bda94c4e01b707d3665b25dc84ee8e5bf04491a6b5c042bf7bda7b3b0a613c631a9780072.95dd6f5ca491aaefd409e2441ced439e","role":"admin","fullName":"Admin User","email":null,"licenseNumber":null,"department":"Management","permissions":"[\"view_dashboard\",\"view_vehicles\",\"view_bookings\",\"view_maintenance\",\"view_fuel\",\"manage_users\"]","isApprover":false,"isDriver":false,"createdAt":"2026-01-05T22:03:53.753Z"}
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+0|fleetcmd | 11:59:52 PM [express] serving on port 5000
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+0|fleetcmd | 11:59:53 PM [express] serving on port 5000
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+0|fleetcmd | 11:59:55 PM [express] serving on port 5000
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+0|fleetcmd | 11:59:56 PM [express] serving on port 5000
+0|fleetcmd | 12:03:03 AM [express] GET /api/user 304 in 7ms :: {"id":1,"username":"admin","password":"865bc2a7770640ad76abf0667cd50cb7434ee34b1e134587bc71630bda94c4e01b707d3665b25dc84ee8e5bf04491a6b5c042bf7bda7b3b0a613c631a9780072.95dd6f5ca491aaefd409e2441ced439e","role":"admin","fullName":"Admin User","email":null,"licenseNumber":null,"department":"Management","permissions":"[\"view_dashboard\",\"view_vehicles\",\"view_bookings\",\"view_maintenance\",\"view_fuel\",\"manage_users\"]","isApprover":false,"isDriver":false,"createdAt":"2026-01-05T22:03:53.753Z"}
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+0|fleetcmd | 12:03:04 AM [express] serving on port 5000
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+0|fleetcmd | 12:03:05 AM [express] serving on port 5000
+
+^C
+aiscoweb@aiscoweb:~$ 
