@@ -1,0 +1,105 @@
+aiscoweb@aiscoweb:~$ # Navigate to the application directory
+cd /opt/fleetcmd
+
+# Stop the application
+pm2 stop fleetcmd
+
+# If using Git, pull the latest changes:
+git pull origin main
+
+# Install any new dependencies
+npm install
+
+# Build the application
+npm run build
+
+# Restart the application
+pm2 start fleetcmd
+
+# Check status
+pm2 status
+[PM2] Applying action stopProcessId on app [fleetcmd](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 27   │ stopped   │ 0%       │ 0b       │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+remote: Enumerating objects: 95, done.
+remote: Counting objects: 100% (95/95), done.
+remote: Compressing objects: 100% (15/15), done.
+remote: Total 73 (delta 58), reused 73 (delta 58), pack-reused 0 (from 0)
+Unpacking objects: 100% (73/73), 286.97 KiB | 344.00 KiB/s, done.
+From https://github.com/Plodera/Fleet-Manager
+ * branch            main       -> FETCH_HEAD
+   42b3bf7..d1f4623  main       -> origin/main
+Updating 42b3bf7..d1f4623
+Fast-forward
+ attached_assets/image_1768744967602.png  | Bin 0 -> 281627 bytes
+ client/src/App.tsx                       |  45 ++-
+ client/src/components/Sidebar.tsx        |  47 ++-
+ client/src/hooks/use-bookings.ts         |  28 +-
+ client/src/lib/i18n.tsx                  | 475 +++++++++++++++++++++++++++++++
+ client/src/pages/BookingPrintView.tsx    | 234 +++++++++++++++
+ client/src/pages/Bookings.tsx            | 172 ++++++-----
+ client/src/pages/Dashboard.tsx           |  64 +++--
+ client/src/pages/SharedRidePrintView.tsx | 251 ++++++++++++++++
+ client/src/pages/SharedRides.tsx         | 135 ++++++---
+ client/src/pages/Vehicles.tsx            | 122 ++++----
+ replit.md                                |  25 ++
+ server/email.ts                          |   3 +-
+ server/routes.ts                         |  48 +++-
+ shared/routes.ts                         |   4 +-
+ shared/schema.ts                         |   4 +-
+ 16 files changed, 1424 insertions(+), 233 deletions(-)
+ create mode 100644 attached_assets/image_1768744967602.png
+ create mode 100644 client/src/lib/i18n.tsx
+ create mode 100644 client/src/pages/BookingPrintView.tsx
+ create mode 100644 client/src/pages/SharedRidePrintView.tsx
+
+up to date, audited 556 packages in 3s
+
+69 packages are looking for funding
+  run `npm fund` for details
+
+3 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+> rest-express@1.0.0 build
+> tsx script/build.ts
+
+building client...
+vite v7.3.0 building client environment for production...
+✓ 2768 modules transformed.
+../dist/public/index.html                     2.06 kB │ gzip:   0.80 kB
+../dist/public/assets/index-BLQ10qnR.css     78.24 kB │ gzip:  12.77 kB
+../dist/public/assets/index-B3G4ERME.js   1,081.12 kB │ gzip: 298.48 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 8.77s
+building server...
+
+  dist/index.cjs  1.4mb ⚠️
+
+⚡ Done in 134ms
+[PM2] Applying action restartProcessId on app [fleetcmd](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+[PM2] Process successfully started
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 27   │ online    │ 0%       │ 17.8mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 27   │ online    │ 0%       │ 56.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+aiscoweb@aiscoweb:/opt/fleetcmd$ 
