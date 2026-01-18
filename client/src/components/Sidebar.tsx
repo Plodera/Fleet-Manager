@@ -86,7 +86,7 @@ export function Sidebar() {
           </div>
           <div>
             <h1 className="font-display font-bold text-lg tracking-tight text-foreground">VMS</h1>
-            <p className="text-xs text-muted-foreground">Aisco Transport Mgmt</p>
+            <p className="text-xs text-muted-foreground">Aisco Vehicle Management System</p>
           </div>
         </div>
       </div>

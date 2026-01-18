@@ -30,8 +30,8 @@ export default function Auth() {
             <Car className="w-8 h-8 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground tracking-tight">ATMS</h1>
-            <p className="text-muted-foreground">Aisco Transport Mgmt System</p>
+            <h1 className="text-3xl font-display font-bold text-foreground tracking-tight">VMS</h1>
+            <p className="text-muted-foreground">Aisco Vehicle Management System</p>
           </div>
         </div>
 
@@ -77,7 +77,7 @@ export default function Auth() {
         </Card>
 
         <p className="text-xs text-muted-foreground text-center">
-          Aisco Transport Management System
+          Aisco Vehicle Management System
         </p>
       </div>
     </div>

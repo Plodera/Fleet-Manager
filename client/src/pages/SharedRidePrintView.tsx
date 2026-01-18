@@ -233,7 +233,7 @@ export default function SharedRidePrintView() {
         </section>
 
         <footer className="mt-12 pt-4 border-t text-center text-sm text-muted-foreground print:mt-8">
-          <p>VMS - Aisco Transport Management System</p>
+          <p>VMS - Aisco Vehicle Management System</p>
           <p>This is an automatically generated report</p>
         </footer>
       </div>
