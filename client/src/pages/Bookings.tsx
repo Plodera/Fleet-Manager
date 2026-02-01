@@ -147,7 +147,7 @@ export default function Bookings() {
   const selectedVehicle = selectedVehicleId ? vehicles?.find(v => v.id === Number(selectedVehicleId)) : null;
   const selectedVehicleCapacity = selectedVehicle ? (selectedVehicle as any).capacity || 5 : 5;
 
-  // Reset shareAllowed, validate passengerCount, and set odometer when vehicle changes
+  // Reset shareAllowed and validate passengerCount when vehicle changes
   useEffect(() => {
     const currentPassengerCount = form.getValues('passengerCount');
     const currentShareAllowed = form.getValues('shareAllowed');
@@ -161,12 +161,7 @@ export default function Bookings() {
     if (currentPassengerCount > selectedVehicleCapacity) {
       form.setValue('passengerCount', selectedVehicleCapacity);
     }
-    
-    // Auto-fill odometer reading with vehicle's current mileage
-    if (selectedVehicle && selectedVehicle.currentMileage) {
-      form.setValue('mileage', selectedVehicle.currentMileage);
-    }
-  }, [selectedVehicleId, selectedVehicleCapacity, selectedVehicle, form]);
+  }, [selectedVehicleId, selectedVehicleCapacity, form]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -221,28 +216,6 @@ export default function Bookings() {
                   </FormItem>
                 )} />
 
-                {selectedVehicle && (
-                  <div className="bg-muted p-3 rounded-md">
-                    <p className="text-sm font-medium text-muted-foreground">{t.bookings.currentMileage}</p>
-                    <p className="text-lg font-semibold">{selectedVehicle.currentMileage?.toLocaleString() || 0} km</p>
-                  </div>
-                )}
-
-                <FormField control={form.control} name="mileage" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t.bookings.odometerReading}</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder={t.bookings.enterOdometer}
-                        value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseInt(e.target.value, 10))}
-                        data-testid="input-mileage"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="startTime" render={({ field }) => (
