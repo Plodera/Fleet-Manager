@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { ClipboardCheck, Plus, Trash2, Eye, Car, Calendar, Clock, Gauge } from "lucide-react";
+import { ClipboardCheck, Plus, Trash2, Eye, Car, Calendar, Clock, Gauge, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -551,6 +551,13 @@ export default function VehicleInspections() {
                     <div>
                       <p className="text-sm text-muted-foreground">{l.startTime} - {l.endTime}</p>
                       <p className="font-medium">{viewInspection.startTime || "-"} - {viewInspection.endTime || "-"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <UserIcon className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">{l.operator}</p>
+                      <p className="font-medium">{viewInspection.operator.fullName}</p>
                     </div>
                   </div>
                 </div>
