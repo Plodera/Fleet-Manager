@@ -142,6 +142,55 @@ export const sharedTrips = pgTable("shared_trips", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const vehicleInspections = pgTable("vehicle_inspections", {
+  id: serial("id").primaryKey(),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id).notNull(),
+  operatorId: integer("operator_id").references(() => users.id).notNull(),
+  inspectionDate: date("inspection_date").notNull(),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  kmCounter: integer("km_counter").notNull(),
+  // Checklist items
+  inspectDamage: boolean("inspect_damage").default(false).notNull(),
+  inspectDamageComment: text("inspect_damage_comment"),
+  checkCabinSeat: boolean("check_cabin_seat").default(false).notNull(),
+  checkCabinSeatComment: text("check_cabin_seat_comment"),
+  cleanRadiator: boolean("clean_radiator").default(false).notNull(),
+  cleanRadiatorComment: text("clean_radiator_comment"),
+  checkEngineOil: boolean("check_engine_oil").default(false).notNull(),
+  checkEngineOilComment: text("check_engine_oil_comment"),
+  checkCoolantLevel: boolean("check_coolant_level").default(false).notNull(),
+  checkCoolantLevelComment: text("check_coolant_level_comment"),
+  checkDriveBelt: boolean("check_drive_belt").default(false).notNull(),
+  checkDriveBeltComment: text("check_drive_belt_comment"),
+  airFilterCleaning: boolean("air_filter_cleaning").default(false).notNull(),
+  airFilterCleaningComment: text("air_filter_cleaning_comment"),
+  checkIntakeExhaust: boolean("check_intake_exhaust").default(false).notNull(),
+  checkIntakeExhaustComment: text("check_intake_exhaust_comment"),
+  checkTyresWheelNuts: boolean("check_tyres_wheel_nuts").default(false).notNull(),
+  checkTyresWheelNutsComment: text("check_tyres_wheel_nuts_comment"),
+  checkHydraulicOil: boolean("check_hydraulic_oil").default(false).notNull(),
+  checkHydraulicOilComment: text("check_hydraulic_oil_comment"),
+  checkControls: boolean("check_controls").default(false).notNull(),
+  checkControlsComment: text("check_controls_comment"),
+  checkLeaksDamages: boolean("check_leaks_damages").default(false).notNull(),
+  checkLeaksDamagesComment: text("check_leaks_damages_comment"),
+  checkHeadlights: boolean("check_headlights").default(false).notNull(),
+  checkHeadlightsComment: text("check_headlights_comment"),
+  checkHorn: boolean("check_horn").default(false).notNull(),
+  checkHornComment: text("check_horn_comment"),
+  checkMirrors: boolean("check_mirrors").default(false).notNull(),
+  checkMirrorsComment: text("check_mirrors_comment"),
+  checkIndicators: boolean("check_indicators").default(false).notNull(),
+  checkIndicatorsComment: text("check_indicators_comment"),
+  greaseHydraulicPins: boolean("grease_hydraulic_pins").default(false).notNull(),
+  greaseHydraulicPinsComment: text("grease_hydraulic_pins_comment"),
+  checkMeters: boolean("check_meters").default(false).notNull(),
+  checkMetersComment: text("check_meters_comment"),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
@@ -165,6 +214,11 @@ export const maintenanceRecordsRelations = relations(maintenanceRecords, ({ one 
 
 export const fuelRecordsRelations = relations(fuelRecords, ({ one }) => ({
   vehicle: one(vehicles, { fields: [fuelRecords.vehicleId], references: [vehicles.id] }),
+}));
+
+export const vehicleInspectionsRelations = relations(vehicleInspections, ({ one }) => ({
+  vehicle: one(vehicles, { fields: [vehicleInspections.vehicleId], references: [vehicles.id] }),
+  operator: one(users, { fields: [vehicleInspections.operatorId], references: [users.id] }),
 }));
 
 // Schemas
@@ -204,6 +258,12 @@ export const insertSharedTripSchema = createInsertSchema(sharedTrips)
     totalCapacity: z.coerce.number(),
     reservedSeats: z.coerce.number().default(0),
   });
+export const insertVehicleInspectionSchema = createInsertSchema(vehicleInspections)
+  .omit({ id: true, createdAt: true, operatorId: true })
+  .extend({
+    vehicleId: z.coerce.number(),
+    kmCounter: z.coerce.number(),
+  });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -223,3 +283,5 @@ export type Department = typeof departments.$inferSelect;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 export type SharedTrip = typeof sharedTrips.$inferSelect;
 export type InsertSharedTrip = z.infer<typeof insertSharedTripSchema>;
+export type VehicleInspection = typeof vehicleInspections.$inferSelect;
+export type InsertVehicleInspection = z.infer<typeof insertVehicleInspectionSchema>;

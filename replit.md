@@ -7,12 +7,23 @@ A vehicle management and booking system for organizational vehicles with user au
 - Vehicle Management: CRUD operations for vehicles
 - Booking System: Reservation and scheduling with approval workflow
 - Maintenance Tracking & Fuel Monitoring
+- Vehicle Inspections: Factory vehicle checklist-based inspections with 18 inspection items
 - User Authentication with role-based access (admin, staff, customer)
 - User Permissions System: Granular access control
 - Analytics Dashboard
 - Booking Approval Workflow: Designate approvers, bookings require approval before use
 - Driver Dashboard: Dedicated view for drivers showing only their assigned trips with Start/End Trip actions
 - Bilingual Support: English/Portuguese for navigation, buttons, and status labels
+
+## Vehicle Inspections
+The system includes a comprehensive vehicle inspection checklist for factory vehicles (`/vehicle-inspections`):
+- **18 Inspection Items**: Damage check, cabin/seat condition, radiator cleaning, engine oil, coolant level, drive belt tension, air filter, intake/exhaust, tyres/wheel nuts, hydraulic oil, controls, leaks/damages, headlights, horn, mirrors, indicators, hydraulic pins, meters
+- **Header Fields**: KM Counter, Date, Start Time, End Time
+- **Comments**: Each checklist item has an optional comment field
+- **Remarks**: General remarks section at the bottom
+- **Bilingual**: Full English/Portuguese support
+- **Access Control**: Requires view_maintenance permission
+- **View Details**: Click to see full inspection report with all checked items and comments
 
 ## Driver Dashboard
 Drivers have a dedicated dashboard (`/driver-dashboard`) that shows only their assigned trips:

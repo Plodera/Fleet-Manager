@@ -13,7 +13,8 @@ import {
   FileText,
   UsersRound,
   Globe,
-  Truck
+  Truck,
+  ClipboardCheck
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ export function Sidebar() {
     { href: "/bookings", label: t.nav.bookings, icon: CalendarDays, permission: "view_bookings", hideFromDriver: true },
     { href: "/shared-rides", label: t.nav.sharedRides, icon: UsersRound, permission: "view_bookings", hideFromDriver: true },
     { href: "/maintenance", label: t.nav.maintenance, icon: Wrench, permission: "view_maintenance", hideFromDriver: true },
+    { href: "/vehicle-inspections", label: t.nav.inspections, icon: ClipboardCheck, permission: "view_maintenance", hideFromDriver: true },
     { href: "/fuel", label: t.nav.fuel, icon: Fuel, permission: "view_fuel", hideFromDriver: true },
     { href: "/reports", label: t.nav.reports, icon: FileText, permission: "view_reports", hideFromDriver: true },
     { href: "/users", label: t.nav.users, icon: Users, permission: "admin_only", hideFromDriver: true },

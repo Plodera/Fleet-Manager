@@ -13,6 +13,7 @@ import Vehicles from "@/pages/Vehicles";
 import Bookings from "@/pages/Bookings";
 import SharedRides from "@/pages/SharedRides";
 import Maintenance from "@/pages/Maintenance";
+import VehicleInspections from "@/pages/VehicleInspections";
 import Fuel from "@/pages/Fuel";
 import Users from "@/pages/Users";
 import Settings from "@/pages/Settings";
@@ -111,6 +112,9 @@ function Router() {
       </Route>
       <Route path="/maintenance">
         <PrivateRoute component={Maintenance} requiredPermission="view_maintenance" />
+      </Route>
+      <Route path="/vehicle-inspections">
+        <PrivateRoute component={VehicleInspections} requiredPermission="view_maintenance" />
       </Route>
       <Route path="/fuel">
         <PrivateRoute component={Fuel} requiredPermission="view_fuel" />

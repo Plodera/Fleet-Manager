@@ -916,6 +916,58 @@ export async function registerRoutes(
     }
   });
 
+  // Vehicle Inspections
+  app.get(api.vehicleInspections.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!hasPermission(user, 'view_maintenance')) {
+      return res.status(403).json({ message: "Access denied: missing view_maintenance permission" });
+    }
+    const inspections = await storage.getVehicleInspections();
+    res.json(inspections);
+  });
+
+  app.get(api.vehicleInspections.get.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!hasPermission(user, 'view_maintenance')) {
+      return res.status(403).json({ message: "Access denied: missing view_maintenance permission" });
+    }
+    const inspection = await storage.getVehicleInspection(Number(req.params.id));
+    if (!inspection) return res.status(404).json({ message: "Inspection not found" });
+    res.json(inspection);
+  });
+
+  app.post(api.vehicleInspections.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!hasPermission(user, 'view_maintenance')) {
+      return res.status(403).json({ message: "Access denied: missing view_maintenance permission" });
+    }
+    try {
+      const input = api.vehicleInspections.create.input.parse(req.body);
+      const inspection = await storage.createVehicleInspection({
+        ...input,
+        operatorId: user.id,
+      } as any);
+      res.status(201).json(inspection);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message || "Invalid data" });
+    }
+  });
+
+  app.delete(api.vehicleInspections.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') {
+      return res.status(403).json({ message: "Only admins can delete inspections" });
+    }
+    const inspection = await storage.getVehicleInspection(Number(req.params.id));
+    if (!inspection) return res.status(404).json({ message: "Inspection not found" });
+    await storage.deleteVehicleInspection(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

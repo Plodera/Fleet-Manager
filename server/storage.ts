@@ -1,9 +1,10 @@
 import { 
-  users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips,
+  users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
-  type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip
+  type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
+  type VehicleInspection, type InsertVehicleInspection
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq } from "drizzle-orm";
@@ -58,6 +59,11 @@ export interface IStorage {
   createSharedTrip(trip: InsertSharedTrip): Promise<SharedTrip>;
   updateSharedTrip(id: number, updates: Partial<InsertSharedTrip>): Promise<SharedTrip>;
   deleteSharedTrip(id: number): Promise<void>;
+
+  getVehicleInspections(): Promise<(VehicleInspection & { vehicle: Vehicle; operator: User })[]>;
+  getVehicleInspection(id: number): Promise<(VehicleInspection & { vehicle: Vehicle; operator: User }) | undefined>;
+  createVehicleInspection(inspection: InsertVehicleInspection): Promise<VehicleInspection>;
+  deleteVehicleInspection(id: number): Promise<void>;
 
   sessionStore: session.Store;
 }
@@ -306,6 +312,42 @@ export class DatabaseStorage implements IStorage {
     await getDb().delete(bookings).where(eq(bookings.sharedTripId, id));
     await getDb().delete(sharedTrips).where(eq(sharedTrips.id, id));
   }
+
+  async getVehicleInspections(): Promise<(VehicleInspection & { vehicle: Vehicle; operator: User })[]> {
+    const inspections = await getDb().select().from(vehicleInspections);
+    const results = [];
+    
+    for (const inspection of inspections) {
+      const [vehicle] = await getDb().select().from(vehicles).where(eq(vehicles.id, inspection.vehicleId));
+      const [operator] = await getDb().select().from(users).where(eq(users.id, inspection.operatorId));
+      
+      if (vehicle && operator) {
+        results.push({ ...inspection, vehicle, operator });
+      }
+    }
+    
+    return results;
+  }
+
+  async getVehicleInspection(id: number): Promise<(VehicleInspection & { vehicle: Vehicle; operator: User }) | undefined> {
+    const [inspection] = await getDb().select().from(vehicleInspections).where(eq(vehicleInspections.id, id));
+    if (!inspection) return undefined;
+    
+    const [vehicle] = await getDb().select().from(vehicles).where(eq(vehicles.id, inspection.vehicleId));
+    const [operator] = await getDb().select().from(users).where(eq(users.id, inspection.operatorId));
+    
+    if (!vehicle || !operator) return undefined;
+    return { ...inspection, vehicle, operator };
+  }
+
+  async createVehicleInspection(inspection: InsertVehicleInspection): Promise<VehicleInspection> {
+    const [created] = await getDb().insert(vehicleInspections).values(inspection).returning();
+    return created;
+  }
+
+  async deleteVehicleInspection(id: number): Promise<void> {
+    await getDb().delete(vehicleInspections).where(eq(vehicleInspections.id, id));
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -356,5 +398,9 @@ export const storage = {
   createSharedTrip: (...args: Parameters<DatabaseStorage['createSharedTrip']>) => getStorage().createSharedTrip(...args),
   updateSharedTrip: (...args: Parameters<DatabaseStorage['updateSharedTrip']>) => getStorage().updateSharedTrip(...args),
   deleteSharedTrip: (...args: Parameters<DatabaseStorage['deleteSharedTrip']>) => getStorage().deleteSharedTrip(...args),
+  getVehicleInspections: () => getStorage().getVehicleInspections(),
+  getVehicleInspection: (...args: Parameters<DatabaseStorage['getVehicleInspection']>) => getStorage().getVehicleInspection(...args),
+  createVehicleInspection: (...args: Parameters<DatabaseStorage['createVehicleInspection']>) => getStorage().createVehicleInspection(...args),
+  deleteVehicleInspection: (...args: Parameters<DatabaseStorage['deleteVehicleInspection']>) => getStorage().deleteVehicleInspection(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

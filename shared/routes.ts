@@ -7,13 +7,15 @@ import {
   insertFuelSchema,
   insertDepartmentSchema,
   insertSharedTripSchema,
+  insertVehicleInspectionSchema,
   users,
   vehicles,
   bookings,
   maintenanceRecords,
   fuelRecords,
   departments,
-  sharedTrips
+  sharedTrips,
+  vehicleInspections
 } from './schema';
 
 export const errorSchemas = {
@@ -407,6 +409,40 @@ export const api = {
       path: '/api/shared-trips/report',
       responses: {
         200: z.array(z.any()),
+      },
+    },
+  },
+  vehicleInspections: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/vehicle-inspections',
+      responses: {
+        200: z.array(z.custom<typeof vehicleInspections.$inferSelect & { vehicle: typeof vehicles.$inferSelect; operator: typeof users.$inferSelect }>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/vehicle-inspections/:id',
+      responses: {
+        200: z.custom<typeof vehicleInspections.$inferSelect & { vehicle: typeof vehicles.$inferSelect; operator: typeof users.$inferSelect }>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/vehicle-inspections',
+      input: insertVehicleInspectionSchema,
+      responses: {
+        201: z.custom<typeof vehicleInspections.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/vehicle-inspections/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
       },
     },
   }
