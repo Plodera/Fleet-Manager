@@ -1,10 +1,12 @@
 import { 
-  users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections,
+  users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
-  type VehicleInspection, type InsertVehicleInspection
+  type VehicleInspection, type InsertVehicleInspection,
+  type EquipmentType, type InsertEquipmentType,
+  type EquipmentChecklistItem, type InsertEquipmentChecklistItem
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq } from "drizzle-orm";
@@ -64,6 +66,19 @@ export interface IStorage {
   getVehicleInspection(id: number): Promise<(VehicleInspection & { vehicle: Vehicle; operator: User }) | undefined>;
   createVehicleInspection(inspection: InsertVehicleInspection): Promise<VehicleInspection>;
   deleteVehicleInspection(id: number): Promise<void>;
+
+  // Equipment Types
+  getEquipmentTypes(): Promise<EquipmentType[]>;
+  getEquipmentType(id: number): Promise<EquipmentType | undefined>;
+  createEquipmentType(type: InsertEquipmentType): Promise<EquipmentType>;
+  updateEquipmentType(id: number, updates: Partial<InsertEquipmentType>): Promise<EquipmentType>;
+  deleteEquipmentType(id: number): Promise<void>;
+  
+  // Equipment Checklist Items
+  getEquipmentChecklistItems(equipmentTypeId: number): Promise<EquipmentChecklistItem[]>;
+  createEquipmentChecklistItem(item: InsertEquipmentChecklistItem): Promise<EquipmentChecklistItem>;
+  updateEquipmentChecklistItem(id: number, updates: Partial<InsertEquipmentChecklistItem>): Promise<EquipmentChecklistItem>;
+  deleteEquipmentChecklistItem(id: number): Promise<void>;
 
   sessionStore: session.Store;
 }
@@ -348,6 +363,51 @@ export class DatabaseStorage implements IStorage {
   async deleteVehicleInspection(id: number): Promise<void> {
     await getDb().delete(vehicleInspections).where(eq(vehicleInspections.id, id));
   }
+
+  // Equipment Types
+  async getEquipmentTypes(): Promise<EquipmentType[]> {
+    return await getDb().select().from(equipmentTypes).orderBy(equipmentTypes.sortOrder);
+  }
+
+  async getEquipmentType(id: number): Promise<EquipmentType | undefined> {
+    const [type] = await getDb().select().from(equipmentTypes).where(eq(equipmentTypes.id, id));
+    return type;
+  }
+
+  async createEquipmentType(type: InsertEquipmentType): Promise<EquipmentType> {
+    const [created] = await getDb().insert(equipmentTypes).values(type).returning();
+    return created;
+  }
+
+  async updateEquipmentType(id: number, updates: Partial<InsertEquipmentType>): Promise<EquipmentType> {
+    const [updated] = await getDb().update(equipmentTypes).set(updates).where(eq(equipmentTypes.id, id)).returning();
+    return updated;
+  }
+
+  async deleteEquipmentType(id: number): Promise<void> {
+    // First delete all checklist items for this type
+    await getDb().delete(equipmentChecklistItems).where(eq(equipmentChecklistItems.equipmentTypeId, id));
+    await getDb().delete(equipmentTypes).where(eq(equipmentTypes.id, id));
+  }
+
+  // Equipment Checklist Items
+  async getEquipmentChecklistItems(equipmentTypeId: number): Promise<EquipmentChecklistItem[]> {
+    return await getDb().select().from(equipmentChecklistItems).where(eq(equipmentChecklistItems.equipmentTypeId, equipmentTypeId)).orderBy(equipmentChecklistItems.sortOrder);
+  }
+
+  async createEquipmentChecklistItem(item: InsertEquipmentChecklistItem): Promise<EquipmentChecklistItem> {
+    const [created] = await getDb().insert(equipmentChecklistItems).values(item).returning();
+    return created;
+  }
+
+  async updateEquipmentChecklistItem(id: number, updates: Partial<InsertEquipmentChecklistItem>): Promise<EquipmentChecklistItem> {
+    const [updated] = await getDb().update(equipmentChecklistItems).set(updates).where(eq(equipmentChecklistItems.id, id)).returning();
+    return updated;
+  }
+
+  async deleteEquipmentChecklistItem(id: number): Promise<void> {
+    await getDb().delete(equipmentChecklistItems).where(eq(equipmentChecklistItems.id, id));
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -402,5 +462,14 @@ export const storage = {
   getVehicleInspection: (...args: Parameters<DatabaseStorage['getVehicleInspection']>) => getStorage().getVehicleInspection(...args),
   createVehicleInspection: (...args: Parameters<DatabaseStorage['createVehicleInspection']>) => getStorage().createVehicleInspection(...args),
   deleteVehicleInspection: (...args: Parameters<DatabaseStorage['deleteVehicleInspection']>) => getStorage().deleteVehicleInspection(...args),
+  getEquipmentTypes: () => getStorage().getEquipmentTypes(),
+  getEquipmentType: (...args: Parameters<DatabaseStorage['getEquipmentType']>) => getStorage().getEquipmentType(...args),
+  createEquipmentType: (...args: Parameters<DatabaseStorage['createEquipmentType']>) => getStorage().createEquipmentType(...args),
+  updateEquipmentType: (...args: Parameters<DatabaseStorage['updateEquipmentType']>) => getStorage().updateEquipmentType(...args),
+  deleteEquipmentType: (...args: Parameters<DatabaseStorage['deleteEquipmentType']>) => getStorage().deleteEquipmentType(...args),
+  getEquipmentChecklistItems: (...args: Parameters<DatabaseStorage['getEquipmentChecklistItems']>) => getStorage().getEquipmentChecklistItems(...args),
+  createEquipmentChecklistItem: (...args: Parameters<DatabaseStorage['createEquipmentChecklistItem']>) => getStorage().createEquipmentChecklistItem(...args),
+  updateEquipmentChecklistItem: (...args: Parameters<DatabaseStorage['updateEquipmentChecklistItem']>) => getStorage().updateEquipmentChecklistItem(...args),
+  deleteEquipmentChecklistItem: (...args: Parameters<DatabaseStorage['deleteEquipmentChecklistItem']>) => getStorage().deleteEquipmentChecklistItem(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

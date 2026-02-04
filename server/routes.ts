@@ -965,6 +965,108 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Equipment Types
+  app.get(api.equipmentTypes.list.path, async (req, res) => {
+    const types = await storage.getEquipmentTypes();
+    res.json(types);
+  });
+
+  app.get(api.equipmentTypes.get.path, async (req, res) => {
+    const type = await storage.getEquipmentType(Number(req.params.id));
+    if (!type) return res.status(404).json({ message: "Equipment type not found" });
+    res.json(type);
+  });
+
+  app.post(api.equipmentTypes.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.equipmentTypes.create.input.parse(req.body);
+      const type = await storage.createEquipmentType(input);
+      res.status(201).json(type);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.equipmentTypes.update.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    const existing = await storage.getEquipmentType(Number(req.params.id));
+    if (!existing) return res.status(404).json({ message: "Equipment type not found" });
+    try {
+      const input = api.equipmentTypes.update.input.parse(req.body);
+      const updated = await storage.updateEquipmentType(Number(req.params.id), input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.equipmentTypes.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    const existing = await storage.getEquipmentType(Number(req.params.id));
+    if (!existing) return res.status(404).json({ message: "Equipment type not found" });
+    await storage.deleteEquipmentType(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  app.get(api.equipmentTypes.listItems.path, async (req, res) => {
+    const items = await storage.getEquipmentChecklistItems(Number(req.params.id));
+    res.json(items);
+  });
+
+  // Equipment Checklist Items
+  app.post(api.equipmentChecklistItems.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.equipmentChecklistItems.create.input.parse(req.body);
+      const item = await storage.createEquipmentChecklistItem(input);
+      res.status(201).json(item);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.equipmentChecklistItems.update.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.equipmentChecklistItems.update.input.parse(req.body);
+      const updated = await storage.updateEquipmentChecklistItem(Number(req.params.id), input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.equipmentChecklistItems.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    await storage.deleteEquipmentChecklistItem(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

@@ -23,6 +23,7 @@ import NotFound from "@/pages/not-found";
 import BookingPrintView from "@/pages/BookingPrintView";
 import SharedRidePrintView from "@/pages/SharedRidePrintView";
 import DriverDashboard from "@/pages/DriverDashboard";
+import EquipmentTypes from "@/pages/EquipmentTypes";
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -124,6 +125,9 @@ function Router() {
       </Route>
       <Route path="/settings">
         <PrivateRoute component={Settings} adminOnly />
+      </Route>
+      <Route path="/equipment-types">
+        <PrivateRoute component={EquipmentTypes} adminOnly />
       </Route>
       <Route path="/reports">
         <PrivateRoute component={Reports} requiredPermission="view_reports" />

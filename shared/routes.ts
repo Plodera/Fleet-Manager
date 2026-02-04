@@ -8,6 +8,8 @@ import {
   insertDepartmentSchema,
   insertSharedTripSchema,
   insertVehicleInspectionSchema,
+  insertEquipmentTypeSchema,
+  insertEquipmentChecklistItemSchema,
   users,
   vehicles,
   bookings,
@@ -15,7 +17,9 @@ import {
   fuelRecords,
   departments,
   sharedTrips,
-  vehicleInspections
+  vehicleInspections,
+  equipmentTypes,
+  equipmentChecklistItems
 } from './schema';
 
 export const errorSchemas = {
@@ -440,6 +444,84 @@ export const api = {
     delete: {
       method: 'DELETE' as const,
       path: '/api/vehicle-inspections/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  equipmentTypes: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/equipment-types',
+      responses: {
+        200: z.array(z.custom<typeof equipmentTypes.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/equipment-types/:id',
+      responses: {
+        200: z.custom<typeof equipmentTypes.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/equipment-types',
+      input: insertEquipmentTypeSchema,
+      responses: {
+        201: z.custom<typeof equipmentTypes.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/equipment-types/:id',
+      input: insertEquipmentTypeSchema.partial(),
+      responses: {
+        200: z.custom<typeof equipmentTypes.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/equipment-types/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+    listItems: {
+      method: 'GET' as const,
+      path: '/api/equipment-types/:id/items',
+      responses: {
+        200: z.array(z.custom<typeof equipmentChecklistItems.$inferSelect>()),
+      },
+    },
+  },
+  equipmentChecklistItems: {
+    create: {
+      method: 'POST' as const,
+      path: '/api/equipment-checklist-items',
+      input: insertEquipmentChecklistItemSchema,
+      responses: {
+        201: z.custom<typeof equipmentChecklistItems.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/equipment-checklist-items/:id',
+      input: insertEquipmentChecklistItemSchema.partial(),
+      responses: {
+        200: z.custom<typeof equipmentChecklistItems.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/equipment-checklist-items/:id',
       responses: {
         204: z.void(),
         404: errorSchemas.notFound,

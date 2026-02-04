@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, numeric, date, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, numeric, date, pgEnum, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -128,6 +128,31 @@ export const departments = pgTable("departments", {
 
 export const sharedTripStatusEnum = pgEnum("shared_trip_status", ["open", "full", "in_progress", "completed", "cancelled"]);
 
+// Equipment Types for flexible inspection checklists
+export const equipmentTypes = pgTable("equipment_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  labelEn: text("label_en").notNull(),
+  labelPt: text("label_pt").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const equipmentChecklistItems = pgTable("equipment_checklist_items", {
+  id: serial("id").primaryKey(),
+  equipmentTypeId: integer("equipment_type_id").references(() => equipmentTypes.id).notNull(),
+  key: text("key").notNull(), // unique key for storing results
+  labelEn: text("label_en").notNull(),
+  labelPt: text("label_pt").notNull(),
+  section: text("section"), // optional section grouping (e.g., "generator", "others")
+  sectionLabelEn: text("section_label_en"),
+  sectionLabelPt: text("section_label_pt"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const sharedTrips = pgTable("shared_trips", {
   id: serial("id").primaryKey(),
   vehicleId: integer("vehicle_id").references(() => vehicles.id).notNull(),
@@ -202,10 +227,19 @@ export const vehicleInspections = pgTable("vehicle_inspections", {
   checkElectricalPanel: boolean("check_electrical_panel").default(false).notNull(),
   checkElectricalPanelComment: text("check_electrical_panel_comment"),
   remarks: text("remarks"),
+  // Dynamic checklist results stored as JSON for flexible equipment types
+  checklistResults: jsonb("checklist_results"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Relations
+export const equipmentTypesRelations = relations(equipmentTypes, ({ many }) => ({
+  checklistItems: many(equipmentChecklistItems),
+}));
+
+export const equipmentChecklistItemsRelations = relations(equipmentChecklistItems, ({ one }) => ({
+  equipmentType: one(equipmentTypes, { fields: [equipmentChecklistItems.equipmentTypeId], references: [equipmentTypes.id] }),
+}));
 export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
 }));
@@ -278,6 +312,18 @@ export const insertVehicleInspectionSchema = createInsertSchema(vehicleInspectio
     vehicleId: z.coerce.number(),
     operatorId: z.coerce.number(),
     kmCounter: z.coerce.number(),
+    checklistResults: z.record(z.object({
+      checked: z.boolean(),
+      comment: z.string().optional(),
+    })).optional(),
+  });
+
+export const insertEquipmentTypeSchema = createInsertSchema(equipmentTypes).omit({ id: true, createdAt: true });
+export const insertEquipmentChecklistItemSchema = createInsertSchema(equipmentChecklistItems)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    equipmentTypeId: z.coerce.number(),
+    sortOrder: z.coerce.number().default(0),
   });
 
 // Types
@@ -300,3 +346,7 @@ export type SharedTrip = typeof sharedTrips.$inferSelect;
 export type InsertSharedTrip = z.infer<typeof insertSharedTripSchema>;
 export type VehicleInspection = typeof vehicleInspections.$inferSelect;
 export type InsertVehicleInspection = z.infer<typeof insertVehicleInspectionSchema>;
+export type EquipmentType = typeof equipmentTypes.$inferSelect;
+export type InsertEquipmentType = z.infer<typeof insertEquipmentTypeSchema>;
+export type EquipmentChecklistItem = typeof equipmentChecklistItems.$inferSelect;
+export type InsertEquipmentChecklistItem = z.infer<typeof insertEquipmentChecklistItemSchema>;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,12 +18,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/lib/i18n";
-import type { Vehicle, VehicleInspection, User } from "@shared/schema";
+import type { Vehicle, VehicleInspection, User, EquipmentType, EquipmentChecklistItem } from "@shared/schema";
 
 const inspectionFormSchema = z.object({
   vehicleId: z.coerce.number().min(1, "Vehicle is required"),
   operatorId: z.coerce.number().min(1, "Operator is required"),
-  equipmentType: z.enum(["factory_vehicle", "transfer_trolley"]).default("factory_vehicle"),
+  equipmentType: z.string().default("factory_vehicle"),
   inspectionDate: z.string().min(1, "Date is required"),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
@@ -79,6 +79,10 @@ const inspectionFormSchema = z.object({
   checkElectricalPanel: z.boolean().default(false),
   checkElectricalPanelComment: z.string().optional(),
   remarks: z.string().optional(),
+  checklistResults: z.record(z.string(), z.object({
+    checked: z.boolean(),
+    comment: z.string().optional(),
+  })).optional(),
 });
 
 type InspectionFormData = z.infer<typeof inspectionFormSchema>;
@@ -125,6 +129,7 @@ export default function VehicleInspections() {
   const { t, language } = useLanguage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [viewInspection, setViewInspection] = useState<(VehicleInspection & { vehicle: Vehicle; operator: User }) | null>(null);
+  const [viewEquipmentTypeId, setViewEquipmentTypeId] = useState<number | null>(null);
 
   const { data: inspections, isLoading: inspectionsLoading } = useQuery<(VehicleInspection & { vehicle: Vehicle; operator: User })[]>({
     queryKey: ["/api/vehicle-inspections"],
@@ -140,6 +145,10 @@ export default function VehicleInspections() {
 
   const { data: currentUser } = useQuery<User>({
     queryKey: ["/api/user"],
+  });
+
+  const { data: equipmentTypes = [] } = useQuery<EquipmentType[]>({
+    queryKey: ["/api/equipment-types"],
   });
 
   const form = useForm<InspectionFormData>({
@@ -201,10 +210,45 @@ export default function VehicleInspections() {
       checkElectricalPanel: false,
       checkElectricalPanelComment: "",
       remarks: "",
+      checklistResults: {} as Record<string, { checked: boolean; comment: string }>,
     },
   });
 
   const selectedEquipmentType = form.watch("equipmentType");
+  const selectedEquipmentTypeId = equipmentTypes.find(et => et.name === selectedEquipmentType)?.id;
+
+  const { data: dbChecklistItems = [] } = useQuery<EquipmentChecklistItem[]>({
+    queryKey: ["/api/equipment-types", selectedEquipmentTypeId, "items"],
+    queryFn: async () => {
+      if (!selectedEquipmentTypeId) return [];
+      const res = await fetch(`/api/equipment-types/${selectedEquipmentTypeId}/items`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedEquipmentTypeId,
+  });
+
+  // Query for checklist items of the viewed inspection's equipment type
+  const { data: viewChecklistItems = [] } = useQuery<EquipmentChecklistItem[]>({
+    queryKey: ["/api/equipment-types", viewEquipmentTypeId, "items"],
+    queryFn: async () => {
+      if (!viewEquipmentTypeId) return [];
+      const res = await fetch(`/api/equipment-types/${viewEquipmentTypeId}/items`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!viewEquipmentTypeId,
+  });
+
+  // Helper to get label for a checklist item key from viewChecklistItems
+  const getViewItemLabel = (key: string) => {
+    const item = viewChecklistItems.find(i => i.key === key);
+    if (item) {
+      return language === "en" ? item.labelEn : item.labelPt;
+    }
+    // Fallback to key name formatted
+    return key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: InspectionFormData) => {
@@ -230,7 +274,17 @@ export default function VehicleInspections() {
     createMutation.mutate(data);
   };
 
-  const getChecklistItems = (equipmentType: string) => {
+  const getChecklistItems = (equipmentType: string, useDbItems: boolean = false) => {
+    // Use database items if available and requested
+    if (useDbItems && dbChecklistItems.length > 0) {
+      return dbChecklistItems.map(item => ({
+        key: item.key,
+        label: language === "en" ? item.labelEn : item.labelPt,
+        section: item.section || undefined,
+        sectionLabel: item.section ? (language === "en" ? item.sectionLabelEn : item.sectionLabelPt) : undefined,
+      }));
+    }
+    // Fallback to hardcoded items
     if (equipmentType === "transfer_trolley") {
       return [...TRANSFER_TROLLEY_GENERATOR_ITEMS, ...TRANSFER_TROLLEY_OTHERS_ITEMS];
     }
@@ -238,7 +292,19 @@ export default function VehicleInspections() {
   };
 
   const countCheckedItems = (inspection: VehicleInspection) => {
-    const items = getChecklistItems((inspection as any).equipmentType || "factory_vehicle");
+    const equipType = (inspection as any).equipmentType || "factory_vehicle";
+    const checklistResults = (inspection as any).checklistResults;
+
+    // For dynamic types (non-legacy), use checklistResults or return 0
+    if (!isLegacyType(equipType)) {
+      if (checklistResults && typeof checklistResults === 'object' && Object.keys(checklistResults).length > 0) {
+        return Object.values(checklistResults).filter((r: any) => r.checked).length;
+      }
+      return 0; // Non-legacy type with no checklistResults
+    }
+
+    // For legacy types, use hardcoded items
+    const items = getChecklistItems(equipType);
     let count = 0;
     items.forEach((item) => {
       if ((inspection as any)[item.key]) count++;
@@ -247,8 +313,57 @@ export default function VehicleInspections() {
   };
 
   const getTotalItems = (inspection: VehicleInspection) => {
-    const items = getChecklistItems((inspection as any).equipmentType || "factory_vehicle");
+    const equipType = (inspection as any).equipmentType || "factory_vehicle";
+    const checklistResults = (inspection as any).checklistResults;
+
+    // For dynamic types (non-legacy), use checklistResults or return 0
+    if (!isLegacyType(equipType)) {
+      if (checklistResults && typeof checklistResults === 'object' && Object.keys(checklistResults).length > 0) {
+        return Object.keys(checklistResults).length;
+      }
+      return 0; // Non-legacy type with no checklistResults
+    }
+
+    // For legacy types, use hardcoded items
+    const items = getChecklistItems(equipType);
     return items.length;
+  };
+
+  const getEquipmentTypeLabel = (typeName: string) => {
+    const dbType = equipmentTypes.find(et => et.name === typeName);
+    if (dbType) {
+      return language === "en" ? dbType.labelEn : dbType.labelPt;
+    }
+    // Fallback for legacy hardcoded types
+    if (typeName === "transfer_trolley") return l.transferTrolley;
+    return l.factoryVehicle;
+  };
+
+  // Check if this is a new dynamic type (not legacy hardcoded)
+  const isLegacyType = (typeName: string) => {
+    return typeName === "factory_vehicle" || typeName === "transfer_trolley";
+  };
+
+  // Get dynamic checklist items from DB, grouped by section
+  const getDynamicChecklistItemsBySection = () => {
+    const sections: Record<string, { label: string; items: EquipmentChecklistItem[] }> = {};
+    const noSectionItems: EquipmentChecklistItem[] = [];
+
+    dbChecklistItems.forEach(item => {
+      if (item.section) {
+        if (!sections[item.section]) {
+          sections[item.section] = {
+            label: language === "en" ? (item.sectionLabelEn || item.section) : (item.sectionLabelPt || item.section),
+            items: [],
+          };
+        }
+        sections[item.section].items.push(item);
+      } else {
+        noSectionItems.push(item);
+      }
+    });
+
+    return { sections, noSectionItems };
   };
 
   const labels = {
@@ -285,6 +400,7 @@ export default function VehicleInspections() {
       transferTrolley: "Transfer Trolley",
       generatorSection: "GENERATOR",
       othersSection: "OTHERS",
+      noChecklistItems: "No checklist items configured for this equipment type. Please configure items in Equipment Types.",
     },
     pt: {
       title: "Inspeções de Veículos",
@@ -319,6 +435,7 @@ export default function VehicleInspections() {
       transferTrolley: "Carro de Transferência",
       generatorSection: "GERADOR",
       othersSection: "OUTROS",
+      noChecklistItems: "Nenhum item de checklist configurado para este tipo de equipamento. Por favor, configure os itens em Tipos de Equipamento.",
     },
   };
 
@@ -418,8 +535,18 @@ export default function VehicleInspections() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="factory_vehicle">{l.factoryVehicle}</SelectItem>
-                              <SelectItem value="transfer_trolley">{l.transferTrolley}</SelectItem>
+                              {equipmentTypes.length > 0 ? (
+                                equipmentTypes.filter(et => et.isActive).map(et => (
+                                  <SelectItem key={et.id} value={et.name}>
+                                    {language === "en" ? et.labelEn : et.labelPt}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <>
+                                  <SelectItem value="factory_vehicle">{l.factoryVehicle}</SelectItem>
+                                  <SelectItem value="transfer_trolley">{l.transferTrolley}</SelectItem>
+                                </>
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -494,7 +621,103 @@ export default function VehicleInspections() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {selectedEquipmentType === "transfer_trolley" ? (
+                        {!isLegacyType(selectedEquipmentType) ? (
+                          // Dynamic equipment type - check if DB items available
+                          dbChecklistItems.length > 0 ? (
+                          (() => {
+                            const { sections, noSectionItems } = getDynamicChecklistItemsBySection();
+                            return (
+                              <>
+                                {noSectionItems.map((item) => (
+                                  <TableRow key={item.key}>
+                                    <TableCell className="text-sm">
+                                      {language === "en" ? item.labelEn : item.labelPt}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <Checkbox
+                                        checked={form.watch(`checklistResults.${item.key}.checked`) || false}
+                                        onCheckedChange={(checked) => {
+                                          const current = form.getValues("checklistResults") || {};
+                                          form.setValue("checklistResults", {
+                                            ...current,
+                                            [item.key]: { ...current[item.key], checked: !!checked },
+                                          });
+                                        }}
+                                        data-testid={`checkbox-${item.key}`}
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        value={form.watch(`checklistResults.${item.key}.comment`) || ""}
+                                        onChange={(e) => {
+                                          const current = form.getValues("checklistResults") || {};
+                                          form.setValue("checklistResults", {
+                                            ...current,
+                                            [item.key]: { ...current[item.key], comment: e.target.value },
+                                          });
+                                        }}
+                                        placeholder={l.comments}
+                                        className="h-8 text-sm"
+                                        data-testid={`input-${item.key}-comment`}
+                                      />
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                                {Object.entries(sections).map(([sectionKey, sectionData]) => (
+                                  <React.Fragment key={sectionKey}>
+                                    <TableRow className="bg-muted/50">
+                                      <TableCell colSpan={3} className="font-semibold text-center">
+                                        {sectionData.label}
+                                      </TableCell>
+                                    </TableRow>
+                                    {sectionData.items.map((item) => (
+                                      <TableRow key={item.key}>
+                                        <TableCell className="text-sm">
+                                          {language === "en" ? item.labelEn : item.labelPt}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                          <Checkbox
+                                            checked={form.watch(`checklistResults.${item.key}.checked`) || false}
+                                            onCheckedChange={(checked) => {
+                                              const current = form.getValues("checklistResults") || {};
+                                              form.setValue("checklistResults", {
+                                                ...current,
+                                                [item.key]: { ...current[item.key], checked: !!checked },
+                                              });
+                                            }}
+                                            data-testid={`checkbox-${item.key}`}
+                                          />
+                                        </TableCell>
+                                        <TableCell>
+                                          <Input
+                                            value={form.watch(`checklistResults.${item.key}.comment`) || ""}
+                                            onChange={(e) => {
+                                              const current = form.getValues("checklistResults") || {};
+                                              form.setValue("checklistResults", {
+                                                ...current,
+                                                [item.key]: { ...current[item.key], comment: e.target.value },
+                                              });
+                                            }}
+                                            placeholder={l.comments}
+                                            className="h-8 text-sm"
+                                            data-testid={`input-${item.key}-comment`}
+                                          />
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </React.Fragment>
+                                ))}
+                              </>
+                            );
+                          })()
+                        ) : (
+                          // Non-legacy type with no DB items - show empty state
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                              {l.noChecklistItems || "No checklist items configured for this equipment type. Please configure items in Equipment Types."}
+                            </TableCell>
+                          </TableRow>
+                        )) : selectedEquipmentType === "transfer_trolley" ? (
                           <>
                             <TableRow className="bg-muted/50">
                               <TableCell colSpan={3} className="font-semibold text-center">{l.generatorSection}</TableCell>
@@ -670,7 +893,7 @@ export default function VehicleInspections() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {(inspection as any).equipmentType === "transfer_trolley" ? l.transferTrolley : l.factoryVehicle}
+                        {getEquipmentTypeLabel((inspection as any).equipmentType || "factory_vehicle")}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -696,7 +919,12 @@ export default function VehicleInspections() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setViewInspection(inspection)}
+                          onClick={() => {
+                            setViewInspection(inspection);
+                            const inspectionEqType = (inspection as any).equipmentType || "factory_vehicle";
+                            const typeId = equipmentTypes.find(et => et.name === inspectionEqType)?.id || null;
+                            setViewEquipmentTypeId(typeId);
+                          }}
                           data-testid={`button-view-inspection-${inspection.id}`}
                         >
                           <Eye className="h-4 w-4" />
@@ -770,7 +998,7 @@ export default function VehicleInspections() {
                     <ClipboardCheck className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm text-muted-foreground">{l.equipmentType}</p>
-                      <p className="font-medium">{(viewInspection as any).equipmentType === "transfer_trolley" ? l.transferTrolley : l.factoryVehicle}</p>
+                      <p className="font-medium">{getEquipmentTypeLabel((viewInspection as any).equipmentType || "factory_vehicle")}</p>
                     </div>
                   </div>
                 </div>
@@ -784,7 +1012,99 @@ export default function VehicleInspections() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(viewInspection as any).equipmentType === "transfer_trolley" ? (
+                    {(viewInspection as any).checklistResults && Object.keys((viewInspection as any).checklistResults).length > 0 ? (
+                      // Dynamic equipment type with checklistResults - render with DB labels if available
+                      (() => {
+                        const results = (viewInspection as any).checklistResults as Record<string, { checked: boolean; comment?: string }>;
+                        // Group by section if viewChecklistItems are available
+                        if (viewChecklistItems.length > 0) {
+                          const sections: Record<string, { label: string; items: { key: string; result: { checked: boolean; comment?: string } }[] }> = {};
+                          const noSectionItems: { key: string; result: { checked: boolean; comment?: string } }[] = [];
+
+                          Object.entries(results).forEach(([key, result]) => {
+                            const item = viewChecklistItems.find(i => i.key === key);
+                            if (item?.section) {
+                              if (!sections[item.section]) {
+                                sections[item.section] = {
+                                  label: language === "en" ? (item.sectionLabelEn || item.section) : (item.sectionLabelPt || item.section),
+                                  items: [],
+                                };
+                              }
+                              sections[item.section].items.push({ key, result });
+                            } else {
+                              noSectionItems.push({ key, result });
+                            }
+                          });
+
+                          return (
+                            <>
+                              {noSectionItems.map(({ key, result }) => (
+                                <TableRow key={key}>
+                                  <TableCell className="text-sm">{getViewItemLabel(key)}</TableCell>
+                                  <TableCell className="text-center">
+                                    {result.checked ? (
+                                      <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✓</Badge>
+                                    ) : (
+                                      <Badge variant="outline">-</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">
+                                    {result.comment || "-"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                              {Object.entries(sections).map(([sectionKey, sectionData]) => (
+                                <React.Fragment key={sectionKey}>
+                                  <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={3} className="font-semibold text-center">
+                                      {sectionData.label}
+                                    </TableCell>
+                                  </TableRow>
+                                  {sectionData.items.map(({ key, result }) => (
+                                    <TableRow key={key}>
+                                      <TableCell className="text-sm">{getViewItemLabel(key)}</TableCell>
+                                      <TableCell className="text-center">
+                                        {result.checked ? (
+                                          <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✓</Badge>
+                                        ) : (
+                                          <Badge variant="outline">-</Badge>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">
+                                        {result.comment || "-"}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </React.Fragment>
+                              ))}
+                            </>
+                          );
+                        }
+                        // Fallback: render without section grouping
+                        return Object.entries(results).map(([key, result]) => (
+                          <TableRow key={key}>
+                            <TableCell className="text-sm">{getViewItemLabel(key)}</TableCell>
+                            <TableCell className="text-center">
+                              {result.checked ? (
+                                <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✓</Badge>
+                              ) : (
+                                <Badge variant="outline">-</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {result.comment || "-"}
+                            </TableCell>
+                          </TableRow>
+                        ));
+                      })()
+                    ) : !isLegacyType((viewInspection as any).equipmentType || "factory_vehicle") ? (
+                      // Non-legacy type with no checklistResults - show empty state
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                          {l.noChecklistItems}
+                        </TableCell>
+                      </TableRow>
+                    ) : (viewInspection as any).equipmentType === "transfer_trolley" ? (
                       <>
                         <TableRow className="bg-muted/50">
                           <TableCell colSpan={3} className="font-semibold text-center">{l.generatorSection}</TableCell>

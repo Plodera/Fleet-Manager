@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   Settings,
+  Settings2,
   FileText,
   UsersRound,
   Globe,
@@ -60,6 +61,7 @@ export function Sidebar() {
     { href: "/reports", label: t.nav.reports, icon: FileText, permission: "view_reports", hideFromDriver: true },
     { href: "/users", label: t.nav.users, icon: Users, permission: "admin_only", hideFromDriver: true },
     { href: "/settings", label: t.nav.settings, icon: Settings, permission: "admin_only", hideFromDriver: true },
+    { href: "/equipment-types", label: t.nav.equipmentTypes, icon: Settings2, permission: "admin_only", hideFromDriver: true },
   ];
 
   // Filter links based on permissions and driver status
