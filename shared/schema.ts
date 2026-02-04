@@ -146,11 +146,12 @@ export const vehicleInspections = pgTable("vehicle_inspections", {
   id: serial("id").primaryKey(),
   vehicleId: integer("vehicle_id").references(() => vehicles.id).notNull(),
   operatorId: integer("operator_id").references(() => users.id).notNull(),
+  equipmentType: text("equipment_type").default("factory_vehicle").notNull(), // "factory_vehicle" or "transfer_trolley"
   inspectionDate: date("inspection_date").notNull(),
   startTime: text("start_time"),
   endTime: text("end_time"),
   kmCounter: integer("km_counter").notNull(),
-  // Checklist items
+  // Factory Vehicle Checklist items
   inspectDamage: boolean("inspect_damage").default(false).notNull(),
   inspectDamageComment: text("inspect_damage_comment"),
   checkCabinSeat: boolean("check_cabin_seat").default(false).notNull(),
@@ -187,6 +188,19 @@ export const vehicleInspections = pgTable("vehicle_inspections", {
   greaseHydraulicPinsComment: text("grease_hydraulic_pins_comment"),
   checkMeters: boolean("check_meters").default(false).notNull(),
   checkMetersComment: text("check_meters_comment"),
+  // Transfer Trolley specific items
+  checkBatteryVoltage: boolean("check_battery_voltage").default(false).notNull(),
+  checkBatteryVoltageComment: text("check_battery_voltage_comment"),
+  checkGeneratorLeakage: boolean("check_generator_leakage").default(false).notNull(),
+  checkGeneratorLeakageComment: text("check_generator_leakage_comment"),
+  checkHydraulicLeakage: boolean("check_hydraulic_leakage").default(false).notNull(),
+  checkHydraulicLeakageComment: text("check_hydraulic_leakage_comment"),
+  checkWheelCondition: boolean("check_wheel_condition").default(false).notNull(),
+  checkWheelConditionComment: text("check_wheel_condition_comment"),
+  checkGearboxCoupling: boolean("check_gearbox_coupling").default(false).notNull(),
+  checkGearboxCouplingComment: text("check_gearbox_coupling_comment"),
+  checkElectricalPanel: boolean("check_electrical_panel").default(false).notNull(),
+  checkElectricalPanelComment: text("check_electrical_panel_comment"),
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
 });

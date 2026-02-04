@@ -23,10 +23,12 @@ import type { Vehicle, VehicleInspection, User } from "@shared/schema";
 const inspectionFormSchema = z.object({
   vehicleId: z.coerce.number().min(1, "Vehicle is required"),
   operatorId: z.coerce.number().min(1, "Operator is required"),
+  equipmentType: z.enum(["factory_vehicle", "transfer_trolley"]).default("factory_vehicle"),
   inspectionDate: z.string().min(1, "Date is required"),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   kmCounter: z.coerce.number().min(0, "KM Counter is required"),
+  // Factory Vehicle items
   inspectDamage: z.boolean().default(false),
   inspectDamageComment: z.string().optional(),
   checkCabinSeat: z.boolean().default(false),
@@ -63,12 +65,25 @@ const inspectionFormSchema = z.object({
   greaseHydraulicPinsComment: z.string().optional(),
   checkMeters: z.boolean().default(false),
   checkMetersComment: z.string().optional(),
+  // Transfer Trolley specific items
+  checkBatteryVoltage: z.boolean().default(false),
+  checkBatteryVoltageComment: z.string().optional(),
+  checkGeneratorLeakage: z.boolean().default(false),
+  checkGeneratorLeakageComment: z.string().optional(),
+  checkHydraulicLeakage: z.boolean().default(false),
+  checkHydraulicLeakageComment: z.string().optional(),
+  checkWheelCondition: z.boolean().default(false),
+  checkWheelConditionComment: z.string().optional(),
+  checkGearboxCoupling: z.boolean().default(false),
+  checkGearboxCouplingComment: z.string().optional(),
+  checkElectricalPanel: z.boolean().default(false),
+  checkElectricalPanelComment: z.string().optional(),
   remarks: z.string().optional(),
 });
 
 type InspectionFormData = z.infer<typeof inspectionFormSchema>;
 
-const CHECKLIST_ITEMS = [
+const FACTORY_VEHICLE_ITEMS = [
   { key: "inspectDamage", label: { en: "Inspect any Damage", pt: "Inspecionar Danos" } },
   { key: "checkCabinSeat", label: { en: "Check Operator's Cabin and driver seat should be in good condition", pt: "Verificar Cabine do Operador e banco do motorista em boas condições" } },
   { key: "cleanRadiator", label: { en: "Clean radiator (with compressed air)", pt: "Limpar radiador (com ar comprimido)" } },
@@ -87,6 +102,23 @@ const CHECKLIST_ITEMS = [
   { key: "checkIndicators", label: { en: "Check Indicator's lights", pt: "Verificar Luzes Indicadoras" } },
   { key: "greaseHydraulicPins", label: { en: "Grease the hydraulic cylinder pins if required", pt: "Lubrificar os pinos do cilindro hidráulico se necessário" } },
   { key: "checkMeters", label: { en: "Ensure all the meters working normal", pt: "Garantir que todos os medidores funcionam normalmente" } },
+];
+
+const TRANSFER_TROLLEY_GENERATOR_ITEMS = [
+  { key: "inspectDamage", label: { en: "Inspect any Damage", pt: "Inspecionar Danos" } },
+  { key: "checkEngineOil", label: { en: "Check Engine Oil", pt: "Verificar Óleo do Motor" } },
+  { key: "checkCoolantLevel", label: { en: "Check coolant level", pt: "Verificar nível do líquido de arrefecimento" } },
+  { key: "checkDriveBelt", label: { en: "Check drive belt and tension", pt: "Verificar correia de transmissão e tensão" } },
+  { key: "checkBatteryVoltage", label: { en: "Check battery voltage", pt: "Verificar tensão da bateria" } },
+  { key: "checkGeneratorLeakage", label: { en: "Check if any leakage in generator", pt: "Verificar vazamentos no gerador" } },
+];
+
+const TRANSFER_TROLLEY_OTHERS_ITEMS = [
+  { key: "checkHydraulicOil", label: { en: "Check hydraulic oil level", pt: "Verificar nível do óleo hidráulico" } },
+  { key: "checkHydraulicLeakage", label: { en: "Check if any leakage in hydraulic system", pt: "Verificar vazamentos no sistema hidráulico" } },
+  { key: "checkWheelCondition", label: { en: "Check the wheel condition", pt: "Verificar condição das rodas" } },
+  { key: "checkGearboxCoupling", label: { en: "Check gear box & coupling tightness", pt: "Verificar caixa de câmbio e aperto do acoplamento" } },
+  { key: "checkElectricalPanel", label: { en: "Ensure all the indication working in electrical panel", pt: "Garantir que todas as indicações funcionam no painel elétrico" } },
 ];
 
 export default function VehicleInspections() {
@@ -115,6 +147,7 @@ export default function VehicleInspections() {
     defaultValues: {
       vehicleId: 0,
       operatorId: 0,
+      equipmentType: "factory_vehicle",
       inspectionDate: new Date().toISOString().split("T")[0],
       startTime: "",
       endTime: "",
@@ -155,9 +188,23 @@ export default function VehicleInspections() {
       greaseHydraulicPinsComment: "",
       checkMeters: false,
       checkMetersComment: "",
+      checkBatteryVoltage: false,
+      checkBatteryVoltageComment: "",
+      checkGeneratorLeakage: false,
+      checkGeneratorLeakageComment: "",
+      checkHydraulicLeakage: false,
+      checkHydraulicLeakageComment: "",
+      checkWheelCondition: false,
+      checkWheelConditionComment: "",
+      checkGearboxCoupling: false,
+      checkGearboxCouplingComment: "",
+      checkElectricalPanel: false,
+      checkElectricalPanelComment: "",
       remarks: "",
     },
   });
+
+  const selectedEquipmentType = form.watch("equipmentType");
 
   const createMutation = useMutation({
     mutationFn: async (data: InspectionFormData) => {
@@ -183,12 +230,25 @@ export default function VehicleInspections() {
     createMutation.mutate(data);
   };
 
+  const getChecklistItems = (equipmentType: string) => {
+    if (equipmentType === "transfer_trolley") {
+      return [...TRANSFER_TROLLEY_GENERATOR_ITEMS, ...TRANSFER_TROLLEY_OTHERS_ITEMS];
+    }
+    return FACTORY_VEHICLE_ITEMS;
+  };
+
   const countCheckedItems = (inspection: VehicleInspection) => {
+    const items = getChecklistItems((inspection as any).equipmentType || "factory_vehicle");
     let count = 0;
-    CHECKLIST_ITEMS.forEach((item) => {
+    items.forEach((item) => {
       if ((inspection as any)[item.key]) count++;
     });
     return count;
+  };
+
+  const getTotalItems = (inspection: VehicleInspection) => {
+    const items = getChecklistItems((inspection as any).equipmentType || "factory_vehicle");
+    return items.length;
   };
 
   const labels = {
@@ -220,6 +280,11 @@ export default function VehicleInspections() {
       cancel: "Cancel",
       viewDetails: "Inspection Details",
       close: "Close",
+      equipmentType: "Equipment Type",
+      factoryVehicle: "Factory Vehicle",
+      transferTrolley: "Transfer Trolley",
+      generatorSection: "GENERATOR",
+      othersSection: "OTHERS",
     },
     pt: {
       title: "Inspeções de Veículos",
@@ -249,6 +314,11 @@ export default function VehicleInspections() {
       cancel: "Cancelar",
       viewDetails: "Detalhes da Inspeção",
       close: "Fechar",
+      equipmentType: "Tipo de Equipamento",
+      factoryVehicle: "Veículo de Fábrica",
+      transferTrolley: "Carro de Transferência",
+      generatorSection: "GERADOR",
+      othersSection: "OUTROS",
     },
   };
 
@@ -335,6 +405,27 @@ export default function VehicleInspections() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="equipmentType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{l.equipmentType}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-equipment-type">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="factory_vehicle">{l.factoryVehicle}</SelectItem>
+                              <SelectItem value="transfer_trolley">{l.transferTrolley}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
                   <div className="grid grid-cols-3 gap-4">
@@ -403,39 +494,116 @@ export default function VehicleInspections() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {CHECKLIST_ITEMS.map((item, index) => (
-                          <TableRow key={item.key}>
-                            <TableCell className="text-sm">{item.label[language]}</TableCell>
-                            <TableCell className="text-center">
-                              <FormField
-                                control={form.control}
-                                name={item.key as keyof InspectionFormData}
-                                render={({ field }) => (
-                                  <Checkbox
-                                    checked={field.value as boolean}
-                                    onCheckedChange={field.onChange}
-                                    data-testid={`checkbox-${item.key}`}
+                        {selectedEquipmentType === "transfer_trolley" ? (
+                          <>
+                            <TableRow className="bg-muted/50">
+                              <TableCell colSpan={3} className="font-semibold text-center">{l.generatorSection}</TableCell>
+                            </TableRow>
+                            {TRANSFER_TROLLEY_GENERATOR_ITEMS.map((item) => (
+                              <TableRow key={item.key}>
+                                <TableCell className="text-sm">{item.label[language]}</TableCell>
+                                <TableCell className="text-center">
+                                  <FormField
+                                    control={form.control}
+                                    name={item.key as keyof InspectionFormData}
+                                    render={({ field }) => (
+                                      <Checkbox
+                                        checked={field.value as boolean}
+                                        onCheckedChange={field.onChange}
+                                        data-testid={`checkbox-${item.key}`}
+                                      />
+                                    )}
                                   />
-                                )}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <FormField
-                                control={form.control}
-                                name={`${item.key}Comment` as keyof InspectionFormData}
-                                render={({ field }) => (
-                                  <Input
-                                    {...field}
-                                    value={field.value as string || ""}
-                                    placeholder={l.comments}
-                                    className="h-8 text-sm"
-                                    data-testid={`input-${item.key}-comment`}
+                                </TableCell>
+                                <TableCell>
+                                  <FormField
+                                    control={form.control}
+                                    name={`${item.key}Comment` as keyof InspectionFormData}
+                                    render={({ field }) => (
+                                      <Input
+                                        {...field}
+                                        value={field.value as string || ""}
+                                        placeholder={l.comments}
+                                        className="h-8 text-sm"
+                                        data-testid={`input-${item.key}-comment`}
+                                      />
+                                    )}
                                   />
-                                )}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-muted/50">
+                              <TableCell colSpan={3} className="font-semibold text-center">{l.othersSection}</TableCell>
+                            </TableRow>
+                            {TRANSFER_TROLLEY_OTHERS_ITEMS.map((item) => (
+                              <TableRow key={item.key}>
+                                <TableCell className="text-sm">{item.label[language]}</TableCell>
+                                <TableCell className="text-center">
+                                  <FormField
+                                    control={form.control}
+                                    name={item.key as keyof InspectionFormData}
+                                    render={({ field }) => (
+                                      <Checkbox
+                                        checked={field.value as boolean}
+                                        onCheckedChange={field.onChange}
+                                        data-testid={`checkbox-${item.key}`}
+                                      />
+                                    )}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <FormField
+                                    control={form.control}
+                                    name={`${item.key}Comment` as keyof InspectionFormData}
+                                    render={({ field }) => (
+                                      <Input
+                                        {...field}
+                                        value={field.value as string || ""}
+                                        placeholder={l.comments}
+                                        className="h-8 text-sm"
+                                        data-testid={`input-${item.key}-comment`}
+                                      />
+                                    )}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </>
+                        ) : (
+                          FACTORY_VEHICLE_ITEMS.map((item) => (
+                            <TableRow key={item.key}>
+                              <TableCell className="text-sm">{item.label[language]}</TableCell>
+                              <TableCell className="text-center">
+                                <FormField
+                                  control={form.control}
+                                  name={item.key as keyof InspectionFormData}
+                                  render={({ field }) => (
+                                    <Checkbox
+                                      checked={field.value as boolean}
+                                      onCheckedChange={field.onChange}
+                                      data-testid={`checkbox-${item.key}`}
+                                    />
+                                  )}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <FormField
+                                  control={form.control}
+                                  name={`${item.key}Comment` as keyof InspectionFormData}
+                                  render={({ field }) => (
+                                    <Input
+                                      {...field}
+                                      value={field.value as string || ""}
+                                      placeholder={l.comments}
+                                      className="h-8 text-sm"
+                                      data-testid={`input-${item.key}-comment`}
+                                    />
+                                  )}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
                       </TableBody>
                     </Table>
                   </div>
@@ -475,6 +643,7 @@ export default function VehicleInspections() {
             <TableHeader>
               <TableRow>
                 <TableHead>{l.vehicle}</TableHead>
+                <TableHead>{l.equipmentType}</TableHead>
                 <TableHead>{l.date}</TableHead>
                 <TableHead>{l.operator}</TableHead>
                 <TableHead>{l.kmCounter}</TableHead>
@@ -500,6 +669,11 @@ export default function VehicleInspections() {
                       </div>
                     </TableCell>
                     <TableCell>
+                      <Badge variant="outline">
+                        {(inspection as any).equipmentType === "transfer_trolley" ? l.transferTrolley : l.factoryVehicle}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         {format(new Date(inspection.inspectionDate), "dd/MM/yyyy")}
@@ -514,7 +688,7 @@ export default function VehicleInspections() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {countCheckedItems(inspection)} / {CHECKLIST_ITEMS.length}
+                        {countCheckedItems(inspection)} / {getTotalItems(inspection)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -592,6 +766,13 @@ export default function VehicleInspections() {
                       <p className="font-medium">{viewInspection.operator.fullName}</p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <ClipboardCheck className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">{l.equipmentType}</p>
+                      <p className="font-medium">{(viewInspection as any).equipmentType === "transfer_trolley" ? l.transferTrolley : l.factoryVehicle}</p>
+                    </div>
+                  </div>
                 </div>
 
                 <Table>
@@ -603,21 +784,62 @@ export default function VehicleInspections() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {CHECKLIST_ITEMS.map((item) => (
-                      <TableRow key={item.key}>
-                        <TableCell className="text-sm">{item.label[language]}</TableCell>
-                        <TableCell className="text-center">
-                          {(viewInspection as any)[item.key] ? (
-                            <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✓</Badge>
-                          ) : (
-                            <Badge variant="outline">-</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {(viewInspection as any)[`${item.key}Comment`] || "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {(viewInspection as any).equipmentType === "transfer_trolley" ? (
+                      <>
+                        <TableRow className="bg-muted/50">
+                          <TableCell colSpan={3} className="font-semibold text-center">{l.generatorSection}</TableCell>
+                        </TableRow>
+                        {TRANSFER_TROLLEY_GENERATOR_ITEMS.map((item) => (
+                          <TableRow key={item.key}>
+                            <TableCell className="text-sm">{item.label[language]}</TableCell>
+                            <TableCell className="text-center">
+                              {(viewInspection as any)[item.key] ? (
+                                <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✓</Badge>
+                              ) : (
+                                <Badge variant="outline">-</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {(viewInspection as any)[`${item.key}Comment`] || "-"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/50">
+                          <TableCell colSpan={3} className="font-semibold text-center">{l.othersSection}</TableCell>
+                        </TableRow>
+                        {TRANSFER_TROLLEY_OTHERS_ITEMS.map((item) => (
+                          <TableRow key={item.key}>
+                            <TableCell className="text-sm">{item.label[language]}</TableCell>
+                            <TableCell className="text-center">
+                              {(viewInspection as any)[item.key] ? (
+                                <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✓</Badge>
+                              ) : (
+                                <Badge variant="outline">-</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {(viewInspection as any)[`${item.key}Comment`] || "-"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </>
+                    ) : (
+                      FACTORY_VEHICLE_ITEMS.map((item) => (
+                        <TableRow key={item.key}>
+                          <TableCell className="text-sm">{item.label[language]}</TableCell>
+                          <TableCell className="text-center">
+                            {(viewInspection as any)[item.key] ? (
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✓</Badge>
+                            ) : (
+                              <Badge variant="outline">-</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {(viewInspection as any)[`${item.key}Comment`] || "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
 
