@@ -1,0 +1,58 @@
+Use --update-env to update environment variables
+[PM2][ERROR] Process or Namespace fleetcmd~ not found
+aiscoweb@aiscoweb:~$
+aiscoweb@aiscoweb:~$
+aiscoweb@aiscoweb:~$
+aiscoweb@aiscoweb:~$ cd /opt/fleetcmd
+aiscoweb@aiscoweb:/opt/fleetcmd$ git pull origin main
+npm install
+pm2 restart fleetcmd
+remote: Enumerating objects: 109, done.
+remote: Counting objects: 100% (109/109), done.
+remote: Compressing objects: 100% (18/18), done.
+remote: Total 91 (delta 73), reused 91 (delta 73), pack-reused 0 (from 0)
+Unpacking objects: 100% (91/91), 145.88 KiB | 230.00 KiB/s, done.
+From https://github.com/Plodera/Fleet-Manager
+ * branch            main       -> FETCH_HEAD
+   ae63a96..578bdfe  main       -> origin/main
+Updating ae63a96..578bdfe
+Fast-forward
+ attached_assets/image_1770197783348.png |  Bin 0 -> 69611 bytes
+ attached_assets/image_1770199380404.png |  Bin 0 -> 63790 bytes
+ client/src/App.tsx                      |    8 +
+ client/src/components/Sidebar.tsx       |   12 +-
+ client/src/lib/i18n.tsx                 |    8 +
+ client/src/pages/Dashboard.tsx          |   33 +-
+ client/src/pages/EquipmentTypes.tsx     |  561 +++++++++++++++
+ client/src/pages/VehicleInspections.tsx | 1185 +++++++++++++++++++++++++++++++
+ replit.md                               |   36 +
+ server/routes.ts                        |  151 ++++
+ server/storage.ts                       |  119 +++-
+ shared/routes.ts                        |  120 +++-
+ shared/schema.ts                        |  129 +++-
+ 13 files changed, 2354 insertions(+), 8 deletions(-)
+ create mode 100644 attached_assets/image_1770197783348.png
+ create mode 100644 attached_assets/image_1770199380404.png
+ create mode 100644 client/src/pages/EquipmentTypes.tsx
+ create mode 100644 client/src/pages/VehicleInspections.tsx
+
+up to date, audited 556 packages in 13s
+
+69 packages are looking for funding
+  run `npm fund` for details
+
+23 vulnerabilities (1 moderate, 22 high)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [fleetcmd](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 73   │ online    │ 0%       │ 18.3mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+aiscoweb@aiscoweb:/opt/fleetcmd$
