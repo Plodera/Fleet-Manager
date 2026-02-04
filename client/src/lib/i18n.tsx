@@ -68,6 +68,8 @@ const translations = {
       search: "Search",
       filter: "Filter",
       all: "All",
+      accessDenied: "Access Denied",
+      noPermissionDashboard: "You do not have permission to view the Dashboard. Please contact your administrator if you believe this is an error.",
     },
     // Dashboard
     dashboard: {
@@ -305,6 +307,8 @@ const translations = {
       search: "Pesquisar",
       filter: "Filtrar",
       all: "Todos",
+      accessDenied: "Acesso Negado",
+      noPermissionDashboard: "Você não tem permissão para visualizar o Painel. Por favor, contacte o seu administrador se acredita que isto é um erro.",
     },
     // Dashboard
     dashboard: {

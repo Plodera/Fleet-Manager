@@ -2,13 +2,14 @@ import { useVehicles } from "@/hooks/use-vehicles";
 import { useBookings } from "@/hooks/use-bookings";
 import { useMaintenance as useMaintenanceHook, useFuel as useFuelHook } from "@/hooks/use-records";
 import { StatsCard } from "@/components/StatsCard";
-import { Car, CalendarCheck, Wrench, Fuel, AlertCircle, TrendingUp, Clock, Activity } from "lucide-react";
+import { Car, CalendarCheck, Wrench, Fuel, AlertCircle, TrendingUp, Clock, Activity, ShieldAlert } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Dashboard() {
   const { vehicles, isLoading: loadingVehicles } = useVehicles();
@@ -16,6 +17,36 @@ export default function Dashboard() {
   const { records: maintenance, isLoading: loadingMaintenance } = useMaintenanceHook();
   const { records: fuel, isLoading: loadingFuel } = useFuelHook();
   const { t } = useLanguage();
+  const { user } = useAuth();
+
+  // Parse user permissions
+  const userPermissions: string[] = (() => {
+    if (!user?.permissions) return [];
+    if (Array.isArray(user.permissions)) return user.permissions;
+    try {
+      return JSON.parse(user.permissions as string);
+    } catch {
+      return [];
+    }
+  })();
+
+  // Check if user has view_dashboard permission (admins always have access)
+  const hasAccess = user?.role === "admin" || userPermissions.includes("view_dashboard");
+
+  // Show access denied if user doesn't have permission
+  if (!hasAccess) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
+        <h1 className="text-2xl font-bold text-foreground mb-2">
+          {t.labels?.accessDenied || "Access Denied"}
+        </h1>
+        <p className="text-muted-foreground max-w-md">
+          {t.labels?.noPermissionDashboard || "You do not have permission to view the Dashboard. Please contact your administrator if you believe this is an error."}
+        </p>
+      </div>
+    );
+  }
 
   if (loadingVehicles || loadingBookings || loadingMaintenance || loadingFuel) {
     return (
