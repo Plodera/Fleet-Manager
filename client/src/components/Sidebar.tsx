@@ -55,7 +55,7 @@ export function Sidebar() {
     { href: "/bookings", label: t.nav.bookings, icon: CalendarDays, permission: "view_bookings", hideFromDriver: true },
     { href: "/shared-rides", label: t.nav.sharedRides, icon: UsersRound, permission: "view_bookings", hideFromDriver: true },
     { href: "/maintenance", label: t.nav.maintenance, icon: Wrench, permission: "view_maintenance", hideFromDriver: true },
-    { href: "/vehicle-inspections", label: t.nav.inspections, icon: ClipboardCheck, permission: "view_maintenance", hideFromDriver: true },
+    { href: "/vehicle-inspections", label: t.nav.inspections, icon: ClipboardCheck, permission: "view_maintenance", hideFromDriver: true, isSubItem: true },
     { href: "/fuel", label: t.nav.fuel, icon: Fuel, permission: "view_fuel", hideFromDriver: true },
     { href: "/reports", label: t.nav.reports, icon: FileText, permission: "view_reports", hideFromDriver: true },
     { href: "/users", label: t.nav.users, icon: Users, permission: "admin_only", hideFromDriver: true },
@@ -97,12 +97,14 @@ export function Sidebar() {
         {links.map((link) => {
           const Icon = link.icon;
           const isActive = location === link.href;
+          const isSubItem = 'isSubItem' in link && link.isSubItem;
           return (
             <Link key={link.href} href={link.href} className={cn(
               "sidebar-link group",
-              isActive ? "sidebar-link-active" : "sidebar-link-inactive"
+              isActive ? "sidebar-link-active" : "sidebar-link-inactive",
+              isSubItem && "ml-4 text-sm"
             )} onClick={() => setOpen(false)}>
-              <Icon className={cn("w-5 h-5", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+              <Icon className={cn(isSubItem ? "w-4 h-4" : "w-5 h-5", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
               {link.label}
             </Link>
           );
