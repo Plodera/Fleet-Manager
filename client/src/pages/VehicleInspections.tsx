@@ -324,7 +324,7 @@ export default function VehicleInspections() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {users?.map((user) => (
+                              {users?.filter(u => u.isDriver).map((user) => (
                                 <SelectItem key={user.id} value={user.id.toString()}>
                                   {user.fullName}
                                 </SelectItem>
