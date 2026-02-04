@@ -8,6 +8,7 @@ A vehicle management and booking system for organizational vehicles with user au
 - Booking System: Reservation and scheduling with approval workflow
 - Maintenance Tracking & Fuel Monitoring
 - Vehicle Inspections: Equipment-specific inspections for Factory Vehicles (18 items) and Transfer Trolleys (11 items in 2 sections)
+- Equipment Types Management: Admin interface for creating custom equipment types with configurable checklist items
 - User Authentication with role-based access (admin, staff, customer)
 - User Permissions System: Granular access control
 - Analytics Dashboard
@@ -16,24 +17,38 @@ A vehicle management and booking system for organizational vehicles with user au
 - Bilingual Support: English/Portuguese for navigation, buttons, and status labels
 
 ## Vehicle Inspections
-The system includes equipment-specific inspection checklists (`/vehicle-inspections`) with support for multiple equipment types:
+The system includes equipment-specific inspection checklists (`/vehicle-inspections`) with support for fully dynamic equipment types configured through admin interface.
 
-### Equipment Types:
+### Dynamic Equipment Types (Admin Configurable)
+Equipment types and their checklist items are fully configurable through the Equipment Types admin page (`/equipment-types`):
+- **Create custom equipment types**: Add any equipment type with English/Portuguese labels
+- **Configure checklist items**: Define inspection items with optional section grouping
+- **Bilingual support**: Each type and item has both English and Portuguese labels
+- **Section grouping**: Items can be organized into sections with headers
+- **Sort order**: Control display order of types and items
+
+### Legacy Equipment Types (Hardcoded):
 1. **Factory Vehicle** (18 items): Damage check, cabin/seat condition, radiator cleaning, engine oil, coolant level, drive belt tension, air filter, intake/exhaust, tyres/wheel nuts, hydraulic oil, controls, leaks/damages, headlights, horn, mirrors, indicators, hydraulic pins, meters
 
 2. **Transfer Trolley** (11 items in 2 sections):
    - **Generator Section** (6 items): Inspect damage, engine oil, coolant level, drive belt tension, battery voltage, generator leakage
    - **Others Section** (5 items): Hydraulic oil, hydraulic leakage, wheel condition, gearbox coupling, electrical panel
 
+### Architecture:
+- **Hybrid approach**: Legacy types use hardcoded columns for backward compatibility; new types use `checklistResults` JSONB column
+- **Database tables**: `equipment_types` (id, name, labelEn, labelPt, isActive, sortOrder) and `equipment_checklist_items` (id, equipmentTypeId, key, labelEn, labelPt, section, sectionLabelEn, sectionLabelPt, sortOrder, isActive)
+- **API endpoints**: `/api/equipment-types` (CRUD), `/api/equipment-types/:id/items`, `/api/equipment-checklist-items` (CRUD)
+
 ### Common Features:
-- **Equipment Type Selector**: Choose between Factory Vehicle or Transfer Trolley at inspection creation
+- **Equipment Type Selector**: Dropdown loads from database with fallback to legacy types
+- **Dynamic Checklist Loading**: Items load from database based on selected equipment type
 - **Operator Selection**: Dropdown filtered to show only drivers/vehicle operators
 - **Header Fields**: KM Counter, Date, Start Time, End Time
 - **Comments**: Each checklist item has an optional comment field
 - **Remarks**: General remarks section at the bottom
 - **Bilingual**: Full English/Portuguese support including section headers
 - **Access Control**: Requires view_maintenance permission
-- **View Details**: Click to see full inspection report with equipment type, all checked items, section headers (for Transfer Trolley), and comments
+- **View Details**: Click to see full inspection report with equipment type, all checked items, section headers, and comments
 
 ## Driver Dashboard
 Drivers have a dedicated dashboard (`/driver-dashboard`) that shows only their assigned trips:
