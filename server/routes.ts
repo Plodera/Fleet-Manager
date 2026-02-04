@@ -100,8 +100,44 @@ export async function registerRoutes(
 
   // Bookings
   app.get(api.bookings.list.path, async (req, res) => {
-    const bookings = await storage.getBookings();
-    res.json(bookings);
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const currentUser = req.user as User;
+    
+    const allBookings = await storage.getBookings();
+    
+    // Admins see all bookings
+    if (currentUser.role === 'admin') {
+      return res.json(allBookings);
+    }
+    
+    // Get shared trips to check if user is a passenger
+    const sharedTrips = await storage.getSharedTrips();
+    const userSharedTripIds = new Set<number>();
+    for (const trip of sharedTrips) {
+      const isPassenger = trip.passengers.some(p => p.user.id === currentUser.id);
+      if (isPassenger) {
+        userSharedTripIds.add(trip.id);
+      }
+    }
+    
+    // Filter bookings to show:
+    // 1. User's own bookings (userId)
+    // 2. Bookings where user is assigned driver (driverId)
+    // 3. Bookings where user is the approver (approverId) - they need to approve/reject
+    // 4. Bookings that are part of a shared trip the user has joined
+    const filteredBookings = allBookings.filter(booking => {
+      // User's own booking
+      if (booking.userId === currentUser.id) return true;
+      // User is assigned driver
+      if ((booking as any).driverId === currentUser.id) return true;
+      // User is the designated approver
+      if ((booking as any).approverId === currentUser.id) return true;
+      // Booking is part of a shared trip user has joined
+      if ((booking as any).sharedTripId && userSharedTripIds.has((booking as any).sharedTripId)) return true;
+      return false;
+    });
+    
+    res.json(filteredBookings);
   });
 
   app.post(api.bookings.create.path, async (req, res) => {
