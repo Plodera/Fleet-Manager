@@ -259,9 +259,10 @@ export const insertSharedTripSchema = createInsertSchema(sharedTrips)
     reservedSeats: z.coerce.number().default(0),
   });
 export const insertVehicleInspectionSchema = createInsertSchema(vehicleInspections)
-  .omit({ id: true, createdAt: true, operatorId: true })
+  .omit({ id: true, createdAt: true })
   .extend({
     vehicleId: z.coerce.number(),
+    operatorId: z.coerce.number(),
     kmCounter: z.coerce.number(),
   });
 

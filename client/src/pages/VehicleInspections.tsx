@@ -22,6 +22,7 @@ import type { Vehicle, VehicleInspection, User } from "@shared/schema";
 
 const inspectionFormSchema = z.object({
   vehicleId: z.coerce.number().min(1, "Vehicle is required"),
+  operatorId: z.coerce.number().min(1, "Operator is required"),
   inspectionDate: z.string().min(1, "Date is required"),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
@@ -101,6 +102,10 @@ export default function VehicleInspections() {
     queryKey: ["/api/vehicles"],
   });
 
+  const { data: users } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
   const { data: currentUser } = useQuery<User>({
     queryKey: ["/api/user"],
   });
@@ -109,6 +114,7 @@ export default function VehicleInspections() {
     resolver: zodResolver(inspectionFormSchema),
     defaultValues: {
       vehicleId: 0,
+      operatorId: 0,
       inspectionDate: new Date().toISOString().split("T")[0],
       startTime: "",
       endTime: "",
@@ -201,6 +207,7 @@ export default function VehicleInspections() {
       noInspections: "No inspections recorded yet",
       createInspection: "Create Vehicle Inspection",
       selectVehicle: "Select a vehicle",
+      selectOperator: "Select an operator",
       inspectionDate: "Inspection Date",
       startTime: "Start Time",
       endTime: "End Time",
@@ -229,6 +236,7 @@ export default function VehicleInspections() {
       noInspections: "Nenhuma inspeção registrada ainda",
       createInspection: "Criar Inspeção de Veículo",
       selectVehicle: "Selecionar um veículo",
+      selectOperator: "Selecionar um operador",
       inspectionDate: "Data da Inspeção",
       startTime: "Hora de Início",
       endTime: "Hora de Término",
@@ -305,6 +313,33 @@ export default function VehicleInspections() {
                     />
                     <FormField
                       control={form.control}
+                      name="operatorId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{l.operator}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-operator">
+                                <SelectValue placeholder={l.selectOperator} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {users?.map((user) => (
+                                <SelectItem key={user.id} value={user.id.toString()}>
+                                  {user.fullName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
                       name="kmCounter"
                       render={({ field }) => (
                         <FormItem>
@@ -316,9 +351,6 @@ export default function VehicleInspections() {
                         </FormItem>
                       )}
                     />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
                       name="inspectionDate"

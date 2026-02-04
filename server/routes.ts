@@ -946,10 +946,7 @@ export async function registerRoutes(
     }
     try {
       const input = api.vehicleInspections.create.input.parse(req.body);
-      const inspection = await storage.createVehicleInspection({
-        ...input,
-        operatorId: user.id,
-      } as any);
+      const inspection = await storage.createVehicleInspection(input);
       res.status(201).json(inspection);
     } catch (err: any) {
       res.status(400).json({ message: err.message || "Invalid data" });
