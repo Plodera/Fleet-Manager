@@ -70,6 +70,8 @@ const translations = {
       all: "All",
       accessDenied: "Access Denied",
       noPermissionDashboard: "You do not have permission to view the Dashboard. Please contact your administrator if you believe this is an error.",
+      sessionExpired: "Session Expired",
+      sessionTerminated: "Your session has been terminated because your account was logged in from another location.",
     },
     // Dashboard
     dashboard: {
@@ -309,6 +311,8 @@ const translations = {
       all: "Todos",
       accessDenied: "Acesso Negado",
       noPermissionDashboard: "Você não tem permissão para visualizar o Painel. Por favor, contacte o seu administrador se acredita que isto é um erro.",
+      sessionExpired: "Sessão Expirada",
+      sessionTerminated: "A sua sessão foi terminada porque a sua conta foi utilizada noutro local.",
     },
     // Dashboard
     dashboard: {

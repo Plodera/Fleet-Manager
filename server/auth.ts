@@ -1,6 +1,6 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
+import { Express, RequestHandler } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -28,6 +28,28 @@ async function comparePasswords(supplied: string, stored: string) {
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
+
+// Middleware to validate single session per user
+export const validateSession: RequestHandler = async (req, res, next) => {
+  if (req.isAuthenticated() && req.user && req.sessionID) {
+    const user = req.user as SelectUser;
+    // Fetch the latest user data to check current session
+    const dbUser = await storage.getUser(user.id);
+    if (dbUser && dbUser.currentSessionId && dbUser.currentSessionId !== req.sessionID) {
+      // Session was invalidated by another login
+      req.logout((err) => {
+        if (err) console.error("Logout error:", err);
+        return res.status(440).json({ 
+          message: "Session expired",
+          reason: "logged_in_elsewhere",
+          notification: "Your session has been terminated because your account was logged in from another location."
+        });
+      });
+      return;
+    }
+  }
+  next();
+};
 
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
@@ -75,8 +97,10 @@ export function setupAuth(app: Express) {
         password: hashedPassword,
       });
 
-      req.login(user, (err) => {
+      req.login(user, async (err) => {
         if (err) return next(err);
+        // Save session ID for single session enforcement
+        await storage.updateUserSession(user.id, req.sessionID);
         res.status(201).json(user);
       });
     } catch (err) {
@@ -84,13 +108,21 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
+  app.post("/api/login", passport.authenticate("local"), async (req, res) => {
+    const user = req.user as SelectUser;
+    // Save session ID for single session enforcement
+    await storage.updateUserSession(user.id, req.sessionID);
     res.status(200).json(req.user);
   });
 
   app.post("/api/logout", (req, res, next) => {
-    req.logout((err) => {
+    const user = req.user as SelectUser | undefined;
+    req.logout(async (err) => {
       if (err) return next(err);
+      // Clear session ID on logout
+      if (user) {
+        await storage.updateUserSession(user.id, null);
+      }
       res.sendStatus(200);
     });
   });

@@ -45,6 +45,7 @@ export interface IStorage {
   updateUserApprover(id: number, isApprover: boolean): Promise<User>;
   updateUserDriver(id: number, isDriver: boolean): Promise<User>;
   updateUserPassword(id: number, password: string): Promise<void>;
+  updateUserSession(id: number, sessionId: string | null): Promise<void>;
   updateUserEmail(id: number, email: string): Promise<User | undefined>;
   updateUserProfile(id: number, data: { username?: string; fullName?: string }): Promise<User | undefined>;
   deleteUser(id: number): Promise<void>;
@@ -220,6 +221,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserPassword(id: number, password: string): Promise<void> {
     await getDb().update(users).set({ password }).where(eq(users.id, id));
+  }
+
+  async updateUserSession(id: number, sessionId: string | null): Promise<void> {
+    await getDb().update(users).set({ currentSessionId: sessionId }).where(eq(users.id, id));
   }
 
   async updateUserEmail(id: number, email: string): Promise<User | undefined> {
@@ -445,6 +450,7 @@ export const storage = {
   updateUserApprover: (...args: Parameters<DatabaseStorage['updateUserApprover']>) => getStorage().updateUserApprover(...args),
   updateUserDriver: (...args: Parameters<DatabaseStorage['updateUserDriver']>) => getStorage().updateUserDriver(...args),
   updateUserPassword: (...args: Parameters<DatabaseStorage['updateUserPassword']>) => getStorage().updateUserPassword(...args),
+  updateUserSession: (...args: Parameters<DatabaseStorage['updateUserSession']>) => getStorage().updateUserSession(...args),
   updateUserEmail: (...args: Parameters<DatabaseStorage['updateUserEmail']>) => getStorage().updateUserEmail(...args),
   updateUserProfile: (...args: Parameters<DatabaseStorage['updateUserProfile']>) => getStorage().updateUserProfile(...args),
   deleteUser: (...args: Parameters<DatabaseStorage['deleteUser']>) => getStorage().deleteUser(...args),

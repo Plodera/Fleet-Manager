@@ -38,6 +38,7 @@ export const users = pgTable("users", {
   permissions: text("permissions").default('["view_dashboard","view_vehicles","view_bookings"]').notNull(),
   isApprover: boolean("is_approver").default(false).notNull(),
   isDriver: boolean("is_driver").default(false).notNull(),
+  currentSessionId: text("current_session_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

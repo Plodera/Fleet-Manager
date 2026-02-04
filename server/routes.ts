@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
-import { setupAuth } from "./auth";
+import { setupAuth, validateSession } from "./auth";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { scrypt, randomBytes } from "crypto";
@@ -35,6 +35,9 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   setupAuth(app);
+  
+  // Validate session for single-session enforcement
+  app.use(validateSession);
 
   // Vehicles
   app.get(api.vehicles.list.path, async (req, res) => {

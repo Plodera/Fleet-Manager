@@ -1,11 +1,13 @@
+import { useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, SESSION_INVALIDATED_EVENT } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Sidebar } from "@/components/Sidebar";
-import { LanguageProvider } from "@/lib/i18n";
+import { LanguageProvider, useLanguage } from "@/lib/i18n";
 
 // Pages
 import Dashboard from "@/pages/Dashboard";
@@ -145,11 +147,35 @@ function Router() {
   );
 }
 
+function SessionInvalidationListener() {
+  const { toast } = useToast();
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    const handleSessionInvalidated = (event: CustomEvent<{ message: string }>) => {
+      toast({
+        title: t.labels?.sessionExpired || "Session Expired",
+        description: event.detail.message,
+        variant: "destructive",
+        duration: 5000,
+      });
+    };
+
+    window.addEventListener(SESSION_INVALIDATED_EVENT, handleSessionInvalidated as EventListener);
+    return () => {
+      window.removeEventListener(SESSION_INVALIDATED_EVENT, handleSessionInvalidated as EventListener);
+    };
+  }, [toast, t]);
+
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <TooltipProvider>
+          <SessionInvalidationListener />
           <Toaster />
           <Router />
         </TooltipProvider>
