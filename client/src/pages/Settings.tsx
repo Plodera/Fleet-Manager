@@ -41,7 +41,7 @@ export default function Settings() {
       smtpUser: "",
       smtpPass: "",
       smtpSecure: true,
-      fromName: "VMS",
+      fromName: "AAMS",
       fromEmail: "",
       enabled: false,
     },

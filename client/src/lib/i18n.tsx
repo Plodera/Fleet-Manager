@@ -76,7 +76,7 @@ const translations = {
     // Dashboard
     dashboard: {
       title: "Dashboard",
-      overview: "Overview of your vehicle management system",
+      overview: "Overview of your automobile management system",
       totalVehicles: "Total Vehicles",
       inUse: "In Use",
       inMaintenance: "In Maintenance",
@@ -317,7 +317,7 @@ const translations = {
     // Dashboard
     dashboard: {
       title: "Painel",
-      overview: "Visão geral do sistema de gestão de veículos",
+      overview: "Visão geral do sistema de gestão automóvel",
       totalVehicles: "Total de Veículos",
       inUse: "Em Uso",
       inMaintenance: "Em Manutenção",
