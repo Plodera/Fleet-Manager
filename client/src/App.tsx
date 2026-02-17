@@ -26,6 +26,8 @@ import BookingPrintView from "@/pages/BookingPrintView";
 import SharedRidePrintView from "@/pages/SharedRidePrintView";
 import DriverDashboard from "@/pages/DriverDashboard";
 import EquipmentTypes from "@/pages/EquipmentTypes";
+import WorkOrders from "@/pages/WorkOrders";
+import WorkOrderConfig from "@/pages/WorkOrderConfig";
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -130,6 +132,12 @@ function Router() {
       </Route>
       <Route path="/equipment-types">
         <PrivateRoute component={EquipmentTypes} adminOnly />
+      </Route>
+      <Route path="/work-orders">
+        <PrivateRoute component={WorkOrders} requiredPermission="view_maintenance" />
+      </Route>
+      <Route path="/work-order-config">
+        <PrivateRoute component={WorkOrderConfig} adminOnly />
       </Route>
       <Route path="/reports">
         <PrivateRoute component={Reports} requiredPermission="view_reports" />

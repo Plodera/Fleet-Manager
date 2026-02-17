@@ -10,6 +10,11 @@ import {
   insertVehicleInspectionSchema,
   insertEquipmentTypeSchema,
   insertEquipmentChecklistItemSchema,
+  insertShiftSchema,
+  insertActivityTypeSchema,
+  insertSubEquipmentSchema,
+  insertWorkOrderSchema,
+  insertWorkOrderItemSchema,
   users,
   vehicles,
   bookings,
@@ -19,7 +24,12 @@ import {
   sharedTrips,
   vehicleInspections,
   equipmentTypes,
-  equipmentChecklistItems
+  equipmentChecklistItems,
+  shifts,
+  activityTypes,
+  subEquipment,
+  workOrders,
+  workOrderItems,
 } from './schema';
 
 export const errorSchemas = {
@@ -527,7 +537,69 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
-  }
+  },
+  shifts: {
+    list: { method: 'GET' as const, path: '/api/shifts', responses: { 200: z.array(z.custom<typeof shifts.$inferSelect>()) } },
+    create: { method: 'POST' as const, path: '/api/shifts', input: insertShiftSchema, responses: { 201: z.custom<typeof shifts.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: 'PATCH' as const, path: '/api/shifts/:id', input: insertShiftSchema.partial(), responses: { 200: z.custom<typeof shifts.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: 'DELETE' as const, path: '/api/shifts/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
+  },
+  activityTypes: {
+    list: { method: 'GET' as const, path: '/api/activity-types', responses: { 200: z.array(z.custom<typeof activityTypes.$inferSelect>()) } },
+    create: { method: 'POST' as const, path: '/api/activity-types', input: insertActivityTypeSchema, responses: { 201: z.custom<typeof activityTypes.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: 'PATCH' as const, path: '/api/activity-types/:id', input: insertActivityTypeSchema.partial(), responses: { 200: z.custom<typeof activityTypes.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: 'DELETE' as const, path: '/api/activity-types/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
+  },
+  subEquipment: {
+    list: { method: 'GET' as const, path: '/api/sub-equipment', responses: { 200: z.array(z.custom<typeof subEquipment.$inferSelect>()) } },
+    create: { method: 'POST' as const, path: '/api/sub-equipment', input: insertSubEquipmentSchema, responses: { 201: z.custom<typeof subEquipment.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: 'PATCH' as const, path: '/api/sub-equipment/:id', input: insertSubEquipmentSchema.partial(), responses: { 200: z.custom<typeof subEquipment.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: 'DELETE' as const, path: '/api/sub-equipment/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
+  },
+  workOrders: {
+    list: { method: 'GET' as const, path: '/api/work-orders', responses: { 200: z.array(z.any()) } },
+    get: { method: 'GET' as const, path: '/api/work-orders/:id', responses: { 200: z.any(), 404: errorSchemas.notFound } },
+    create: {
+      method: 'POST' as const,
+      path: '/api/work-orders',
+      input: z.object({
+        vehicleId: z.coerce.number(),
+        maintenanceType: z.enum(['breakdown', 'preventive', 'general']),
+        shiftId: z.coerce.number().optional().nullable(),
+        date: z.string(),
+        remarks: z.string().optional().nullable(),
+        items: z.array(z.object({
+          subEquipmentId: z.coerce.number().optional().nullable(),
+          activityTypeId: z.coerce.number().optional().nullable(),
+          startTime: z.string(),
+          endTime: z.string(),
+          description: z.string(),
+        })),
+      }),
+      responses: { 201: z.any(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/work-orders/:id',
+      input: z.object({
+        vehicleId: z.coerce.number().optional(),
+        maintenanceType: z.enum(['breakdown', 'preventive', 'general']).optional(),
+        shiftId: z.coerce.number().optional().nullable(),
+        date: z.string().optional(),
+        status: z.enum(['open', 'in_progress', 'completed']).optional(),
+        remarks: z.string().optional().nullable(),
+        items: z.array(z.object({
+          subEquipmentId: z.coerce.number().optional().nullable(),
+          activityTypeId: z.coerce.number().optional().nullable(),
+          startTime: z.string(),
+          endTime: z.string(),
+          description: z.string(),
+        })).optional(),
+      }),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
+    },
+    delete: { method: 'DELETE' as const, path: '/api/work-orders/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {

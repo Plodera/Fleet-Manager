@@ -9,6 +9,7 @@ export const PERMISSIONS = {
   VIEW_BOOKINGS: 'view_bookings',
   VIEW_MAINTENANCE: 'view_maintenance',
   VIEW_FUEL: 'view_fuel',
+  VIEW_WORK_ORDERS: 'view_work_orders',
   MANAGE_USERS: 'manage_users',
 } as const;
 
@@ -18,6 +19,7 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'view_bookings', label: 'Bookings' },
   { id: 'view_maintenance', label: 'Maintenance' },
   { id: 'view_fuel', label: 'Fuel Logs' },
+  { id: 'view_work_orders', label: 'Work Orders' },
   { id: 'manage_users', label: 'User Management' },
 ] as const;
 
@@ -233,6 +235,77 @@ export const vehicleInspections = pgTable("vehicle_inspections", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Work Order Configuration Tables
+export const workOrderStatusEnum = pgEnum("work_order_status", ["open", "in_progress", "completed"]);
+export const maintenanceTypeEnum = pgEnum("maintenance_type", ["breakdown", "preventive", "general"]);
+
+export const shifts = pgTable("shifts", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  nameEn: text("name_en").notNull(),
+  namePt: text("name_pt").notNull(),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const activityTypes = pgTable("activity_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  labelEn: text("label_en").notNull(),
+  labelPt: text("label_pt").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const subEquipment = pgTable("sub_equipment", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  labelEn: text("label_en").notNull(),
+  labelPt: text("label_pt").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const workOrders = pgTable("work_orders", {
+  id: serial("id").primaryKey(),
+  jobNo: text("job_no").notNull().unique(),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id).notNull(),
+  maintenanceType: maintenanceTypeEnum("maintenance_type").notNull(),
+  shiftId: integer("shift_id").references(() => shifts.id),
+  date: date("date").notNull(),
+  status: workOrderStatusEnum("status").default("open").notNull(),
+  createdById: integer("created_by_id").references(() => users.id).notNull(),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const workOrderItems = pgTable("work_order_items", {
+  id: serial("id").primaryKey(),
+  workOrderId: integer("work_order_id").references(() => workOrders.id).notNull(),
+  subEquipmentId: integer("sub_equipment_id").references(() => subEquipment.id),
+  activityTypeId: integer("activity_type_id").references(() => activityTypes.id),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  description: text("description").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Work Order Relations
+export const workOrdersRelations = relations(workOrders, ({ one, many }) => ({
+  vehicle: one(vehicles, { fields: [workOrders.vehicleId], references: [vehicles.id] }),
+  shift: one(shifts, { fields: [workOrders.shiftId], references: [shifts.id] }),
+  createdBy: one(users, { fields: [workOrders.createdById], references: [users.id] }),
+  items: many(workOrderItems),
+}));
+
+export const workOrderItemsRelations = relations(workOrderItems, ({ one }) => ({
+  workOrder: one(workOrders, { fields: [workOrderItems.workOrderId], references: [workOrders.id] }),
+  subEquipment: one(subEquipment, { fields: [workOrderItems.subEquipmentId], references: [subEquipment.id] }),
+  activityType: one(activityTypes, { fields: [workOrderItems.activityTypeId], references: [activityTypes.id] }),
+}));
+
 // Relations
 export const equipmentTypesRelations = relations(equipmentTypes, ({ many }) => ({
   checklistItems: many(equipmentChecklistItems),
@@ -327,6 +400,24 @@ export const insertEquipmentChecklistItemSchema = createInsertSchema(equipmentCh
     sortOrder: z.coerce.number().default(0),
   });
 
+export const insertShiftSchema = createInsertSchema(shifts).omit({ id: true, createdAt: true });
+export const insertActivityTypeSchema = createInsertSchema(activityTypes).omit({ id: true, createdAt: true });
+export const insertSubEquipmentSchema = createInsertSchema(subEquipment).omit({ id: true, createdAt: true });
+export const insertWorkOrderSchema = createInsertSchema(workOrders)
+  .omit({ id: true, createdAt: true, jobNo: true })
+  .extend({
+    vehicleId: z.coerce.number(),
+    shiftId: z.coerce.number().optional().nullable(),
+    createdById: z.coerce.number(),
+  });
+export const insertWorkOrderItemSchema = createInsertSchema(workOrderItems)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    workOrderId: z.coerce.number(),
+    subEquipmentId: z.coerce.number().optional().nullable(),
+    activityTypeId: z.coerce.number().optional().nullable(),
+  });
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -351,3 +442,13 @@ export type EquipmentType = typeof equipmentTypes.$inferSelect;
 export type InsertEquipmentType = z.infer<typeof insertEquipmentTypeSchema>;
 export type EquipmentChecklistItem = typeof equipmentChecklistItems.$inferSelect;
 export type InsertEquipmentChecklistItem = z.infer<typeof insertEquipmentChecklistItemSchema>;
+export type Shift = typeof shifts.$inferSelect;
+export type InsertShift = z.infer<typeof insertShiftSchema>;
+export type ActivityType = typeof activityTypes.$inferSelect;
+export type InsertActivityType = z.infer<typeof insertActivityTypeSchema>;
+export type SubEquipment = typeof subEquipment.$inferSelect;
+export type InsertSubEquipment = z.infer<typeof insertSubEquipmentSchema>;
+export type WorkOrder = typeof workOrders.$inferSelect;
+export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
+export type WorkOrderItem = typeof workOrderItems.$inferSelect;
+export type InsertWorkOrderItem = z.infer<typeof insertWorkOrderItemSchema>;

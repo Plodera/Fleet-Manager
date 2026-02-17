@@ -1106,6 +1106,203 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Shifts
+  app.get(api.shifts.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    res.json(await storage.getShifts());
+  });
+
+  app.post(api.shifts.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.shifts.create.input.parse(req.body);
+      const shift = await storage.createShift(input);
+      res.status(201).json(shift);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.patch(api.shifts.update.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.shifts.update.input.parse(req.body);
+      const shift = await storage.updateShift(Number(req.params.id), input);
+      res.json(shift);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete(api.shifts.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    await storage.deleteShift(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // Activity Types
+  app.get(api.activityTypes.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    res.json(await storage.getActivityTypes());
+  });
+
+  app.post(api.activityTypes.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.activityTypes.create.input.parse(req.body);
+      const type = await storage.createActivityType(input);
+      res.status(201).json(type);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.patch(api.activityTypes.update.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.activityTypes.update.input.parse(req.body);
+      const type = await storage.updateActivityType(Number(req.params.id), input);
+      res.json(type);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete(api.activityTypes.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    await storage.deleteActivityType(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // Sub-Equipment
+  app.get(api.subEquipment.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    res.json(await storage.getSubEquipment());
+  });
+
+  app.post(api.subEquipment.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.subEquipment.create.input.parse(req.body);
+      const item = await storage.createSubEquipment(input);
+      res.status(201).json(item);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.patch(api.subEquipment.update.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.subEquipment.update.input.parse(req.body);
+      const item = await storage.updateSubEquipment(Number(req.params.id), input);
+      res.json(item);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete(api.subEquipment.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    await storage.deleteSubEquipment(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // Work Orders
+  app.get(api.workOrders.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    res.json(await storage.getWorkOrders());
+  });
+
+  app.get(api.workOrders.get.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const order = await storage.getWorkOrder(Number(req.params.id));
+    if (!order) return res.status(404).json({ message: "Work order not found" });
+    res.json(order);
+  });
+
+  app.post(api.workOrders.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const input = api.workOrders.create.input.parse(req.body);
+      const currentUser = req.user as User;
+      const order = await storage.createWorkOrder({
+        vehicleId: input.vehicleId,
+        maintenanceType: input.maintenanceType,
+        shiftId: input.shiftId ?? null,
+        date: input.date,
+        createdById: currentUser.id,
+        remarks: input.remarks ?? null,
+      });
+
+      if (input.items && input.items.length > 0) {
+        for (const item of input.items) {
+          await storage.createWorkOrderItem({
+            workOrderId: order.id,
+            subEquipmentId: item.subEquipmentId ?? null,
+            activityTypeId: item.activityTypeId ?? null,
+            startTime: item.startTime,
+            endTime: item.endTime,
+            description: item.description,
+          });
+        }
+      }
+
+      const enriched = await storage.getWorkOrder(order.id);
+      res.status(201).json(enriched);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.put(api.workOrders.update.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const input = api.workOrders.update.input.parse(req.body);
+      const id = Number(req.params.id);
+      const existing = await storage.getWorkOrder(id);
+      if (!existing) return res.status(404).json({ message: "Work order not found" });
+
+      const { items, ...orderUpdates } = input;
+      if (Object.keys(orderUpdates).length > 0) {
+        await storage.updateWorkOrder(id, orderUpdates as any);
+      }
+
+      if (items) {
+        await storage.deleteWorkOrderItems(id);
+        for (const item of items) {
+          await storage.createWorkOrderItem({
+            workOrderId: id,
+            subEquipmentId: item.subEquipmentId ?? null,
+            activityTypeId: item.activityTypeId ?? null,
+            startTime: item.startTime,
+            endTime: item.endTime,
+            description: item.description,
+          });
+        }
+      }
+
+      const enriched = await storage.getWorkOrder(id);
+      res.json(enriched);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete(api.workOrders.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    const order = await storage.getWorkOrder(Number(req.params.id));
+    if (!order) return res.status(404).json({ message: "Work order not found" });
+    if (user.role !== 'admin' && order.createdById !== user.id) {
+      return res.status(403).send("You can only delete your own work orders");
+    }
+    await storage.deleteWorkOrder(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {
