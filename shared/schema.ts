@@ -277,7 +277,6 @@ export const workOrders = pgTable("work_orders", {
   date: date("date").notNull(),
   status: workOrderStatusEnum("status").default("open").notNull(),
   createdById: integer("created_by_id").references(() => users.id).notNull(),
-  remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -288,7 +287,7 @@ export const workOrderItems = pgTable("work_order_items", {
   activityTypeId: integer("activity_type_id").references(() => activityTypes.id),
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
-  description: text("description").notNull(),
+  descriptions: text("descriptions").array().notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

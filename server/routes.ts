@@ -1238,7 +1238,6 @@ export async function registerRoutes(
         shiftId: input.shiftId ?? null,
         date: input.date,
         createdById: currentUser.id,
-        remarks: input.remarks ?? null,
       });
 
       if (input.items && input.items.length > 0) {
@@ -1249,7 +1248,7 @@ export async function registerRoutes(
             activityTypeId: item.activityTypeId ?? null,
             startTime: item.startTime,
             endTime: item.endTime,
-            description: item.description,
+            descriptions: item.descriptions,
           });
         }
       }
@@ -1281,7 +1280,7 @@ export async function registerRoutes(
             activityTypeId: item.activityTypeId ?? null,
             startTime: item.startTime,
             endTime: item.endTime,
-            description: item.description,
+            descriptions: item.descriptions,
           });
         }
       }

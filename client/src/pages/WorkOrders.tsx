@@ -33,7 +33,7 @@ interface WorkItem {
   activityTypeId?: number | null;
   startTime: string;
   endTime: string;
-  description: string;
+  descriptions: string[];
 }
 
 export default function WorkOrders() {
@@ -51,9 +51,8 @@ export default function WorkOrders() {
   const [maintenanceType, setMaintenanceType] = useState<string>("");
   const [shiftId, setShiftId] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [remarks, setRemarks] = useState("");
   const [items, setItems] = useState<WorkItem[]>([
-    { subEquipmentId: null, activityTypeId: null, startTime: "", endTime: "", description: "" }
+    { subEquipmentId: null, activityTypeId: null, startTime: "", endTime: "", descriptions: [""] }
   ]);
 
   const { data: workOrders, isLoading } = useQuery<any[]>({
@@ -107,13 +106,12 @@ export default function WorkOrders() {
     setMaintenanceType("");
     setShiftId("");
     setDate(new Date().toISOString().split("T")[0]);
-    setRemarks("");
-    setItems([{ subEquipmentId: null, activityTypeId: null, startTime: "", endTime: "", description: "" }]);
+    setItems([{ subEquipmentId: null, activityTypeId: null, startTime: "", endTime: "", descriptions: [""] }]);
   };
 
   const handleCreate = () => {
     if (!vehicleId || !maintenanceType || !date) return;
-    const validItems = items.filter(i => i.startTime && i.endTime && i.description);
+    const validItems = items.filter(i => i.startTime && i.endTime && i.descriptions.some(d => d.trim()));
     if (validItems.length === 0) {
       toast({ title: t.labels.error, description: t.workOrders.addAtLeastOneItem, variant: "destructive" });
       return;
@@ -123,13 +121,12 @@ export default function WorkOrders() {
       maintenanceType,
       shiftId: shiftId ? Number(shiftId) : null,
       date,
-      remarks: remarks || null,
       items: validItems.map(i => ({
         subEquipmentId: i.subEquipmentId || null,
         activityTypeId: i.activityTypeId || null,
         startTime: i.startTime,
         endTime: i.endTime,
-        description: i.description,
+        descriptions: i.descriptions.filter(d => d.trim()),
       })),
     });
   };
@@ -147,7 +144,7 @@ export default function WorkOrders() {
   };
 
   const addItem = () => {
-    setItems([...items, { subEquipmentId: null, activityTypeId: null, startTime: "", endTime: "", description: "" }]);
+    setItems([...items, { subEquipmentId: null, activityTypeId: null, startTime: "", endTime: "", descriptions: [""] }]);
   };
 
   const removeItem = (index: number) => {
@@ -265,16 +262,6 @@ export default function WorkOrders() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>{t.workOrders.remarks}</Label>
-                <Textarea
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder={t.workOrders.remarksPlaceholder}
-                  data-testid="input-remarks"
-                />
-              </div>
-
               <div className="space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <Label className="text-base font-semibold">{t.workOrders.items}</Label>
@@ -355,14 +342,55 @@ export default function WorkOrders() {
                         />
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">{t.workOrders.description}</Label>
-                      <Input
-                        value={item.description}
-                        onChange={(e) => updateItem(index, "description", e.target.value)}
-                        placeholder={t.workOrders.descriptionPlaceholder}
-                        data-testid={`input-description-${index}`}
-                      />
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <Label className="text-xs">{t.workOrders.description}</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const updated = [...items];
+                            updated[index] = { ...updated[index], descriptions: [...updated[index].descriptions, ""] };
+                            setItems(updated);
+                          }}
+                          data-testid={`button-add-description-${index}`}
+                        >
+                          <Plus className="w-3 h-3 mr-1" /> {t.workOrders.addDescription}
+                        </Button>
+                      </div>
+                      {item.descriptions.map((desc, dIdx) => (
+                        <div key={dIdx} className="flex items-center gap-2">
+                          <Input
+                            value={desc}
+                            onChange={(e) => {
+                              const updated = [...items];
+                              const newDescs = [...updated[index].descriptions];
+                              newDescs[dIdx] = e.target.value;
+                              updated[index] = { ...updated[index], descriptions: newDescs };
+                              setItems(updated);
+                            }}
+                            placeholder={t.workOrders.descriptionPlaceholder}
+                            data-testid={`input-description-${index}-${dIdx}`}
+                          />
+                          {item.descriptions.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const updated = [...items];
+                                const newDescs = updated[index].descriptions.filter((_, i) => i !== dIdx);
+                                updated[index] = { ...updated[index], descriptions: newDescs };
+                                setItems(updated);
+                              }}
+                              data-testid={`button-remove-description-${index}-${dIdx}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </Card>
                 ))}
@@ -525,13 +553,6 @@ export default function WorkOrders() {
                 </div>
               </div>
 
-              {viewWorkOrder.remarks && (
-                <div>
-                  <span className="text-sm text-muted-foreground">{t.workOrders.remarks}</span>
-                  <p className="mt-1" data-testid="view-remarks">{viewWorkOrder.remarks}</p>
-                </div>
-              )}
-
               <div>
                 <h3 className="font-semibold mb-3">{t.workOrders.items}</h3>
                 {viewWorkOrder.items && viewWorkOrder.items.length > 0 ? (
@@ -558,7 +579,13 @@ export default function WorkOrders() {
                           )}
                           <TableCell>{item.startTime}</TableCell>
                           <TableCell>{item.endTime}</TableCell>
-                          <TableCell>{item.description}</TableCell>
+                          <TableCell>
+                            {Array.isArray(item.descriptions)
+                              ? item.descriptions.map((d: string, di: number) => (
+                                  <div key={di} data-testid={`view-description-${idx}-${di}`}>{d}</div>
+                                ))
+                              : item.description || "-"}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
