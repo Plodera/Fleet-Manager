@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useUsers } from "@/hooks/use-users";
 import { useAuth } from "@/hooks/use-auth";
+import { useLanguage } from "@/lib/i18n";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +22,12 @@ import { useToast } from "@/hooks/use-toast";
 export default function Users() {
   const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updateDriver, isUpdatingDriver, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser, updateProfile, isUpdatingProfile } = useUsers();
   const { user: currentUser } = useAuth();
+  const { language } = useLanguage();
   const { toast } = useToast();
+
+  const getPermLabel = (perm: typeof AVAILABLE_PERMISSIONS[number]) => {
+    return language === "pt" ? perm.labelPt : perm.label;
+  };
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingPermissionsUserId, setEditingPermissionsUserId] = useState<number | null>(null);
@@ -220,7 +226,7 @@ export default function Users() {
                               }}
                               data-testid={`checkbox-permission-${perm.id}`}
                             />
-                            <label className="text-sm font-medium cursor-pointer">{perm.label}</label>
+                            <label className="text-sm font-medium cursor-pointer">{getPermLabel(perm)}</label>
                           </div>
                         ))}
                       </div>
@@ -361,7 +367,7 @@ export default function Users() {
                                   }}
                                   data-testid={`checkbox-edit-permission-${perm.id}-${user.id}`}
                                 />
-                                <label className="text-sm font-medium cursor-pointer">{perm.label}</label>
+                                <label className="text-sm font-medium cursor-pointer">{getPermLabel(perm)}</label>
                               </div>
                             ))}
                           </div>
@@ -371,9 +377,11 @@ export default function Users() {
                       <div className="flex items-center gap-1 flex-wrap">
                         {userPermissions.length > 0 ? (
                           <>
-                            {userPermissions.slice(0, 2).map((perm: string) => (
-                              <Badge key={perm} variant="outline" className="text-xs capitalize">{perm.replace('view_', '').replace('manage_', '')}</Badge>
-                            ))}
+                            {userPermissions.slice(0, 2).map((perm: string) => {
+                              const permDef = AVAILABLE_PERMISSIONS.find(p => p.id === perm);
+                              const displayLabel = permDef ? (language === "pt" ? permDef.labelPt : permDef.label) : perm.replace('view_', '').replace('manage_', '');
+                              return <Badge key={perm} variant="outline" className="text-xs capitalize">{displayLabel}</Badge>;
+                            })}
                             {userPermissions.length > 2 && (
                               <Badge variant="outline" className="text-xs">+{userPermissions.length - 2}</Badge>
                             )}

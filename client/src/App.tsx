@@ -114,13 +114,13 @@ function Router() {
         <PrivateRoute component={Bookings} requiredPermission="view_bookings" />
       </Route>
       <Route path="/shared-rides">
-        <PrivateRoute component={SharedRides} requiredPermission="view_bookings" />
+        <PrivateRoute component={SharedRides} requiredPermission="view_shared_rides" />
       </Route>
       <Route path="/maintenance">
         <PrivateRoute component={Maintenance} requiredPermission="view_maintenance" />
       </Route>
       <Route path="/vehicle-inspections">
-        <PrivateRoute component={VehicleInspections} requiredPermission="view_maintenance" />
+        <PrivateRoute component={VehicleInspections} requiredPermission="view_inspections" />
       </Route>
       <Route path="/fuel">
         <PrivateRoute component={Fuel} requiredPermission="view_fuel" />
@@ -135,13 +135,13 @@ function Router() {
         <PrivateRoute component={EquipmentTypes} adminOnly />
       </Route>
       <Route path="/work-orders">
-        <PrivateRoute component={WorkOrders} requiredPermission="view_maintenance" />
+        <PrivateRoute component={WorkOrders} requiredPermission="view_work_orders" />
       </Route>
       <Route path="/work-order-config">
         <PrivateRoute component={WorkOrderConfig} adminOnly />
       </Route>
       <Route path="/work-order-reports">
-        <PrivateRoute component={WorkOrderReports} requiredPermission="view_maintenance" />
+        <PrivateRoute component={WorkOrderReports} requiredPermission="view_work_order_reports" />
       </Route>
       <Route path="/reports">
         <PrivateRoute component={Reports} requiredPermission="view_reports" />
@@ -151,7 +151,7 @@ function Router() {
         <PrintRoute component={BookingPrintView} requiredPermission="view_bookings" />
       </Route>
       <Route path="/shared-rides/:id/print">
-        <PrintRoute component={SharedRidePrintView} requiredPermission="view_bookings" />
+        <PrintRoute component={SharedRidePrintView} requiredPermission="view_shared_rides" />
       </Route>
       
       <Route component={NotFound} />

@@ -7,20 +7,28 @@ export const PERMISSIONS = {
   VIEW_DASHBOARD: 'view_dashboard',
   VIEW_VEHICLES: 'view_vehicles',
   VIEW_BOOKINGS: 'view_bookings',
+  VIEW_SHARED_RIDES: 'view_shared_rides',
   VIEW_MAINTENANCE: 'view_maintenance',
+  VIEW_INSPECTIONS: 'view_inspections',
   VIEW_FUEL: 'view_fuel',
   VIEW_WORK_ORDERS: 'view_work_orders',
+  VIEW_WORK_ORDER_REPORTS: 'view_work_order_reports',
+  VIEW_REPORTS: 'view_reports',
   MANAGE_USERS: 'manage_users',
 } as const;
 
 export const AVAILABLE_PERMISSIONS = [
-  { id: 'view_dashboard', label: 'Dashboard' },
-  { id: 'view_vehicles', label: 'Vehicles' },
-  { id: 'view_bookings', label: 'Bookings' },
-  { id: 'view_maintenance', label: 'Maintenance' },
-  { id: 'view_fuel', label: 'Fuel Logs' },
-  { id: 'view_work_orders', label: 'Work Orders' },
-  { id: 'manage_users', label: 'User Management' },
+  { id: 'view_dashboard', label: 'Dashboard', labelPt: 'Painel' },
+  { id: 'view_vehicles', label: 'Vehicles', labelPt: 'Veículos' },
+  { id: 'view_bookings', label: 'Bookings', labelPt: 'Reservas' },
+  { id: 'view_shared_rides', label: 'Shared Rides', labelPt: 'Viagens Partilhadas' },
+  { id: 'view_maintenance', label: 'Maintenance', labelPt: 'Manutenção' },
+  { id: 'view_inspections', label: 'Inspections', labelPt: 'Inspeções' },
+  { id: 'view_fuel', label: 'Fuel Logs', labelPt: 'Registos de Combustível' },
+  { id: 'view_work_orders', label: 'Work Orders', labelPt: 'Ordens de Trabalho' },
+  { id: 'view_work_order_reports', label: 'Work Order Reports', labelPt: 'Relatórios de Ordens' },
+  { id: 'view_reports', label: 'Reports', labelPt: 'Relatórios' },
+  { id: 'manage_users', label: 'User Management', labelPt: 'Gestão de Utilizadores' },
 ] as const;
 
 export const roleEnum = pgEnum("role", ["admin", "staff", "customer"]);
