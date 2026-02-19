@@ -51,6 +51,7 @@ export default function WorkOrders() {
   const [maintenanceType, setMaintenanceType] = useState<string>("");
   const [shiftId, setShiftId] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [status, setStatus] = useState("open");
   const [items, setItems] = useState<WorkItem[]>([
     { subEquipmentId: null, activityTypeId: null, startTime: "", endTime: "", descriptions: [""] }
   ]);
@@ -110,6 +111,7 @@ export default function WorkOrders() {
     setMaintenanceType("");
     setShiftId("");
     setDate(new Date().toISOString().split("T")[0]);
+    setStatus("open");
     setItems([{ subEquipmentId: null, activityTypeId: null, startTime: "", endTime: "", descriptions: [""] }]);
   };
 
@@ -125,6 +127,7 @@ export default function WorkOrders() {
       maintenanceType,
       shiftId: shiftId ? Number(shiftId) : null,
       date,
+      status,
       items: validItems.map(i => ({
         subEquipmentId: i.subEquipmentId || null,
         activityTypeId: i.activityTypeId || null,
@@ -245,7 +248,7 @@ export default function WorkOrders() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>{t.workOrders.shift}</Label>
                   <Select value={shiftId} onValueChange={setShiftId}>
@@ -264,6 +267,19 @@ export default function WorkOrders() {
                 <div className="space-y-2">
                   <Label>{t.workOrders.date}</Label>
                   <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} data-testid="input-date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t.workOrders.status}</Label>
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger data-testid="select-status">
+                      <SelectValue placeholder={t.workOrders.selectStatus} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="open" data-testid="select-status-open">{t.workOrders.open}</SelectItem>
+                      <SelectItem value="in_progress" data-testid="select-status-in-progress">{t.workOrders.inProgress}</SelectItem>
+                      <SelectItem value="completed" data-testid="select-status-completed">{t.workOrders.completed}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

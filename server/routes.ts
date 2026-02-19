@@ -1273,6 +1273,7 @@ export async function registerRoutes(
         maintenanceType: input.maintenanceType,
         shiftId: input.shiftId ?? null,
         date: input.date,
+        status: input.status ?? "open",
         createdById: currentUser.id,
       });
 

@@ -575,6 +575,7 @@ export const api = {
         maintenanceType: z.string(),
         shiftId: z.coerce.number().optional().nullable(),
         date: z.string(),
+        status: z.enum(['open', 'in_progress', 'completed']).optional(),
         items: z.array(z.object({
           subEquipmentId: z.coerce.number().optional().nullable(),
           activityTypeId: z.coerce.number().optional().nullable(),
