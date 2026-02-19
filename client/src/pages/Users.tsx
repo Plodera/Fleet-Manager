@@ -31,6 +31,7 @@ export default function Users() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingPermissionsUserId, setEditingPermissionsUserId] = useState<number | null>(null);
+  const [pendingPermissions, setPendingPermissions] = useState<string[]>([]);
   const [changePasswordUserId, setChangePasswordUserId] = useState<number | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [editEmailUserId, setEditEmailUserId] = useState<number | null>(null);
@@ -356,14 +357,13 @@ export default function Users() {
                             {AVAILABLE_PERMISSIONS.map((perm) => (
                               <div key={perm.id} className="flex items-center space-x-2">
                                 <Checkbox
-                                  checked={userPermissions.includes(perm.id)}
+                                  checked={pendingPermissions.includes(perm.id)}
                                   onCheckedChange={(checked) => {
-                                    const newPerms = checked
-                                      ? [...userPermissions, perm.id]
-                                      : userPermissions.filter((p: string) => p !== perm.id);
-                                    updatePermissions({ userId: user.id, permissions: newPerms }, {
-                                      onSuccess: () => setEditingPermissionsUserId(null),
-                                    });
+                                    setPendingPermissions((prev) =>
+                                      checked
+                                        ? [...prev, perm.id]
+                                        : prev.filter((p) => p !== perm.id)
+                                    );
                                   }}
                                   data-testid={`checkbox-edit-permission-${perm.id}-${user.id}`}
                                 />
@@ -371,6 +371,17 @@ export default function Users() {
                               </div>
                             ))}
                           </div>
+                          <Button
+                            onClick={() => {
+                              updatePermissions({ userId: user.id, permissions: pendingPermissions }, {
+                                onSuccess: () => setEditingPermissionsUserId(null),
+                              });
+                            }}
+                            disabled={isUpdatingPermissions}
+                            data-testid={`button-save-permissions-${user.id}`}
+                          >
+                            {isUpdatingPermissions ? (language === "pt" ? "A guardar..." : "Saving...") : (language === "pt" ? "Guardar" : "Save")}
+                          </Button>
                         </DialogContent>
                       </Dialog>
                     ) : (
@@ -493,7 +504,10 @@ export default function Users() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => setEditingPermissionsUserId(user.id)}
+                              onClick={() => {
+                                setEditingPermissionsUserId(user.id);
+                                setPendingPermissions(userPermissions);
+                              }}
                               disabled={isUpdatingPermissions}
                               data-testid={`button-edit-permissions-${user.id}`}
                             >
