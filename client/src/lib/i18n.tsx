@@ -293,6 +293,10 @@ const translations = {
       workOrderConfig: "Work Order Configuration",
       workOrderConfigSubtitle: "Manage shifts, activity types, and sub-equipment for work orders",
       maintenanceTypes: "Maintenance Types",
+      maintenanceTypesSubtitle: "Configure available maintenance types for work orders",
+      addMaintenanceType: "Add Maintenance Type",
+      editMaintenanceType: "Edit Maintenance Type",
+      maintenanceTypeName: "Type Name",
     },
     // Driver Dashboard
     driverDashboard: {
@@ -607,6 +611,10 @@ const translations = {
       workOrderConfig: "Configuração de Ordens de Trabalho",
       workOrderConfigSubtitle: "Gerir turnos, tipos de actividade e sub-equipamento para ordens de trabalho",
       maintenanceTypes: "Tipos de Manutenção",
+      maintenanceTypesSubtitle: "Configurar tipos de manutenção disponíveis para ordens de trabalho",
+      addMaintenanceType: "Adicionar Tipo de Manutenção",
+      editMaintenanceType: "Editar Tipo de Manutenção",
+      maintenanceTypeName: "Nome do Tipo",
     },
     // Driver Dashboard
     driverDashboard: {

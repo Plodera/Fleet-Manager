@@ -18,10 +18,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2 } from "lucide-react";
-import type { Shift, ActivityType, SubEquipment } from "@shared/schema";
+import type { Shift, ActivityType, SubEquipment, MaintenanceTypeConfig } from "@shared/schema";
 
 export default function WorkOrderConfig() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -37,6 +37,10 @@ export default function WorkOrderConfig() {
     queryKey: [api.subEquipment.list.path],
   });
 
+  const { data: maintenanceTypeConfigs, isLoading: mtConfigLoading } = useQuery<MaintenanceTypeConfig[]>({
+    queryKey: [api.maintenanceTypeConfigs.list.path],
+  });
+
   const [shiftDialog, setShiftDialog] = useState<{ open: boolean; editing: Shift | null }>({ open: false, editing: null });
   const [shiftForm, setShiftForm] = useState({ name: "", nameEn: "", namePt: "", startTime: "", endTime: "" });
 
@@ -45,6 +49,9 @@ export default function WorkOrderConfig() {
 
   const [subEquipDialog, setSubEquipDialog] = useState<{ open: boolean; editing: SubEquipment | null }>({ open: false, editing: null });
   const [subEquipForm, setSubEquipForm] = useState({ name: "", labelEn: "", labelPt: "", maintenanceTypes: [] as string[] });
+
+  const [mtDialog, setMtDialog] = useState<{ open: boolean; editing: MaintenanceTypeConfig | null }>({ open: false, editing: null });
+  const [mtForm, setMtForm] = useState({ name: "", labelEn: "", labelPt: "" });
 
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; type: string; id: number | null }>({ open: false, type: "", id: null });
 
@@ -162,6 +169,44 @@ export default function WorkOrderConfig() {
     onError: () => toast({ title: t.labels.error, variant: "destructive" }),
   });
 
+  const createMtConfig = useMutation({
+    mutationFn: async (data: typeof mtForm) => {
+      const res = await apiRequest("POST", api.maintenanceTypeConfigs.create.path, { ...data, isActive: true });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.maintenanceTypeConfigs.list.path] });
+      setMtDialog({ open: false, editing: null });
+      toast({ title: t.adminConfig.maintenanceTypes });
+    },
+    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+  });
+
+  const updateMtConfig = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number } & typeof mtForm) => {
+      const res = await apiRequest("PATCH", buildUrl(api.maintenanceTypeConfigs.update.path, { id }), data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.maintenanceTypeConfigs.list.path] });
+      setMtDialog({ open: false, editing: null });
+      toast({ title: t.adminConfig.maintenanceTypes });
+    },
+    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+  });
+
+  const deleteMtConfigMut = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", buildUrl(api.maintenanceTypeConfigs.delete.path, { id }));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.maintenanceTypeConfigs.list.path] });
+      setDeleteDialog({ open: false, type: "", id: null });
+      toast({ title: t.buttons.delete });
+    },
+    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+  });
+
   const openAddShift = () => {
     setShiftForm({ name: "", nameEn: "", namePt: "", startTime: "", endTime: "" });
     setShiftDialog({ open: true, editing: null });
@@ -225,11 +270,30 @@ export default function WorkOrderConfig() {
     }
   };
 
+  const openAddMtConfig = () => {
+    setMtForm({ name: "", labelEn: "", labelPt: "" });
+    setMtDialog({ open: true, editing: null });
+  };
+
+  const openEditMtConfig = (mt: MaintenanceTypeConfig) => {
+    setMtForm({ name: mt.name, labelEn: mt.labelEn, labelPt: mt.labelPt });
+    setMtDialog({ open: true, editing: mt });
+  };
+
+  const handleMtSubmit = () => {
+    if (mtDialog.editing) {
+      updateMtConfig.mutate({ id: mtDialog.editing.id, ...mtForm });
+    } else {
+      createMtConfig.mutate(mtForm);
+    }
+  };
+
   const handleDelete = () => {
     if (!deleteDialog.id) return;
     if (deleteDialog.type === "shift") deleteShiftMut.mutate(deleteDialog.id);
     else if (deleteDialog.type === "activity") deleteActivityTypeMut.mutate(deleteDialog.id);
     else if (deleteDialog.type === "subequip") deleteSubEquipmentMut.mutate(deleteDialog.id);
+    else if (deleteDialog.type === "mtconfig") deleteMtConfigMut.mutate(deleteDialog.id);
   };
 
   return (
@@ -241,10 +305,62 @@ export default function WorkOrderConfig() {
 
       <Tabs defaultValue="shifts" className="space-y-6">
         <TabsList data-testid="tabs-config">
+          <TabsTrigger value="maintenanceTypes" data-testid="tab-maintenance-types">{t.adminConfig.maintenanceTypes}</TabsTrigger>
           <TabsTrigger value="shifts" data-testid="tab-shifts">{t.adminConfig.shifts}</TabsTrigger>
           <TabsTrigger value="activityTypes" data-testid="tab-activity-types">{t.adminConfig.activityTypes}</TabsTrigger>
           <TabsTrigger value="subEquipment" data-testid="tab-sub-equipment">{t.adminConfig.subEquipment}</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="maintenanceTypes" className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h2 className="text-xl font-semibold" data-testid="text-mt-config-title">{t.adminConfig.maintenanceTypes}</h2>
+              <p className="text-sm text-muted-foreground">{t.adminConfig.maintenanceTypesSubtitle}</p>
+            </div>
+            <Button onClick={openAddMtConfig} data-testid="button-add-mt-config">
+              <Plus className="w-4 h-4 mr-2" /> {t.adminConfig.addMaintenanceType}
+            </Button>
+          </div>
+          <Card className="border-none shadow-md overflow-visible">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead>{t.adminConfig.maintenanceTypeName}</TableHead>
+                  <TableHead>Label (EN)</TableHead>
+                  <TableHead>Label (PT)</TableHead>
+                  <TableHead className="text-right">{t.buttons.edit}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mtConfigLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center" data-testid="text-mt-config-loading">{t.labels.loading}</TableCell>
+                  </TableRow>
+                ) : maintenanceTypeConfigs?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground" data-testid="text-mt-config-empty">{t.labels.noRecords}</TableCell>
+                  </TableRow>
+                ) : maintenanceTypeConfigs?.map((mt) => (
+                  <TableRow key={mt.id} data-testid={`row-mt-config-${mt.id}`}>
+                    <TableCell className="font-medium">{mt.name}</TableCell>
+                    <TableCell>{mt.labelEn}</TableCell>
+                    <TableCell>{mt.labelPt}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEditMtConfig(mt)} data-testid={`button-edit-mt-config-${mt.id}`}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => setDeleteDialog({ open: true, type: "mtconfig", id: mt.id })} data-testid={`button-delete-mt-config-${mt.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="shifts" className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -377,11 +493,14 @@ export default function WorkOrderConfig() {
                     <TableCell className="font-medium">{se.name}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {((se as any).maintenanceTypes || []).map((mt: string) => (
-                          <Badge key={mt} variant="outline" data-testid={`badge-sub-equip-mt-${se.id}-${mt}`}>
-                            {mt === "breakdown" ? t.workOrders.breakdown : mt === "preventive" ? t.workOrders.preventive : t.workOrders.general}
-                          </Badge>
-                        ))}
+                        {((se as any).maintenanceTypes || []).map((mtName: string) => {
+                          const mtConfig = maintenanceTypeConfigs?.find(m => m.name === mtName);
+                          return (
+                            <Badge key={mtName} variant="outline" data-testid={`badge-sub-equip-mt-${se.id}-${mtName}`}>
+                              {mtConfig ? (language === "pt" ? mtConfig.labelPt : mtConfig.labelEn) : mtName}
+                            </Badge>
+                          );
+                        })}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -559,16 +678,16 @@ export default function WorkOrderConfig() {
             <div>
               <label className="text-sm font-medium">{t.adminConfig.maintenanceTypes}</label>
               <div className="flex flex-wrap gap-4 mt-2">
-                {(["breakdown", "preventive", "general"] as const).map(type => (
-                  <div key={type} className="flex items-center gap-2">
+                {maintenanceTypeConfigs?.map(mt => (
+                  <div key={mt.name} className="flex items-center gap-2">
                     <Checkbox
-                      id={`mt-${type}`}
-                      checked={subEquipForm.maintenanceTypes.includes(type)}
-                      onCheckedChange={() => toggleMaintenanceType(type)}
-                      data-testid={`checkbox-maintenance-type-${type}`}
+                      id={`mt-${mt.name}`}
+                      checked={subEquipForm.maintenanceTypes.includes(mt.name)}
+                      onCheckedChange={() => toggleMaintenanceType(mt.name)}
+                      data-testid={`checkbox-maintenance-type-${mt.name}`}
                     />
-                    <Label htmlFor={`mt-${type}`} className="text-sm cursor-pointer">
-                      {type === "breakdown" ? t.workOrders.breakdown : type === "preventive" ? t.workOrders.preventive : t.workOrders.general}
+                    <Label htmlFor={`mt-${mt.name}`} className="text-sm cursor-pointer">
+                      {language === "pt" ? mt.labelPt : mt.labelEn}
                     </Label>
                   </div>
                 ))}
@@ -585,6 +704,56 @@ export default function WorkOrderConfig() {
               data-testid="button-sub-equip-save"
             >
               {(createSubEquipment.isPending || updateSubEquipment.isPending) ? t.labels.loading : t.buttons.save}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mtDialog.open} onOpenChange={(open) => setMtDialog({ ...mtDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle data-testid="text-mt-dialog-title">
+              {mtDialog.editing ? t.adminConfig.editMaintenanceType : t.adminConfig.addMaintenanceType}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">{t.adminConfig.maintenanceTypeName}</label>
+              <Input
+                value={mtForm.name}
+                onChange={(e) => setMtForm({ ...mtForm, name: e.target.value })}
+                data-testid="input-mt-config-name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Label (EN)</label>
+                <Input
+                  value={mtForm.labelEn}
+                  onChange={(e) => setMtForm({ ...mtForm, labelEn: e.target.value })}
+                  data-testid="input-mt-config-label-en"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Label (PT)</label>
+                <Input
+                  value={mtForm.labelPt}
+                  onChange={(e) => setMtForm({ ...mtForm, labelPt: e.target.value })}
+                  data-testid="input-mt-config-label-pt"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setMtDialog({ open: false, editing: null })} data-testid="button-mt-cancel">
+              {t.buttons.cancel}
+            </Button>
+            <Button
+              onClick={handleMtSubmit}
+              disabled={createMtConfig.isPending || updateMtConfig.isPending}
+              data-testid="button-mt-save"
+            >
+              {(createMtConfig.isPending || updateMtConfig.isPending) ? t.labels.loading : t.buttons.save}
             </Button>
           </DialogFooter>
         </DialogContent>

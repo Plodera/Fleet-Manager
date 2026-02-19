@@ -10,6 +10,7 @@ import {
   insertVehicleInspectionSchema,
   insertEquipmentTypeSchema,
   insertEquipmentChecklistItemSchema,
+  insertMaintenanceTypeConfigSchema,
   insertShiftSchema,
   insertActivityTypeSchema,
   insertSubEquipmentSchema,
@@ -25,6 +26,7 @@ import {
   vehicleInspections,
   equipmentTypes,
   equipmentChecklistItems,
+  maintenanceTypeConfig,
   shifts,
   activityTypes,
   subEquipment,
@@ -538,6 +540,12 @@ export const api = {
       },
     },
   },
+  maintenanceTypeConfigs: {
+    list: { method: 'GET' as const, path: '/api/maintenance-type-configs', responses: { 200: z.array(z.custom<typeof maintenanceTypeConfig.$inferSelect>()) } },
+    create: { method: 'POST' as const, path: '/api/maintenance-type-configs', input: insertMaintenanceTypeConfigSchema, responses: { 201: z.custom<typeof maintenanceTypeConfig.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: 'PATCH' as const, path: '/api/maintenance-type-configs/:id', input: insertMaintenanceTypeConfigSchema.partial(), responses: { 200: z.custom<typeof maintenanceTypeConfig.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: 'DELETE' as const, path: '/api/maintenance-type-configs/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
+  },
   shifts: {
     list: { method: 'GET' as const, path: '/api/shifts', responses: { 200: z.array(z.custom<typeof shifts.$inferSelect>()) } },
     create: { method: 'POST' as const, path: '/api/shifts', input: insertShiftSchema, responses: { 201: z.custom<typeof shifts.$inferSelect>(), 400: errorSchemas.validation } },
@@ -564,7 +572,7 @@ export const api = {
       path: '/api/work-orders',
       input: z.object({
         vehicleId: z.coerce.number(),
-        maintenanceType: z.enum(['breakdown', 'preventive', 'general']),
+        maintenanceType: z.string(),
         shiftId: z.coerce.number().optional().nullable(),
         date: z.string(),
         items: z.array(z.object({
@@ -582,7 +590,7 @@ export const api = {
       path: '/api/work-orders/:id',
       input: z.object({
         vehicleId: z.coerce.number().optional(),
-        maintenanceType: z.enum(['breakdown', 'preventive', 'general']).optional(),
+        maintenanceType: z.string().optional(),
         shiftId: z.coerce.number().optional().nullable(),
         date: z.string().optional(),
         status: z.enum(['open', 'in_progress', 'completed']).optional(),

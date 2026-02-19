@@ -1178,6 +1178,42 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Maintenance Type Config
+  app.get(api.maintenanceTypeConfigs.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    res.json(await storage.getMaintenanceTypeConfigs());
+  });
+
+  app.post(api.maintenanceTypeConfigs.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.maintenanceTypeConfigs.create.input.parse(req.body);
+      const item = await storage.createMaintenanceTypeConfig(input);
+      res.status(201).json(item);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.patch(api.maintenanceTypeConfigs.update.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.maintenanceTypeConfigs.update.input.parse(req.body);
+      const item = await storage.updateMaintenanceTypeConfig(Number(req.params.id), input);
+      res.json(item);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete(api.maintenanceTypeConfigs.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    await storage.deleteMaintenanceTypeConfig(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // Sub-Equipment
   app.get(api.subEquipment.list.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

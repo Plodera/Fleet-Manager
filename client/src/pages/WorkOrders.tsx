@@ -37,7 +37,7 @@ interface WorkItem {
 }
 
 export default function WorkOrders() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   const { vehicles } = useVehicles();
   const { toast } = useToast();
@@ -69,6 +69,10 @@ export default function WorkOrders() {
 
   const { data: activityTypesData } = useQuery<any[]>({
     queryKey: [api.activityTypes.list.path],
+  });
+
+  const { data: maintenanceTypeConfigs } = useQuery<any[]>({
+    queryKey: [api.maintenanceTypeConfigs.list.path],
   });
 
   const createMutation = useMutation({
@@ -159,17 +163,13 @@ export default function WorkOrders() {
   };
 
   const getMaintenanceTypeBadge = (type: string) => {
-    const labels: Record<string, string> = {
-      breakdown: t.workOrders.breakdown,
-      preventive: t.workOrders.preventive,
-      general: t.workOrders.general,
-    };
+    const mtConfig = maintenanceTypeConfigs?.find(m => m.name === type);
+    const label = mtConfig ? (language === "pt" ? mtConfig.labelPt : mtConfig.labelEn) : type;
     const variants: Record<string, "destructive" | "secondary" | "outline"> = {
       breakdown: "destructive",
       preventive: "secondary",
-      general: "outline",
     };
-    return <Badge variant={variants[type] || "outline"} data-testid={`badge-maintenance-type-${type}`}>{labels[type] || type}</Badge>;
+    return <Badge variant={variants[type] || "outline"} data-testid={`badge-maintenance-type-${type}`}>{label}</Badge>;
   };
 
   const getStatusBadge = (status: string) => {
@@ -235,9 +235,11 @@ export default function WorkOrders() {
                       <SelectValue placeholder={t.workOrders.maintenanceType} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="breakdown" data-testid="select-maintenance-type-breakdown">{t.workOrders.breakdown}</SelectItem>
-                      <SelectItem value="preventive" data-testid="select-maintenance-type-preventive">{t.workOrders.preventive}</SelectItem>
-                      <SelectItem value="general" data-testid="select-maintenance-type-general">{t.workOrders.general}</SelectItem>
+                      {maintenanceTypeConfigs?.map(mt => (
+                        <SelectItem key={mt.name} value={mt.name} data-testid={`select-maintenance-type-${mt.name}`}>
+                          {language === "pt" ? mt.labelPt : mt.labelEn}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

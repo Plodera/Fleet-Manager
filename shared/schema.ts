@@ -250,6 +250,15 @@ export const shifts = pgTable("shifts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const maintenanceTypeConfig = pgTable("maintenance_type_config", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  labelEn: text("label_en").notNull(),
+  labelPt: text("label_pt").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const activityTypes = pgTable("activity_types", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
@@ -273,7 +282,7 @@ export const workOrders = pgTable("work_orders", {
   id: serial("id").primaryKey(),
   jobNo: text("job_no").notNull().unique(),
   vehicleId: integer("vehicle_id").references(() => vehicles.id).notNull(),
-  maintenanceType: maintenanceTypeEnum("maintenance_type").notNull(),
+  maintenanceType: text("maintenance_type").notNull(),
   shiftId: integer("shift_id").references(() => shifts.id),
   date: date("date").notNull(),
   status: workOrderStatusEnum("status").default("open").notNull(),
@@ -400,6 +409,7 @@ export const insertEquipmentChecklistItemSchema = createInsertSchema(equipmentCh
     sortOrder: z.coerce.number().default(0),
   });
 
+export const insertMaintenanceTypeConfigSchema = createInsertSchema(maintenanceTypeConfig).omit({ id: true, createdAt: true });
 export const insertShiftSchema = createInsertSchema(shifts).omit({ id: true, createdAt: true });
 export const insertActivityTypeSchema = createInsertSchema(activityTypes).omit({ id: true, createdAt: true });
 export const insertSubEquipmentSchema = createInsertSchema(subEquipment).omit({ id: true, createdAt: true });
@@ -442,6 +452,8 @@ export type EquipmentType = typeof equipmentTypes.$inferSelect;
 export type InsertEquipmentType = z.infer<typeof insertEquipmentTypeSchema>;
 export type EquipmentChecklistItem = typeof equipmentChecklistItems.$inferSelect;
 export type InsertEquipmentChecklistItem = z.infer<typeof insertEquipmentChecklistItemSchema>;
+export type MaintenanceTypeConfig = typeof maintenanceTypeConfig.$inferSelect;
+export type InsertMaintenanceTypeConfig = z.infer<typeof insertMaintenanceTypeConfigSchema>;
 export type Shift = typeof shifts.$inferSelect;
 export type InsertShift = z.infer<typeof insertShiftSchema>;
 export type ActivityType = typeof activityTypes.$inferSelect;

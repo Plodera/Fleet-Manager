@@ -1,6 +1,6 @@
 import { 
   users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
-  shifts, activityTypes, subEquipment, workOrders, workOrderItems,
+  maintenanceTypeConfig, shifts, activityTypes, subEquipment, workOrders, workOrderItems,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -8,6 +8,7 @@ import {
   type VehicleInspection, type InsertVehicleInspection,
   type EquipmentType, type InsertEquipmentType,
   type EquipmentChecklistItem, type InsertEquipmentChecklistItem,
+  type MaintenanceTypeConfig, type InsertMaintenanceTypeConfig,
   type Shift, type InsertShift,
   type ActivityType, type InsertActivityType,
   type SubEquipment, type InsertSubEquipment,
@@ -86,6 +87,12 @@ export interface IStorage {
   createEquipmentChecklistItem(item: InsertEquipmentChecklistItem): Promise<EquipmentChecklistItem>;
   updateEquipmentChecklistItem(id: number, updates: Partial<InsertEquipmentChecklistItem>): Promise<EquipmentChecklistItem>;
   deleteEquipmentChecklistItem(id: number): Promise<void>;
+
+  // Maintenance Type Config
+  getMaintenanceTypeConfigs(): Promise<MaintenanceTypeConfig[]>;
+  createMaintenanceTypeConfig(item: InsertMaintenanceTypeConfig): Promise<MaintenanceTypeConfig>;
+  updateMaintenanceTypeConfig(id: number, updates: Partial<InsertMaintenanceTypeConfig>): Promise<MaintenanceTypeConfig>;
+  deleteMaintenanceTypeConfig(id: number): Promise<void>;
 
   // Shifts
   getShifts(): Promise<Shift[]>;
@@ -452,6 +459,25 @@ export class DatabaseStorage implements IStorage {
     await getDb().delete(equipmentChecklistItems).where(eq(equipmentChecklistItems.id, id));
   }
 
+  // Maintenance Type Config
+  async getMaintenanceTypeConfigs(): Promise<MaintenanceTypeConfig[]> {
+    return await getDb().select().from(maintenanceTypeConfig);
+  }
+
+  async createMaintenanceTypeConfig(item: InsertMaintenanceTypeConfig): Promise<MaintenanceTypeConfig> {
+    const [created] = await getDb().insert(maintenanceTypeConfig).values(item).returning();
+    return created;
+  }
+
+  async updateMaintenanceTypeConfig(id: number, updates: Partial<InsertMaintenanceTypeConfig>): Promise<MaintenanceTypeConfig> {
+    const [updated] = await getDb().update(maintenanceTypeConfig).set(updates).where(eq(maintenanceTypeConfig.id, id)).returning();
+    return updated;
+  }
+
+  async deleteMaintenanceTypeConfig(id: number): Promise<void> {
+    await getDb().delete(maintenanceTypeConfig).where(eq(maintenanceTypeConfig.id, id));
+  }
+
   // Shifts
   async getShifts(): Promise<Shift[]> {
     return await getDb().select().from(shifts);
@@ -662,6 +688,10 @@ export const storage = {
   createEquipmentChecklistItem: (...args: Parameters<DatabaseStorage['createEquipmentChecklistItem']>) => getStorage().createEquipmentChecklistItem(...args),
   updateEquipmentChecklistItem: (...args: Parameters<DatabaseStorage['updateEquipmentChecklistItem']>) => getStorage().updateEquipmentChecklistItem(...args),
   deleteEquipmentChecklistItem: (...args: Parameters<DatabaseStorage['deleteEquipmentChecklistItem']>) => getStorage().deleteEquipmentChecklistItem(...args),
+  getMaintenanceTypeConfigs: () => getStorage().getMaintenanceTypeConfigs(),
+  createMaintenanceTypeConfig: (...args: Parameters<DatabaseStorage['createMaintenanceTypeConfig']>) => getStorage().createMaintenanceTypeConfig(...args),
+  updateMaintenanceTypeConfig: (...args: Parameters<DatabaseStorage['updateMaintenanceTypeConfig']>) => getStorage().updateMaintenanceTypeConfig(...args),
+  deleteMaintenanceTypeConfig: (...args: Parameters<DatabaseStorage['deleteMaintenanceTypeConfig']>) => getStorage().deleteMaintenanceTypeConfig(...args),
   getShifts: () => getStorage().getShifts(),
   createShift: (...args: Parameters<DatabaseStorage['createShift']>) => getStorage().createShift(...args),
   updateShift: (...args: Parameters<DatabaseStorage['updateShift']>) => getStorage().updateShift(...args),
