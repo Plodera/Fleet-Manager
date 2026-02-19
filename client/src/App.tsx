@@ -28,6 +28,7 @@ import DriverDashboard from "@/pages/DriverDashboard";
 import EquipmentTypes from "@/pages/EquipmentTypes";
 import WorkOrders from "@/pages/WorkOrders";
 import WorkOrderConfig from "@/pages/WorkOrderConfig";
+import WorkOrderReports from "@/pages/WorkOrderReports";
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -138,6 +139,9 @@ function Router() {
       </Route>
       <Route path="/work-order-config">
         <PrivateRoute component={WorkOrderConfig} adminOnly />
+      </Route>
+      <Route path="/work-order-reports">
+        <PrivateRoute component={WorkOrderReports} requiredPermission="view_maintenance" />
       </Route>
       <Route path="/reports">
         <PrivateRoute component={Reports} requiredPermission="view_reports" />

@@ -17,7 +17,8 @@ import {
   Truck,
   ClipboardCheck,
   ClipboardList,
-  Cog
+  Cog,
+  BarChart3
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ export function Sidebar() {
     { href: "/vehicle-inspections", label: t.nav.inspections, icon: ClipboardCheck, permission: "view_maintenance", hideFromDriver: true, isSubItem: true },
     { href: "/work-orders", label: t.nav.workOrders, icon: ClipboardList, permission: "view_maintenance", hideFromDriver: true, isSubItem: true },
     { href: "/work-order-config", label: t.nav.workOrderConfig, icon: Cog, permission: "admin_only", hideFromDriver: true, isSubItem: true },
+    { href: "/work-order-reports", label: t.nav.workOrderReports, icon: BarChart3, permission: "view_maintenance", hideFromDriver: true, isSubItem: true },
     { href: "/fuel", label: t.nav.fuel, icon: Fuel, permission: "view_fuel", hideFromDriver: true },
     { href: "/reports", label: t.nav.reports, icon: FileText, permission: "view_reports", hideFromDriver: true },
     { href: "/users", label: t.nav.users, icon: Users, permission: "admin_only", hideFromDriver: true },
