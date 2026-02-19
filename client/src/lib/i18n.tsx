@@ -292,6 +292,7 @@ const translations = {
       deleteConfirm: "Are you sure you want to delete this item?",
       workOrderConfig: "Work Order Configuration",
       workOrderConfigSubtitle: "Manage shifts, activity types, and sub-equipment for work orders",
+      maintenanceTypes: "Maintenance Types",
     },
     // Driver Dashboard
     driverDashboard: {
@@ -605,6 +606,7 @@ const translations = {
       deleteConfirm: "Tem a certeza que deseja eliminar este item?",
       workOrderConfig: "Configuração de Ordens de Trabalho",
       workOrderConfigSubtitle: "Gerir turnos, tipos de actividade e sub-equipamento para ordens de trabalho",
+      maintenanceTypes: "Tipos de Manutenção",
     },
     // Driver Dashboard
     driverDashboard: {

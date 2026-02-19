@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
@@ -14,6 +16,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import type { Shift, ActivityType, SubEquipment } from "@shared/schema";
 
@@ -41,7 +44,7 @@ export default function WorkOrderConfig() {
   const [activityForm, setActivityForm] = useState({ name: "", labelEn: "", labelPt: "" });
 
   const [subEquipDialog, setSubEquipDialog] = useState<{ open: boolean; editing: SubEquipment | null }>({ open: false, editing: null });
-  const [subEquipForm, setSubEquipForm] = useState({ name: "", labelEn: "", labelPt: "" });
+  const [subEquipForm, setSubEquipForm] = useState({ name: "", labelEn: "", labelPt: "", maintenanceTypes: [] as string[] });
 
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; type: string; id: number | null }>({ open: false, type: "", id: null });
 
@@ -196,13 +199,22 @@ export default function WorkOrderConfig() {
   };
 
   const openAddSubEquip = () => {
-    setSubEquipForm({ name: "", labelEn: "", labelPt: "" });
+    setSubEquipForm({ name: "", labelEn: "", labelPt: "", maintenanceTypes: [] });
     setSubEquipDialog({ open: true, editing: null });
   };
 
   const openEditSubEquip = (se: SubEquipment) => {
-    setSubEquipForm({ name: se.name, labelEn: se.labelEn, labelPt: se.labelPt });
+    setSubEquipForm({ name: se.name, labelEn: se.labelEn, labelPt: se.labelPt, maintenanceTypes: (se as any).maintenanceTypes || [] });
     setSubEquipDialog({ open: true, editing: se });
+  };
+
+  const toggleMaintenanceType = (type: string) => {
+    setSubEquipForm(prev => ({
+      ...prev,
+      maintenanceTypes: prev.maintenanceTypes.includes(type)
+        ? prev.maintenanceTypes.filter(t => t !== type)
+        : [...prev.maintenanceTypes, type]
+    }));
   };
 
   const handleSubEquipSubmit = () => {
@@ -347,21 +359,31 @@ export default function WorkOrderConfig() {
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead>{t.adminConfig.subEquipmentName}</TableHead>
+                  <TableHead>{t.adminConfig.maintenanceTypes}</TableHead>
                   <TableHead className="text-right">{t.buttons.edit}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {subEquipmentLoading ? (
                   <TableRow>
-                    <TableCell colSpan={2} className="h-24 text-center" data-testid="text-sub-equipment-loading">{t.labels.loading}</TableCell>
+                    <TableCell colSpan={3} className="h-24 text-center" data-testid="text-sub-equipment-loading">{t.labels.loading}</TableCell>
                   </TableRow>
                 ) : subEquipmentList?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={2} className="h-24 text-center text-muted-foreground" data-testid="text-sub-equipment-empty">{t.labels.noRecords}</TableCell>
+                    <TableCell colSpan={3} className="h-24 text-center text-muted-foreground" data-testid="text-sub-equipment-empty">{t.labels.noRecords}</TableCell>
                   </TableRow>
                 ) : subEquipmentList?.map((se) => (
                   <TableRow key={se.id} data-testid={`row-sub-equipment-${se.id}`}>
                     <TableCell className="font-medium">{se.name}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {((se as any).maintenanceTypes || []).map((mt: string) => (
+                          <Badge key={mt} variant="outline" data-testid={`badge-sub-equip-mt-${se.id}-${mt}`}>
+                            {mt === "breakdown" ? t.workOrders.breakdown : mt === "preventive" ? t.workOrders.preventive : t.workOrders.general}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button size="icon" variant="ghost" onClick={() => openEditSubEquip(se)} data-testid={`button-edit-sub-equipment-${se.id}`}>
@@ -532,6 +554,24 @@ export default function WorkOrderConfig() {
                   onChange={(e) => setSubEquipForm({ ...subEquipForm, labelPt: e.target.value })}
                   data-testid="input-sub-equipment-label-pt"
                 />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">{t.adminConfig.maintenanceTypes}</label>
+              <div className="flex flex-wrap gap-4 mt-2">
+                {(["breakdown", "preventive", "general"] as const).map(type => (
+                  <div key={type} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`mt-${type}`}
+                      checked={subEquipForm.maintenanceTypes.includes(type)}
+                      onCheckedChange={() => toggleMaintenanceType(type)}
+                      data-testid={`checkbox-maintenance-type-${type}`}
+                    />
+                    <Label htmlFor={`mt-${type}`} className="text-sm cursor-pointer">
+                      {type === "breakdown" ? t.workOrders.breakdown : type === "preventive" ? t.workOrders.preventive : t.workOrders.general}
+                    </Label>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

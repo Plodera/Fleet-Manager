@@ -227,7 +227,10 @@ export default function WorkOrders() {
                 </div>
                 <div className="space-y-2">
                   <Label>{t.workOrders.maintenanceType}</Label>
-                  <Select value={maintenanceType} onValueChange={setMaintenanceType}>
+                  <Select value={maintenanceType} onValueChange={(v) => {
+                      setMaintenanceType(v);
+                      setItems(prev => prev.map(item => ({ ...item, subEquipmentId: null })));
+                    }}>
                     <SelectTrigger data-testid="select-maintenance-type">
                       <SelectValue placeholder={t.workOrders.maintenanceType} />
                     </SelectTrigger>
@@ -297,7 +300,9 @@ export default function WorkOrders() {
                             <SelectValue placeholder={t.workOrders.selectSubEquipment} />
                           </SelectTrigger>
                           <SelectContent>
-                            {subEquipmentData?.map((se: any) => (
+                            {subEquipmentData
+                              ?.filter((se: any) => !maintenanceType || !se.maintenanceTypes?.length || se.maintenanceTypes.includes(maintenanceType))
+                              ?.map((se: any) => (
                               <SelectItem key={se.id} value={String(se.id)}>{se.name}</SelectItem>
                             ))}
                           </SelectContent>
