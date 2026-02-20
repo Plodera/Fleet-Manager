@@ -294,7 +294,7 @@ export default function WorkOrders() {
                 {items.map((item, index) => (
                   <Card key={index} className="p-4 space-y-3">
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <span className="text-sm font-medium text-muted-foreground">#{index + 1}</span>
+                      <span className="text-sm font-medium text-muted-foreground">{language === "pt" ? `Item Nº ${index + 1}` : `Item No. ${index + 1}`}</span>
                       {items.length > 1 && (
                         <Button
                           type="button"
