@@ -13,9 +13,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Car, Gauge, Calendar, Pencil, Image, Users } from "lucide-react";
+import { Plus, Search, Car, Gauge, Calendar, Pencil, Image, Users, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/lib/i18n";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Vehicles() {
   const { vehicles, isLoading, createVehicle, updateVehicle, deleteVehicle } = useVehicles();
@@ -27,6 +28,11 @@ export default function Vehicles() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+
+  const { data: overdueVehicleIds = [] } = useQuery<number[]>({
+    queryKey: ['/api/vehicles/overdue'],
+    refetchInterval: 60000,
+  });
 
   const filteredVehicles = vehicles?.filter(v => 
     v.make.toLowerCase().includes(search.toLowerCase()) || 
@@ -112,7 +118,8 @@ export default function Vehicles() {
     available: "bg-green-100 text-green-700 hover:bg-green-100/80 border-green-200",
     in_use: "bg-blue-100 text-blue-700 hover:bg-blue-100/80 border-blue-200",
     maintenance: "bg-amber-100 text-amber-700 hover:bg-amber-100/80 border-amber-200",
-    unavailable: "bg-gray-100 text-gray-700 hover:bg-gray-100/80 border-gray-200"
+    unavailable: "bg-gray-100 text-gray-700 hover:bg-gray-100/80 border-gray-200",
+    overdue: "bg-red-100 text-red-700 hover:bg-red-100/80 border-red-200"
   };
 
   return (
@@ -424,9 +431,16 @@ export default function Vehicles() {
                   alt={`${vehicle.make} ${vehicle.model}`}
                   className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500"
                 />
-                <Badge className={`absolute top-4 right-4 shadow-sm ${statusColors[vehicle.status] || statusColors.available}`}>
-                  {t.status[vehicle.status as keyof typeof t.status] || vehicle.status}
-                </Badge>
+                {overdueVehicleIds.includes(vehicle.id) ? (
+                  <Badge className={`absolute top-4 right-4 shadow-sm ${statusColors.overdue} flex items-center gap-1`} data-testid={`badge-overdue-${vehicle.id}`}>
+                    <AlertTriangle className="w-3 h-3" />
+                    {t.status.overdue}
+                  </Badge>
+                ) : (
+                  <Badge className={`absolute top-4 right-4 shadow-sm ${statusColors[vehicle.status] || statusColors.available}`} data-testid={`badge-status-${vehicle.id}`}>
+                    {t.status[vehicle.status as keyof typeof t.status] || vehicle.status}
+                  </Badge>
+                )}
               </div>
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">

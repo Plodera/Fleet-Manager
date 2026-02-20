@@ -45,6 +45,27 @@ export async function registerRoutes(
     res.json(vehicles);
   });
 
+  app.get('/api/vehicles/overdue', async (req, res) => {
+    try {
+      const allBookings = await storage.getBookings();
+      const now = new Date();
+      const overdueVehicleIds: number[] = [];
+      for (const booking of allBookings) {
+        if (
+          (booking.status === 'approved' || booking.status === 'in_progress') &&
+          new Date(booking.endTime) < now
+        ) {
+          if (!overdueVehicleIds.includes(booking.vehicleId)) {
+            overdueVehicleIds.push(booking.vehicleId);
+          }
+        }
+      }
+      res.json(overdueVehicleIds);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to check overdue vehicles" });
+    }
+  });
+
   app.get(api.vehicles.get.path, async (req, res) => {
     const vehicle = await storage.getVehicle(Number(req.params.id));
     if (!vehicle) return res.status(404).json({ message: "Vehicle not found" });

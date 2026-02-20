@@ -59,6 +59,7 @@ const translations = {
       unavailable: "Unavailable",
       open: "Open",
       full: "Full",
+      overdue: "Overdue",
     },
     // Common labels
     labels: {
@@ -395,6 +396,7 @@ const translations = {
       unavailable: "Indisponível",
       open: "Aberto",
       full: "Completo",
+      overdue: "Atrasado",
     },
     // Common labels
     labels: {
