@@ -134,6 +134,29 @@ export function useBookings() {
     },
   });
 
+  const extendBooking = useMutation({
+    mutationFn: async ({ id, newEndTime }: { id: number; newEndTime: string }) => {
+      const res = await fetch(`/api/bookings/${id}/extend`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newEndTime }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to extend booking");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vehicles/overdue'] });
+      toast({ title: "Booking extended", description: "The booking duration has been updated." });
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const { data: approvers } = useQuery({
     queryKey: [api.approvers.list.path],
     queryFn: async () => {
@@ -150,6 +173,7 @@ export function useBookings() {
     updateBookingStatus,
     startTrip,
     endTrip,
+    extendBooking,
     approvers,
   };
 }

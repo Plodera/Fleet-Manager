@@ -23,7 +23,7 @@ import { api } from "@shared/routes";
 import { useLanguage } from "@/lib/i18n";
 
 export default function Bookings() {
-  const { bookings, isLoading, createBooking, updateBookingStatus, startTrip, endTrip, approvers } = useBookings();
+  const { bookings, isLoading, createBooking, updateBookingStatus, startTrip, endTrip, extendBooking, approvers } = useBookings();
   const { vehicles } = useVehicles();
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -34,6 +34,9 @@ export default function Bookings() {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [approvalBookingId, setApprovalBookingId] = useState<number | null>(null);
   const [selectedDriverId, setSelectedDriverId] = useState<number | null>(null);
+  const [extendDialogOpen, setExtendDialogOpen] = useState(false);
+  const [extendBookingId, setExtendBookingId] = useState<number | null>(null);
+  const [newEndTime, setNewEndTime] = useState("");
 
   const { data: users } = useQuery({
     queryKey: [api.users.list.path],
@@ -139,6 +142,41 @@ export default function Bookings() {
 
   const handleEndTrip = (bookingId: number) => {
     endTrip.mutate(bookingId);
+  };
+
+  const handleExtendClick = (bookingId: number) => {
+    setExtendBookingId(bookingId);
+    setNewEndTime("");
+    setExtendDialogOpen(true);
+  };
+
+  const handleConfirmExtend = () => {
+    if (extendBookingId && newEndTime) {
+      extendBooking.mutate(
+        { id: extendBookingId, newEndTime: new Date(newEndTime).toISOString() },
+        {
+          onSuccess: () => {
+            setExtendDialogOpen(false);
+            setExtendBookingId(null);
+            setNewEndTime("");
+          }
+        }
+      );
+    }
+  };
+
+  const isBookingOverdue = (booking: any) => {
+    return (booking.status === 'approved' || booking.status === 'in_progress') && 
+           new Date(booking.endTime) < new Date();
+  };
+
+  const canExtendBooking = (booking: any) => {
+    if (!user) return false;
+    const isDriver = booking.driverId === user.id;
+    const isApprover = booking.approverId === user.id;
+    const isAdmin = user.role === 'admin';
+    const isOwner = booking.userId === user.id;
+    return isDriver || isApprover || isAdmin || isOwner;
   };
 
   const approvingBooking = bookings?.find(b => b.id === approvalBookingId);
@@ -483,13 +521,63 @@ export default function Bookings() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={extendDialogOpen} onOpenChange={setExtendDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-orange-500" />
+              {t.bookings.extendBookingTitle}
+            </DialogTitle>
+            <DialogDescription>
+              {extendBookingId && bookings?.find(b => b.id === extendBookingId) && (
+                <span>
+                  {t.bookings.extendingFor} {bookings.find(b => b.id === extendBookingId)!.vehicle.make} {bookings.find(b => b.id === extendBookingId)!.vehicle.model}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {extendBookingId && bookings?.find(b => b.id === extendBookingId) && (
+              <div className="bg-muted p-3 rounded-md">
+                <p className="text-sm">
+                  <span className="font-medium">{t.bookings.currentEndTime}:</span>{" "}
+                  {format(new Date(bookings.find(b => b.id === extendBookingId)!.endTime), "MMM d, yyyy h:mm a")}
+                </p>
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium mb-2 block">{t.bookings.newEndTime}</label>
+              <Input
+                type="datetime-local"
+                value={newEndTime}
+                onChange={(e) => setNewEndTime(e.target.value)}
+                data-testid="input-extend-end-time"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExtendDialogOpen(false)} data-testid="button-extend-dialog-close">
+              {t.buttons.cancel}
+            </Button>
+            <Button
+              onClick={handleConfirmExtend}
+              disabled={!newEndTime || extendBooking.isPending}
+              className="bg-orange-600 hover:bg-orange-700"
+              data-testid="button-confirm-extend"
+            >
+              {extendBooking.isPending ? t.buttons.extending : t.buttons.extendBooking}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-4">
         {isLoading ? (
           <div className="space-y-4">
             {[1,2,3].map(i => <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />)}
           </div>
         ) : bookings?.map((booking) => (
-          <Card key={booking.id} className="border-none shadow-sm hover:shadow-md transition-shadow" data-testid={`card-booking-${booking.id}`}>
+          <Card key={booking.id} className={`border-none shadow-sm hover:shadow-md transition-shadow ${isBookingOverdue(booking) ? 'ring-2 ring-red-300 dark:ring-red-700' : ''}`} data-testid={`card-booking-${booking.id}`}>
             <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-start gap-4 flex-1">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -499,6 +587,12 @@ export default function Bookings() {
                   <div className="flex items-center gap-3 mb-1 flex-wrap">
                     <h3 className="font-semibold text-lg">{booking.vehicle.make} {booking.vehicle.model}</h3>
                     {getStatusBadge(booking.status)}
+                    {isBookingOverdue(booking) && (
+                      <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800 flex items-center gap-1" data-testid={`badge-overdue-booking-${booking.id}`}>
+                        <AlertTriangle className="w-3 h-3" />
+                        {t.status.overdue}
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1.5">
@@ -611,6 +705,17 @@ export default function Bookings() {
                       <Play className="w-4 h-4 mr-1" /> {t.buttons.startTrip}
                     </Button>
                   )}
+                  {isBookingOverdue(booking) && canExtendBooking(booking) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-orange-200 text-orange-700"
+                      onClick={() => handleExtendClick(booking.id)}
+                      data-testid={`button-extend-booking-${booking.id}`}
+                    >
+                      <Clock className="w-4 h-4 mr-1" /> {t.buttons.extendBooking}
+                    </Button>
+                  )}
                   {(booking.approverId === user?.id || user?.role === 'admin') && (
                     <>
                       <Button 
@@ -653,6 +758,17 @@ export default function Bookings() {
                       data-testid={`button-end-trip-${booking.id}`}
                     >
                       <Flag className="w-4 h-4 mr-1" /> {t.buttons.endTrip}
+                    </Button>
+                  )}
+                  {isBookingOverdue(booking) && canExtendBooking(booking) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-orange-200 text-orange-700"
+                      onClick={() => handleExtendClick(booking.id)}
+                      data-testid={`button-extend-booking-${booking.id}`}
+                    >
+                      <Clock className="w-4 h-4 mr-1" /> {t.buttons.extendBooking}
                     </Button>
                   )}
                 </div>

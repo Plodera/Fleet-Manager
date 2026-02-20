@@ -450,6 +450,53 @@ export async function registerRoutes(
     }
   });
 
+  // Extend booking duration
+  app.put('/api/bookings/:id/extend', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const currentUser = req.user as User;
+
+    try {
+      const bookingId = Number(req.params.id);
+      const { newEndTime } = req.body;
+
+      if (!newEndTime) {
+        return res.status(400).json({ message: "New end time is required" });
+      }
+
+      const existingBooking = await storage.getBooking(bookingId);
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const isDriver = existingBooking.driverId === currentUser.id;
+      const isApprover = existingBooking.approverId === currentUser.id;
+      const isAdmin = currentUser.role === 'admin';
+      const isOwner = existingBooking.userId === currentUser.id;
+
+      if (!isDriver && !isApprover && !isAdmin && !isOwner) {
+        return res.status(403).json({ message: "Only the driver, approver, or admin can extend this booking" });
+      }
+
+      if (existingBooking.status !== 'approved' && existingBooking.status !== 'in_progress') {
+        return res.status(400).json({ message: "Only approved or in-progress bookings can be extended" });
+      }
+
+      const newEnd = new Date(newEndTime);
+      if (isNaN(newEnd.getTime())) {
+        return res.status(400).json({ message: "Invalid date format" });
+      }
+
+      if (newEnd <= new Date(existingBooking.endTime)) {
+        return res.status(400).json({ message: "New end time must be later than the current end time" });
+      }
+
+      const booking = await storage.updateBooking(bookingId, { endTime: newEnd });
+      res.json(booking);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to extend booking" });
+    }
+  });
+
   // Maintenance
   app.get(api.maintenance.list.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

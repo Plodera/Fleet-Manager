@@ -44,6 +44,8 @@ const translations = {
       newBooking: "New Booking",
       newVehicle: "New Vehicle",
       setPending: "Set Pending",
+      extendBooking: "Extend Booking",
+      extending: "Extending...",
     },
     // Status labels
     status: {
@@ -179,6 +181,10 @@ const translations = {
       goBack: "Go Back",
       cancelling: "Cancelling...",
       confirmCancellation: "Confirm Cancellation",
+      extendBookingTitle: "Extend Booking Duration",
+      extendingFor: "Extending booking for",
+      newEndTime: "New End Time",
+      currentEndTime: "Current End Time",
       approveBooking: "Approve Booking",
       approvingFor: "Approving booking for",
       assignDriver: "Assign Driver",
@@ -381,6 +387,8 @@ const translations = {
       newBooking: "Nova Reserva",
       newVehicle: "Novo Veículo",
       setPending: "Definir Pendente",
+      extendBooking: "Prolongar Reserva",
+      extending: "A prolongar...",
     },
     // Status labels
     status: {
@@ -516,6 +524,10 @@ const translations = {
       goBack: "Voltar",
       cancelling: "A cancelar...",
       confirmCancellation: "Confirmar Cancelamento",
+      extendBookingTitle: "Prolongar Duração da Reserva",
+      extendingFor: "A prolongar reserva para",
+      newEndTime: "Nova Hora de Fim",
+      currentEndTime: "Hora de Fim Actual",
       approveBooking: "Aprovar Reserva",
       approvingFor: "A aprovar reserva para",
       assignDriver: "Atribuir Motorista",
