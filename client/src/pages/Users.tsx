@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, AVAILABLE_PERMISSIONS, type Department } from "@shared/schema";
-import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail, Building2, Trash2, Plus, User } from "lucide-react";
+import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail, Building2, Trash2, Plus, User, Info, Car, FileCheck, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Users() {
@@ -100,30 +100,33 @@ export default function Users() {
     });
   };
 
+  const t = useLanguage().t;
+  const um = t.userManagement;
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">User Management</h1>
-          <p className="text-muted-foreground mt-1">Manage system access and roles.</p>
+          <h1 className="text-3xl font-bold font-display tracking-tight">{um.title}</h1>
+          <p className="text-muted-foreground mt-1">{um.subtitle}</p>
         </div>
         {currentUser?.role === 'admin' && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="shadow-lg shadow-primary/25">
                 <UserPlus className="w-4 h-4 mr-2" />
-                Add User
+                {um.addUser}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Create New User</DialogTitle>
+                <DialogTitle>{um.createUser}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField control={form.control} name="fullName" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Full Name</FormLabel>
+                      <FormLabel>{um.fullName}</FormLabel>
                       <FormControl>
                         <Input placeholder="John Doe" {...field} />
                       </FormControl>
@@ -133,7 +136,7 @@ export default function Users() {
 
                   <FormField control={form.control} name="username" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username</FormLabel>
+                      <FormLabel>{um.username}</FormLabel>
                       <FormControl>
                         <Input placeholder="jdoe" {...field} />
                       </FormControl>
@@ -143,7 +146,7 @@ export default function Users() {
 
                   <FormField control={form.control} name="password" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>{um.changePassword}</FormLabel>
                       <FormControl>
                         <Input type="password" placeholder="Enter password" {...field} />
                       </FormControl>
@@ -153,7 +156,7 @@ export default function Users() {
 
                   <FormField control={form.control} name="email" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>{um.email}</FormLabel>
                       <FormControl>
                         <Input type="email" placeholder="user@example.com" {...field} data-testid="input-user-email" />
                       </FormControl>
@@ -163,7 +166,7 @@ export default function Users() {
 
                   <FormField control={form.control} name="role" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Role</FormLabel>
+                      <FormLabel>{um.role}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
@@ -182,7 +185,7 @@ export default function Users() {
 
                   <FormField control={form.control} name="department" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Department</FormLabel>
+                      <FormLabel>{um.department}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger data-testid="select-department">
@@ -203,7 +206,7 @@ export default function Users() {
 
                   <FormField control={form.control} name="licenseNumber" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>License Number</FormLabel>
+                      <FormLabel>{um.licenseNumber}</FormLabel>
                       <FormControl>
                         <Input placeholder="Optional" {...field} />
                       </FormControl>
@@ -213,7 +216,7 @@ export default function Users() {
 
                   <FormField control={form.control} name="permissions" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Access Rights</FormLabel>
+                      <FormLabel>{um.accessRights}</FormLabel>
                       <div className="space-y-3 border rounded-md p-4 bg-muted/30">
                         {AVAILABLE_PERMISSIONS.map((perm) => (
                           <div key={perm.id} className="flex items-center space-x-2">
@@ -236,7 +239,7 @@ export default function Users() {
                   )} />
 
                   <Button type="submit" className="w-full" disabled={isCreatingUser}>
-                    {isCreatingUser ? "Creating..." : "Create User"}
+                    {isCreatingUser ? um.creating : um.createUser}
                   </Button>
                 </form>
               </Form>
@@ -245,40 +248,102 @@ export default function Users() {
         )}
       </div>
 
+      {currentUser?.role === 'admin' && (
+        <Card className="border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 shadow-sm">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm text-blue-900 dark:text-blue-200">{um.rolesGuide}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                  <div className="flex items-start gap-2">
+                    <Shield className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-medium">{um.role}</span>
+                      <p className="text-xs text-muted-foreground">{um.roleExplanation}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <FileCheck className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-medium">{um.approver}</span>
+                      <p className="text-xs text-muted-foreground">{um.approverExplanation}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Car className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-medium">{um.driver}</span>
+                      <p className="text-xs text-muted-foreground">{um.driverExplanation}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Eye className="w-4 h-4 text-orange-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-medium">{um.permissions}</span>
+                      <p className="text-xs text-muted-foreground">{um.permissionsExplanation}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-none shadow-md overflow-hidden">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UsersIcon className="w-5 h-5 text-primary" />
-            Registered Users
+            {um.registeredUsers}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead>Full Name</TableHead>
-                <TableHead>Username</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Approver</TableHead>
-                <TableHead>Driver</TableHead>
-                <TableHead>Permissions</TableHead>
-                {currentUser?.role === 'admin' && <TableHead>Actions</TableHead>}
+                <TableHead>{um.fullName}</TableHead>
+                <TableHead>{um.role}</TableHead>
+                <TableHead>{um.department}</TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
+                    <FileCheck className="w-3.5 h-3.5 text-green-600" />
+                    {um.approver}
+                  </div>
+                  <span className="text-xs font-normal text-muted-foreground">{um.approverDesc}</span>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
+                    <Car className="w-3.5 h-3.5 text-blue-600" />
+                    {um.driver}
+                  </div>
+                  <span className="text-xs font-normal text-muted-foreground">{um.driverDesc}</span>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
+                    <Eye className="w-3.5 h-3.5 text-orange-600" />
+                    {um.permissions}
+                  </div>
+                  <span className="text-xs font-normal text-muted-foreground">{um.permissionsDesc}</span>
+                </TableHead>
+                {currentUser?.role === 'admin' && <TableHead>{um.actions}</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={currentUser?.role === 'admin' ? 9 : 8} className="h-24 text-center">Loading...</TableCell>
+                  <TableCell colSpan={currentUser?.role === 'admin' ? 7 : 6} className="h-24 text-center">{t.labels.loading}</TableCell>
                 </TableRow>
               ) : users?.map((user) => {
                 const userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions || [];
                 return (
                 <TableRow key={user.id} className="hover:bg-muted/20">
-                  <TableCell className="font-medium">{user.fullName}</TableCell>
-                  <TableCell>{user.username}</TableCell>
-                  <TableCell className="text-sm">{user.email || "-"}</TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{user.fullName}</div>
+                      <div className="text-xs text-muted-foreground">{user.username}{user.email ? ` · ${user.email}` : ''}</div>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {currentUser?.role === 'admin' && editingUserId !== user.id ? (
                       <div className="flex items-center gap-2">
@@ -295,7 +360,6 @@ export default function Users() {
                     )}
                   </TableCell>
                   <TableCell>{user.department || "-"}</TableCell>
-                  <TableCell className="font-mono text-xs">{user.licenseNumber || "-"}</TableCell>
                   <TableCell>
                     {currentUser?.role === 'admin' ? (
                       <Button
@@ -304,16 +368,16 @@ export default function Users() {
                         onClick={() => updateApprover({ userId: user.id, isApprover: !user.isApprover })}
                         disabled={isUpdatingApprover}
                         data-testid={`button-toggle-approver-${user.id}`}
-                        className={user.isApprover ? "" : "border-muted-foreground/30"}
+                        className={user.isApprover ? "bg-green-600 hover:bg-green-700" : "border-muted-foreground/30"}
                       >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        {user.isApprover ? "Approver" : "Not Set"}
+                        <FileCheck className="w-4 h-4 mr-1" />
+                        {user.isApprover ? um.approver : um.notApprover}
                       </Button>
                     ) : (
                       user.isApprover ? (
                         <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Approver
+                          <FileCheck className="w-3 h-3 mr-1" />
+                          {um.approver}
                         </Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">-</span>
@@ -328,16 +392,16 @@ export default function Users() {
                         onClick={() => updateDriver({ userId: user.id, isDriver: !(user as any).isDriver })}
                         disabled={isUpdatingDriver}
                         data-testid={`button-toggle-driver-${user.id}`}
-                        className={(user as any).isDriver ? "" : "border-muted-foreground/30"}
+                        className={(user as any).isDriver ? "bg-blue-600 hover:bg-blue-700" : "border-muted-foreground/30"}
                       >
-                        <User className="w-4 h-4 mr-1" />
-                        {(user as any).isDriver ? "Driver" : "Not Set"}
+                        <Car className="w-4 h-4 mr-1" />
+                        {(user as any).isDriver ? um.driver : um.notDriver}
                       </Button>
                     ) : (
                       (user as any).isDriver ? (
                         <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">
-                          <User className="w-3 h-3 mr-1" />
-                          Driver
+                          <Car className="w-3 h-3 mr-1" />
+                          {um.driver}
                         </Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">-</span>
@@ -351,7 +415,7 @@ export default function Users() {
                       }}>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Edit Access Rights</DialogTitle>
+                            <DialogTitle>{um.editAccessRights}</DialogTitle>
                           </DialogHeader>
                           <div className="space-y-3">
                             {AVAILABLE_PERMISSIONS.map((perm) => (
@@ -380,7 +444,7 @@ export default function Users() {
                             disabled={isUpdatingPermissions}
                             data-testid={`button-save-permissions-${user.id}`}
                           >
-                            {isUpdatingPermissions ? (language === "pt" ? "A guardar..." : "Saving...") : (language === "pt" ? "Guardar" : "Save")}
+                            {isUpdatingPermissions ? um.saving : t.buttons.save}
                           </Button>
                         </DialogContent>
                       </Dialog>
@@ -398,7 +462,7 @@ export default function Users() {
                             )}
                           </>
                         ) : (
-                          <span className="text-xs text-muted-foreground">None</span>
+                          <span className="text-xs text-muted-foreground">{um.none}</span>
                         )}
                       </div>
                     )}
@@ -447,11 +511,11 @@ export default function Users() {
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>
-                                  <DialogTitle>Edit Profile for {user.fullName}</DialogTitle>
+                                  <DialogTitle>{um.editProfile} - {user.fullName}</DialogTitle>
                                 </DialogHeader>
                                 <div className="space-y-4">
                                   <div>
-                                    <label className="text-sm font-medium">Full Name</label>
+                                    <label className="text-sm font-medium">{um.fullName}</label>
                                     <Input
                                       placeholder="John Doe"
                                       value={editFullName}
@@ -460,7 +524,7 @@ export default function Users() {
                                     />
                                   </div>
                                   <div>
-                                    <label className="text-sm font-medium">Username</label>
+                                    <label className="text-sm font-medium">{um.username}</label>
                                     <Input
                                       placeholder="johndoe"
                                       value={editUsername}
@@ -487,7 +551,7 @@ export default function Users() {
                                     disabled={(editUsername === user.username && editFullName === user.fullName) || isUpdatingProfile}
                                     data-testid={`button-confirm-profile-${user.id}`}
                                   >
-                                    {isUpdatingProfile ? "Updating..." : "Update Profile"}
+                                    {isUpdatingProfile ? um.updating : um.updateProfile}
                                   </Button>
                                 </div>
                               </DialogContent>
@@ -535,11 +599,11 @@ export default function Users() {
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>
-                                  <DialogTitle>Edit Email for {user.fullName}</DialogTitle>
+                                  <DialogTitle>{um.editEmail} - {user.fullName}</DialogTitle>
                                 </DialogHeader>
                                 <div className="space-y-4">
                                   <div>
-                                    <label className="text-sm font-medium">Email Address</label>
+                                    <label className="text-sm font-medium">{um.email}</label>
                                     <Input
                                       type="email"
                                       placeholder="user@example.com"
@@ -562,7 +626,7 @@ export default function Users() {
                                     disabled={!newEmail || isUpdatingEmail}
                                     data-testid={`button-confirm-email-${user.id}`}
                                   >
-                                    {isUpdatingEmail ? "Updating..." : "Update Email"}
+                                    {isUpdatingEmail ? um.updating : um.updateEmail}
                                   </Button>
                                 </div>
                               </DialogContent>
@@ -586,14 +650,14 @@ export default function Users() {
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>
-                                  <DialogTitle>Change Password for {user.fullName}</DialogTitle>
+                                  <DialogTitle>{um.changePassword} - {user.fullName}</DialogTitle>
                                 </DialogHeader>
                                 <div className="space-y-4">
                                   <div>
-                                    <label className="text-sm font-medium">New Password</label>
+                                    <label className="text-sm font-medium">{um.newPassword}</label>
                                     <Input
                                       type="password"
-                                      placeholder="Enter new password (min 6 characters)"
+                                      placeholder={um.passwordPlaceholder}
                                       value={newPassword}
                                       onChange={(e) => setNewPassword(e.target.value)}
                                       data-testid={`input-new-password-${user.id}`}
@@ -613,7 +677,7 @@ export default function Users() {
                                     disabled={newPassword.length < 6 || isUpdatingPassword}
                                     data-testid={`button-confirm-password-${user.id}`}
                                   >
-                                    {isUpdatingPassword ? "Updating..." : "Update Password"}
+                                    {isUpdatingPassword ? um.updating : um.updatePassword}
                                   </Button>
                                 </div>
                               </DialogContent>
@@ -624,7 +688,7 @@ export default function Users() {
                                 variant="ghost"
                                 className="text-destructive hover:text-destructive"
                                 onClick={() => {
-                                  if (confirm(`Are you sure you want to delete ${user.fullName}? This action cannot be undone.`)) {
+                                  if (confirm(`${um.deleteConfirm} ${user.fullName}? ${um.cannotUndo}`)) {
                                     deleteUser(user.id);
                                   }
                                 }}
@@ -652,22 +716,22 @@ export default function Users() {
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2">
               <Building2 className="w-5 h-5 text-primary" />
-              Departments
+              {um.departments}
             </CardTitle>
             <Dialog open={isDeptDialogOpen} onOpenChange={setIsDeptDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" data-testid="button-add-department">
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Department
+                  {um.addDepartment}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Create New Department</DialogTitle>
+                  <DialogTitle>{um.createDepartment}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium">Name</label>
+                    <label className="text-sm font-medium">{um.deptName}</label>
                     <Input
                       placeholder="Department name"
                       value={newDeptName}
@@ -676,7 +740,7 @@ export default function Users() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Description (optional)</label>
+                    <label className="text-sm font-medium">{um.deptDesc}</label>
                     <Input
                       placeholder="Description"
                       value={newDeptDesc}
@@ -693,7 +757,7 @@ export default function Users() {
                     disabled={!newDeptName.trim() || createDeptMutation.isPending}
                     data-testid="button-confirm-department"
                   >
-                    {createDeptMutation.isPending ? "Creating..." : "Create Department"}
+                    {createDeptMutation.isPending ? um.creating : um.createDepartment}
                   </Button>
                 </div>
               </DialogContent>
@@ -701,7 +765,7 @@ export default function Users() {
           </CardHeader>
           <CardContent>
             {departments.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No departments configured. Add a department to get started.</p>
+              <p className="text-muted-foreground text-sm">{um.noDepartments}</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {departments.map((dept) => (
