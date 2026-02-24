@@ -22,6 +22,10 @@ const translations = {
       workOrderConfig: "Work Order Config",
       workOrderReports: "Work Order Reports",
       logout: "Logout",
+      sectionOverview: "Overview",
+      sectionFleet: "Fleet Management",
+      sectionOperations: "Operations",
+      sectionAdmin: "Administration",
     },
     // Common buttons
     buttons: {
@@ -416,6 +420,10 @@ const translations = {
       workOrderConfig: "Config. Ordens Trabalho",
       workOrderReports: "Relatórios Ordens Trabalho",
       logout: "Sair",
+      sectionOverview: "Visão Geral",
+      sectionFleet: "Gestão de Frota",
+      sectionOperations: "Operações",
+      sectionAdmin: "Administração",
     },
     // Common buttons
     buttons: {
