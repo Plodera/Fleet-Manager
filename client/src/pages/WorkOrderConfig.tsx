@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Cog } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 import type { Shift, ActivityType, SubEquipment, MaintenanceTypeConfig } from "@shared/schema";
 
 export default function WorkOrderConfig() {
@@ -298,10 +299,11 @@ export default function WorkOrderConfig() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-bold font-display tracking-tight" data-testid="text-page-title">{t.adminConfig.workOrderConfig}</h1>
-        <p className="text-muted-foreground mt-1" data-testid="text-page-subtitle">{t.adminConfig.workOrderConfigSubtitle}</p>
-      </div>
+      <PageHeader
+        title={t.adminConfig.workOrderConfig}
+        description={t.adminConfig.workOrderConfigSubtitle}
+        icon={<Cog className="w-5 h-5 text-primary" />}
+      />
 
       <Tabs defaultValue="shifts" className="space-y-6">
         <TabsList data-testid="tabs-config">

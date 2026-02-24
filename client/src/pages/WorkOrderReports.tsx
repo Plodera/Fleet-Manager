@@ -16,8 +16,9 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
-import { FileText, Printer, Download, Filter, CheckSquare } from "lucide-react";
+import { FileText, Printer, Download, Filter, CheckSquare, BarChart3 } from "lucide-react";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 
 interface FieldOption {
   key: string;
@@ -225,10 +226,11 @@ export default function WorkOrderReports() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold" data-testid="text-report-title">{t.workOrders.workOrderReport}</h1>
-        <p className="text-muted-foreground" data-testid="text-report-subtitle">{t.workOrders.reportSubtitle}</p>
-      </div>
+      <PageHeader
+        title={t.workOrders.workOrderReport}
+        description={t.workOrders.reportSubtitle}
+        icon={<BarChart3 className="w-5 h-5 text-primary" />}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-4">

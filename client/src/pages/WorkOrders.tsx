@@ -25,8 +25,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Eye, Trash2, Printer, X } from "lucide-react";
+import { Plus, Eye, Trash2, Printer, X, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 
 interface WorkItem {
   subEquipmentId?: number | null;
@@ -195,18 +196,18 @@ export default function WorkOrders() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight" data-testid="text-work-orders-title">{t.workOrders.title}</h1>
-          <p className="text-muted-foreground mt-1" data-testid="text-work-orders-subtitle">{t.workOrders.subtitle}</p>
-        </div>
+      <PageHeader
+        title={t.workOrders.title}
+        description={t.workOrders.subtitle}
+        icon={<ClipboardList className="w-5 h-5 text-primary" />}
+        actions={
+          <Button className="shadow-lg shadow-primary/25" onClick={() => setIsCreateOpen(true)} data-testid="button-new-work-order">
+            <Plus className="w-4 h-4 mr-2" /> {t.workOrders.newWorkOrder}
+          </Button>
+        }
+      />
 
         <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button className="shadow-lg shadow-primary/25" data-testid="button-new-work-order">
-              <Plus className="w-4 h-4 mr-2" /> {t.workOrders.newWorkOrder}
-            </Button>
-          </DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{t.workOrders.newWorkOrder}</DialogTitle>
@@ -433,7 +434,6 @@ export default function WorkOrders() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
 
       <Card className="border-none shadow-md overflow-hidden">
         <Table>

@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card } from "@/components/ui/card";
 import { Fuel as FuelIcon, Plus } from "lucide-react";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function Fuel() {
   const { records, createRecord, isLoading } = useFuelHook();
@@ -55,18 +56,18 @@ export default function Fuel() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">Fuel Log</h1>
-          <p className="text-muted-foreground mt-1">Monitor fuel consumption and expenses.</p>
-        </div>
-        
+      <PageHeader
+        title="Fuel Log"
+        description="Monitor fuel consumption and expenses."
+        icon={<FuelIcon className="w-5 h-5 text-primary" />}
+        actions={
+          <Button className="shadow-lg shadow-primary/25" onClick={() => setIsDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" /> Log Fuel
+          </Button>
+        }
+      />
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="shadow-lg shadow-primary/25">
-              <Plus className="w-4 h-4 mr-2" /> Log Fuel
-            </Button>
-          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Log Fuel Entry</DialogTitle>
@@ -143,7 +144,6 @@ export default function Fuel() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
 
       <Card className="border-none shadow-md overflow-hidden">
         <Table>

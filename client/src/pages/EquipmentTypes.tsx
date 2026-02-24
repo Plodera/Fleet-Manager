@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Settings2, Plus, Trash2, Edit2, ChevronDown, ListChecks, GripVertical } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
+import { PageHeader } from "@/components/PageHeader";
 import type { EquipmentType, EquipmentChecklistItem } from "@shared/schema";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -254,16 +255,16 @@ export default function EquipmentTypes() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">{l.title}</h1>
-          <p className="text-muted-foreground mt-1">{l.subtitle}</p>
-        </div>
-        
-        <Button onClick={openAddType} className="shadow-lg shadow-primary/25" data-testid="button-add-equipment-type">
-          <Plus className="w-4 h-4 mr-2" /> {l.addType}
-        </Button>
-      </div>
+      <PageHeader
+        title={l.title}
+        description={l.subtitle}
+        icon={<Settings2 className="w-5 h-5 text-primary" />}
+        actions={
+          <Button onClick={openAddType} className="shadow-lg shadow-primary/25" data-testid="button-add-equipment-type">
+            <Plus className="w-4 h-4 mr-2" /> {l.addType}
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="flex justify-center py-8">Loading...</div>

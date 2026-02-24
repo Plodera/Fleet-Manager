@@ -27,13 +27,25 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n";
 
+interface NavLink {
+  href: string;
+  label: string;
+  icon: any;
+  permission: string;
+  hideFromDriver: boolean;
+}
+
+interface NavSection {
+  label: string;
+  links: NavLink[];
+}
+
 export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
 
-  // Parse user permissions from JSON string
   const userPermissions: string[] = (() => {
     if (!user?.permissions) return [];
     if (Array.isArray(user.permissions)) return user.permissions;
@@ -44,7 +56,6 @@ export function Sidebar() {
     }
   })();
 
-  // Check if user has a specific permission (admins have all permissions)
   const hasPermission = (permission: string) => {
     if (user?.role === "admin") return true;
     return userPermissions.includes(permission);
@@ -52,40 +63,57 @@ export function Sidebar() {
 
   const isDriver = user?.isDriver === true;
 
-  const allLinks = [
-    { href: "/", label: t.nav.dashboard, icon: LayoutDashboard, permission: "view_dashboard", hideFromDriver: false },
-    { href: "/driver-dashboard", label: t.nav.driverDashboard, icon: Truck, permission: "driver_only", hideFromDriver: false },
-    { href: "/vehicles", label: t.nav.vehicles, icon: Car, permission: "view_vehicles", hideFromDriver: true },
-    { href: "/bookings", label: t.nav.bookings, icon: CalendarDays, permission: "view_bookings", hideFromDriver: true },
-    { href: "/shared-rides", label: t.nav.sharedRides, icon: UsersRound, permission: "view_shared_rides", hideFromDriver: true },
-    { href: "/maintenance", label: t.nav.maintenance, icon: Wrench, permission: "view_maintenance", hideFromDriver: true },
-    { href: "/vehicle-inspections", label: t.nav.inspections, icon: ClipboardCheck, permission: "view_inspections", hideFromDriver: true, isSubItem: true },
-    { href: "/work-orders", label: t.nav.workOrders, icon: ClipboardList, permission: "view_work_orders", hideFromDriver: true, isSubItem: true },
-    { href: "/work-order-config", label: t.nav.workOrderConfig, icon: Cog, permission: "admin_only", hideFromDriver: true, isSubItem: true },
-    { href: "/work-order-reports", label: t.nav.workOrderReports, icon: BarChart3, permission: "view_work_order_reports", hideFromDriver: true, isSubItem: true },
-    { href: "/fuel", label: t.nav.fuel, icon: Fuel, permission: "view_fuel", hideFromDriver: true },
-    { href: "/reports", label: t.nav.reports, icon: FileText, permission: "view_reports", hideFromDriver: true },
-    { href: "/users", label: t.nav.users, icon: Users, permission: "admin_only", hideFromDriver: true },
-    { href: "/settings", label: t.nav.settings, icon: Settings, permission: "admin_only", hideFromDriver: true },
-    { href: "/equipment-types", label: t.nav.equipmentTypes, icon: Settings2, permission: "admin_only", hideFromDriver: true },
+  const isLinkVisible = (link: NavLink) => {
+    if (link.permission === "driver_only") return isDriver;
+    if (link.permission === "admin_only") return user?.role === "admin";
+    if (isDriver && link.hideFromDriver) return false;
+    return hasPermission(link.permission);
+  };
+
+  const sections: NavSection[] = [
+    {
+      label: t.nav.sectionOverview,
+      links: [
+        { href: "/", label: t.nav.dashboard, icon: LayoutDashboard, permission: "view_dashboard", hideFromDriver: false },
+        { href: "/driver-dashboard", label: t.nav.driverDashboard, icon: Truck, permission: "driver_only", hideFromDriver: false },
+      ],
+    },
+    {
+      label: t.nav.sectionFleet,
+      links: [
+        { href: "/vehicles", label: t.nav.vehicles, icon: Car, permission: "view_vehicles", hideFromDriver: true },
+        { href: "/bookings", label: t.nav.bookings, icon: CalendarDays, permission: "view_bookings", hideFromDriver: true },
+        { href: "/shared-rides", label: t.nav.sharedRides, icon: UsersRound, permission: "view_shared_rides", hideFromDriver: true },
+      ],
+    },
+    {
+      label: t.nav.sectionOperations,
+      links: [
+        { href: "/maintenance", label: t.nav.maintenance, icon: Wrench, permission: "view_maintenance", hideFromDriver: true },
+        { href: "/vehicle-inspections", label: t.nav.inspections, icon: ClipboardCheck, permission: "view_inspections", hideFromDriver: true },
+        { href: "/work-orders", label: t.nav.workOrders, icon: ClipboardList, permission: "view_work_orders", hideFromDriver: true },
+        { href: "/work-order-reports", label: t.nav.workOrderReports, icon: BarChart3, permission: "view_work_order_reports", hideFromDriver: true },
+        { href: "/fuel", label: t.nav.fuel, icon: Fuel, permission: "view_fuel", hideFromDriver: true },
+        { href: "/reports", label: t.nav.reports, icon: FileText, permission: "view_reports", hideFromDriver: true },
+      ],
+    },
+    {
+      label: t.nav.sectionAdmin,
+      links: [
+        { href: "/users", label: t.nav.users, icon: Users, permission: "admin_only", hideFromDriver: true },
+        { href: "/settings", label: t.nav.settings, icon: Settings, permission: "admin_only", hideFromDriver: true },
+        { href: "/equipment-types", label: t.nav.equipmentTypes, icon: Settings2, permission: "admin_only", hideFromDriver: true },
+        { href: "/work-order-config", label: t.nav.workOrderConfig, icon: Cog, permission: "admin_only", hideFromDriver: true },
+      ],
+    },
   ];
 
-  // Filter links based on permissions and driver status
-  const links = allLinks.filter(link => {
-    // Driver-only link
-    if (link.permission === "driver_only") {
-      return isDriver;
-    }
-    // Admin-only links
-    if (link.permission === "admin_only") {
-      return user?.role === "admin";
-    }
-    // Hide from drivers if marked
-    if (isDriver && link.hideFromDriver) {
-      return false;
-    }
-    return hasPermission(link.permission);
-  });
+  const visibleSections = sections
+    .map(section => ({
+      ...section,
+      links: section.links.filter(isLinkVisible),
+    }))
+    .filter(section => section.links.length > 0);
 
   const NavContent = () => (
     <div className="flex flex-col h-full">
@@ -96,27 +124,36 @@ export function Sidebar() {
           </div>
           <div>
             <h1 className="font-display font-bold text-lg tracking-tight text-foreground">AAMS</h1>
-            <p className="text-xs text-muted-foreground">Aisco Automobile Management System</p>
+            <p className="text-xs text-muted-foreground">Fleet Management</p>
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {links.map((link) => {
-          const Icon = link.icon;
-          const isActive = location === link.href;
-          const isSubItem = 'isSubItem' in link && link.isSubItem;
-          return (
-            <Link key={link.href} href={link.href} className={cn(
-              "sidebar-link group",
-              isActive ? "sidebar-link-active" : "sidebar-link-inactive",
-              isSubItem && "ml-4 text-sm"
-            )} onClick={() => setOpen(false)}>
-              <Icon className={cn(isSubItem ? "w-4 h-4" : "w-5 h-5", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-              {link.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 p-3 overflow-y-auto" data-testid="sidebar-nav">
+        {visibleSections.map((section, sectionIndex) => (
+          <div key={section.label} className={cn(sectionIndex > 0 && "mt-4")}>
+            <div className="px-3 mb-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                {section.label}
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              {section.links.map((link) => {
+                const Icon = link.icon;
+                const isActive = location === link.href;
+                return (
+                  <Link key={link.href} href={link.href} className={cn(
+                    "sidebar-link group",
+                    isActive ? "sidebar-link-active" : "sidebar-link-inactive",
+                  )} onClick={() => setOpen(false)} data-testid={`nav-link-${link.href.replace(/\//g, '-').replace(/^-/, '')}`}>
+                    <Icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                    <span className="text-sm">{link.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       <div className="p-4 border-t border-border/50">
@@ -160,7 +197,6 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile Trigger */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
@@ -174,7 +210,6 @@ export function Sidebar() {
         </Sheet>
       </div>
 
-      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-64 border-r border-border h-screen bg-card sticky top-0">
         <NavContent />
       </aside>

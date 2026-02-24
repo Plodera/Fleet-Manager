@@ -16,6 +16,7 @@ import {
   Activity, MapPin, Users
 } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -156,13 +157,11 @@ export default function Reports() {
 
   return (
     <div className="p-6 space-y-6 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2" data-testid="text-reports-title">
-          <FileText className="w-6 h-6 text-primary" />
-          Reports
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">Comprehensive vehicle analytics and insights</p>
-      </div>
+      <PageHeader
+        title="Reports"
+        description="Comprehensive vehicle analytics and insights"
+        icon={<FileText className="w-5 h-5 text-primary" />}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>

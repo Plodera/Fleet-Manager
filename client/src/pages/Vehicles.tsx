@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Car, Gauge, Calendar, Pencil, Image, Users, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/lib/i18n";
+import { PageHeader } from "@/components/PageHeader";
 import { useQuery } from "@tanstack/react-query";
 
 export default function Vehicles() {
@@ -124,19 +125,18 @@ export default function Vehicles() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">{t.vehicles.title}</h1>
-          <p className="text-muted-foreground mt-1">{t.vehicles.subtitle}</p>
-        </div>
-        
-        {isAdmin && (
+      <PageHeader
+        title={t.vehicles.title}
+        description={t.vehicles.subtitle}
+        icon={<Car className="w-5 h-5 text-primary" />}
+        actions={isAdmin ? (
+          <Button className="shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all" onClick={() => setIsDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" /> {t.vehicles.addVehicle}
+          </Button>
+        ) : undefined}
+      />
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
-              <Plus className="w-4 h-4 mr-2" /> {t.vehicles.addVehicle}
-            </Button>
-          </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>{t.vehicles.addNewVehicle}</DialogTitle>
@@ -264,8 +264,6 @@ export default function Vehicles() {
             </Form>
           </DialogContent>
         </Dialog>
-        )}
-      </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
         setIsEditDialogOpen(open);

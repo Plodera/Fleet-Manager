@@ -15,7 +15,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon, Play, Printer } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon, Play, Printer, Plus } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
@@ -217,16 +218,16 @@ export default function Bookings() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">{t.bookings.title}</h1>
-          <p className="text-muted-foreground mt-1">{t.bookings.subtitle}</p>
-        </div>
-        
+      <PageHeader
+        title={t.bookings.title}
+        description={t.bookings.subtitle}
+        icon={<CalendarDays className="w-5 h-5 text-primary" />}
+        actions={
+          <Button className="shadow-lg shadow-primary/25" onClick={() => setIsDialogOpen(true)} data-testid="button-new-booking">{t.bookings.newBooking}</Button>
+        }
+      />
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="shadow-lg shadow-primary/25" data-testid="button-new-booking">{t.bookings.newBooking}</Button>
-          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{t.bookings.requestVehicle}</DialogTitle>
@@ -404,7 +405,6 @@ export default function Bookings() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
 
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>

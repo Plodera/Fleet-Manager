@@ -18,6 +18,7 @@ import { api } from "@shared/routes";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/i18n";
+import { PageHeader } from "@/components/PageHeader";
 import { z } from "zod";
 
 const joinTripSchema = z.object({
@@ -245,20 +246,20 @@ export default function SharedRides() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">{t.sharedRides.title}</h1>
-          <p className="text-muted-foreground mt-1">{t.sharedRides.subtitle}</p>
-        </div>
-        
+      <PageHeader
+        title={t.sharedRides.title}
+        description={t.sharedRides.subtitle}
+        icon={<Users className="w-5 h-5 text-primary" />}
+        actions={canCreateTrip ? (
+          <Button className="shadow-lg shadow-primary/25" onClick={() => setCreateDialogOpen(true)} data-testid="button-create-shared-trip">
+            <Plus className="w-4 h-4 mr-2" />
+            {t.sharedRides.createSharedTrip}
+          </Button>
+        ) : undefined}
+      />
+
         {canCreateTrip && (
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="shadow-lg shadow-primary/25" data-testid="button-create-shared-trip">
-                <Plus className="w-4 h-4 mr-2" />
-                {t.sharedRides.createSharedTrip}
-              </Button>
-            </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{t.sharedRides.createSharedTrip}</DialogTitle>
@@ -338,7 +339,6 @@ export default function SharedRides() {
             </DialogContent>
           </Dialog>
         )}
-      </div>
 
       <Dialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen}>
         <DialogContent>

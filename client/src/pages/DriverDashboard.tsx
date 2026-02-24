@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Truck, MapPin, Clock, User, Play, Flag, Car, Calendar } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
 import { format } from "date-fns";
 import type { Booking, Vehicle, User as UserType } from "@shared/schema";
 
@@ -112,13 +113,11 @@ export default function DriverDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-          <Truck className="w-8 h-8 text-primary" />
-          {t.driverDashboard.title}
-        </h1>
-        <p className="text-muted-foreground mt-1">{t.driverDashboard.subtitle}</p>
-      </div>
+      <PageHeader
+        title={t.driverDashboard.title}
+        description={t.driverDashboard.subtitle}
+        icon={<Truck className="w-5 h-5 text-primary" />}
+      />
 
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">{t.driverDashboard.assignedTrips}</h2>

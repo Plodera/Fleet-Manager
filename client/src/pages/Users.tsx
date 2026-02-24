@@ -18,6 +18,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, AVAILABLE_PERMISSIONS, type Department } from "@shared/schema";
 import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail, Building2, Trash2, Plus, User, Info, Car, FileCheck, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function Users() {
   const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updateDriver, isUpdatingDriver, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser, updateProfile, isUpdatingProfile } = useUsers();
@@ -105,19 +106,20 @@ export default function Users() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">{um.title}</h1>
-          <p className="text-muted-foreground mt-1">{um.subtitle}</p>
-        </div>
+      <PageHeader
+        title={um.title}
+        description={um.subtitle}
+        icon={<UsersIcon className="w-5 h-5 text-primary" />}
+        actions={currentUser?.role === 'admin' ? (
+          <Button className="shadow-lg shadow-primary/25" onClick={() => setIsDialogOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            {um.addUser}
+          </Button>
+        ) : undefined}
+      />
+
         {currentUser?.role === 'admin' && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="shadow-lg shadow-primary/25">
-                <UserPlus className="w-4 h-4 mr-2" />
-                {um.addUser}
-              </Button>
-            </DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{um.createUser}</DialogTitle>
@@ -246,7 +248,6 @@ export default function Users() {
             </DialogContent>
           </Dialog>
         )}
-      </div>
 
       {currentUser?.role === 'admin' && (
         <Card className="border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 shadow-sm">

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Mail, Send, Settings as SettingsIcon } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 import { useState } from "react";
 
 const emailSettingsSchema = z.object({
@@ -101,15 +102,11 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <SettingsIcon className="w-6 h-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Settings</h1>
-          <p className="text-muted-foreground">Configure system settings</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Configure system settings"
+        icon={<SettingsIcon className="w-5 h-5 text-primary" />}
+      />
 
       <Card>
         <CardHeader>

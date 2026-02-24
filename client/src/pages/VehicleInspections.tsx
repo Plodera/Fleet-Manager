@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { ClipboardCheck, Plus, Trash2, Eye, Car, Calendar, Clock, Gauge, User as UserIcon } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -451,21 +452,19 @@ export default function VehicleInspections() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <ClipboardCheck className="h-8 w-8" />
-            {l.title}
-          </h1>
-          <p className="text-muted-foreground">{l.subtitle}</p>
-        </div>
+      <PageHeader
+        title={l.title}
+        description={l.subtitle}
+        icon={<ClipboardCheck className="w-5 h-5 text-primary" />}
+        actions={
+          <Button onClick={() => setIsDialogOpen(true)} data-testid="button-new-inspection">
+            <Plus className="h-4 w-4 mr-2" />
+            {l.newInspection}
+          </Button>
+        }
+      />
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-new-inspection">
-              <Plus className="h-4 w-4 mr-2" />
-              {l.newInspection}
-            </Button>
-          </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh]">
             <DialogHeader>
               <DialogTitle>{l.createInspection}</DialogTitle>
@@ -858,7 +857,6 @@ export default function VehicleInspections() {
             </ScrollArea>
           </DialogContent>
         </Dialog>
-      </div>
 
       <Card>
         <CardContent className="p-0">

@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card } from "@/components/ui/card";
 import { Wrench, Plus } from "lucide-react";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function Maintenance() {
   const { records, createRecord, isLoading } = useMaintenanceHook();
@@ -51,18 +52,18 @@ export default function Maintenance() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">Maintenance Log</h1>
-          <p className="text-muted-foreground mt-1">Track vehicle repairs and services.</p>
-        </div>
-        
+      <PageHeader
+        title="Maintenance Log"
+        description="Track vehicle repairs and services."
+        icon={<Wrench className="w-5 h-5 text-primary" />}
+        actions={
+          <Button className="shadow-lg shadow-primary/25" onClick={() => setIsDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" /> Log Service
+          </Button>
+        }
+      />
+
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="shadow-lg shadow-primary/25">
-              <Plus className="w-4 h-4 mr-2" /> Log Service
-            </Button>
-          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Log Maintenance Record</DialogTitle>
@@ -147,7 +148,6 @@ export default function Maintenance() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
 
       <Card className="border-none shadow-md overflow-hidden">
         <Table>

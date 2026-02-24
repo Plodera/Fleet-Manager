@@ -2,7 +2,7 @@ import { useVehicles } from "@/hooks/use-vehicles";
 import { useBookings } from "@/hooks/use-bookings";
 import { useMaintenance as useMaintenanceHook, useFuel as useFuelHook } from "@/hooks/use-records";
 import { StatsCard } from "@/components/StatsCard";
-import { Car, CalendarCheck, Wrench, Fuel, AlertCircle, TrendingUp, Clock, Activity, ShieldAlert } from "lucide-react";
+import { Car, CalendarCheck, Wrench, Fuel, AlertCircle, TrendingUp, Clock, Activity, ShieldAlert, LayoutDashboard } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function Dashboard() {
   const { vehicles, isLoading: loadingVehicles } = useVehicles();
@@ -106,10 +107,11 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 space-y-6 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-dashboard-title">{t.dashboard.title}</h1>
-        <p className="text-muted-foreground text-sm mt-1">{t.dashboard.overview}</p>
-      </div>
+      <PageHeader
+        title={t.dashboard.title}
+        description={t.dashboard.overview}
+        icon={<LayoutDashboard className="w-5 h-5 text-primary" />}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard 
