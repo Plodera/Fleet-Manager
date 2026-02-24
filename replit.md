@@ -1,7 +1,12 @@
-# VMS - Aisco Vehicle Management System
+# AAMS - Aisco Automobile Management System
 
 ## Overview
 A vehicle management and booking system for organizational vehicles with user authentication, booking approval workflow, and role-based access control.
+
+## UI Architecture
+- **Sidebar Navigation**: Grouped into 4 sections (Overview, Fleet Management, Operations, Administration) with automatic section hiding based on user permissions. Driver-only users see simplified sidebar.
+- **PageHeader Component**: Reusable `client/src/components/PageHeader.tsx` with icon, title, description, and optional actions slot. Applied consistently across all 16 main pages.
+- **Dialog Pattern**: Dialog triggers placed in PageHeader actions prop; Dialog bodies rendered as siblings outside the header component.
 
 ## Features
 - Vehicle Management: CRUD operations for vehicles
