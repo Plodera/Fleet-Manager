@@ -181,7 +181,6 @@ export class DatabaseStorage implements IStorage {
     const cleaned = {
       ...insertVehicle,
       vin: insertVehicle.vin?.trim() || null,
-      licensePlate: insertVehicle.licensePlate?.trim() || null,
     };
     const [vehicle] = await getDb().insert(vehicles).values(cleaned).returning();
     return vehicle;

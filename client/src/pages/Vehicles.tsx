@@ -40,7 +40,7 @@ export default function Vehicles() {
   const filteredVehicles = vehicles?.filter(v => 
     v.make.toLowerCase().includes(search.toLowerCase()) || 
     v.model.toLowerCase().includes(search.toLowerCase()) ||
-    v.licensePlate.toLowerCase().includes(search.toLowerCase())
+    (v.licensePlate || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const form = useForm({
@@ -90,8 +90,8 @@ export default function Vehicles() {
         make: editingVehicle.make,
         model: editingVehicle.model,
         year: editingVehicle.year,
-        licensePlate: editingVehicle.licensePlate,
-        vin: editingVehicle.vin,
+        licensePlate: editingVehicle.licensePlate || "",
+        vin: editingVehicle.vin || "",
         currentMileage: editingVehicle.currentMileage,
         status: editingVehicle.status as any,
         imageUrl: editingVehicle.imageUrl || "",
@@ -189,7 +189,7 @@ export default function Vehicles() {
 
                 <FormField control={form.control} name="vin" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t.vehicles.vin}</FormLabel>
+                    <FormLabel>{t.vehicles.vin} <span className="text-muted-foreground font-normal">({t.labels.optional})</span></FormLabel>
                     <FormControl><Input placeholder={t.vehicles.vinPlaceholder} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -321,7 +321,7 @@ export default function Vehicles() {
 
               <FormField control={editForm.control} name="vin" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t.vehicles.vin}</FormLabel>
+                  <FormLabel>{t.vehicles.vin} <span className="text-muted-foreground font-normal">({t.labels.optional})</span></FormLabel>
                   <FormControl><Input placeholder={t.vehicles.vinPlaceholder} {...field} data-testid="input-edit-vin" /></FormControl>
                   <FormMessage />
                 </FormItem>

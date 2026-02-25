@@ -61,7 +61,7 @@ export const vehicles = pgTable("vehicles", {
   make: text("make").notNull(),
   model: text("model").notNull(),
   year: integer("year").notNull(),
-  licensePlate: text("license_plate").unique(),
+  licensePlate: text("license_plate").notNull().unique(),
   vin: text("vin").unique(),
   status: vehicleStatusEnum("status").default("available").notNull(),
   currentMileage: integer("current_mileage").default(0).notNull(),
