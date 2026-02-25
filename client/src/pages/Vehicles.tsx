@@ -24,7 +24,9 @@ export default function Vehicles() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const isAdmin = user?.role === 'admin';
-  const canManageAvailability = isAdmin || user?.isApprover;
+  const userPermissions = typeof user?.permissions === 'string' ? JSON.parse(user.permissions) : (user?.permissions || []);
+  const canManageVehicles = isAdmin || userPermissions.includes('manage_vehicles');
+  const canManageAvailability = canManageVehicles || user?.isApprover;
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -129,7 +131,7 @@ export default function Vehicles() {
         title={t.vehicles.title}
         description={t.vehicles.subtitle}
         icon={<Car className="w-5 h-5 text-primary" />}
-        actions={isAdmin ? (
+        actions={canManageVehicles ? (
           <Button className="shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all" onClick={() => setIsDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" /> {t.vehicles.addVehicle}
           </Button>
@@ -481,7 +483,7 @@ export default function Vehicles() {
                     {vehicle.status === 'available' ? t.vehicles.markUnavailable : t.vehicles.markAvailable}
                   </Button>
                 )}
-                {isAdmin && (
+                {canManageVehicles && (
                   <>
                     <Button variant="outline" onClick={() => {
                       if(confirm(t.vehicles.deleteConfirm)) deleteVehicle.mutate(vehicle.id);

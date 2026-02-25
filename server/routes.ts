@@ -75,7 +75,7 @@ export async function registerRoutes(
   app.post(api.vehicles.create.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
-    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    if (user.role !== 'admin' && !hasPermission(user, 'manage_vehicles')) return res.status(403).send("Access denied");
     try {
       const input = api.vehicles.create.input.parse(req.body);
       const vehicle = await storage.createVehicle(input);
@@ -92,14 +92,14 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
     
-    // Approvers can only update vehicle status (available/unavailable)
+    const canManageVehicles = user.role === 'admin' || hasPermission(user, 'manage_vehicles');
     const isApproverStatusChange = user.isApprover && 
       Object.keys(req.body).length === 1 && 
       req.body.status && 
       ['available', 'unavailable'].includes(req.body.status);
     
-    if (user.role !== 'admin' && !isApproverStatusChange) {
-      return res.status(403).send("Admin access required");
+    if (!canManageVehicles && !isApproverStatusChange) {
+      return res.status(403).send("Access denied");
     }
     
     try {
@@ -117,7 +117,7 @@ export async function registerRoutes(
   app.delete(api.vehicles.delete.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
-    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    if (user.role !== 'admin' && !hasPermission(user, 'manage_vehicles')) return res.status(403).send("Access denied");
     await storage.deleteVehicle(Number(req.params.id));
     res.sendStatus(204);
   });

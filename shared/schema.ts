@@ -15,11 +15,13 @@ export const PERMISSIONS = {
   VIEW_WORK_ORDER_REPORTS: 'view_work_order_reports',
   VIEW_REPORTS: 'view_reports',
   MANAGE_USERS: 'manage_users',
+  MANAGE_VEHICLES: 'manage_vehicles',
 } as const;
 
 export const AVAILABLE_PERMISSIONS = [
   { id: 'view_dashboard', label: 'Dashboard', labelPt: 'Painel' },
   { id: 'view_vehicles', label: 'Vehicles', labelPt: 'Veículos' },
+  { id: 'manage_vehicles', label: 'Manage Vehicles', labelPt: 'Gerir Veículos' },
   { id: 'view_bookings', label: 'Bookings', labelPt: 'Reservas' },
   { id: 'view_shared_rides', label: 'Shared Rides', labelPt: 'Viagens Partilhadas' },
   { id: 'view_maintenance', label: 'Maintenance', labelPt: 'Manutenção' },
