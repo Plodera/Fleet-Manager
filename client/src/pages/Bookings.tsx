@@ -15,15 +15,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon, Play, Printer, Plus, Search, ArrowUpDown, SortAsc, SortDesc } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon, Play, Printer, Plus, Search, ArrowUpDown, SortAsc, SortDesc, Calendar } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Checkbox } from "@/components/ui/checkbox";
-import { format } from "date-fns";
+import { format, startOfDay, startOfWeek, startOfMonth, endOfDay, endOfWeek, endOfMonth, subMonths } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useLanguage } from "@/lib/i18n";
 
 type StatusFilter = "all" | "active" | "pending" | "approved" | "in_progress" | "completed" | "cancelled" | "rejected";
+type DateFilter = "all" | "today" | "thisWeek" | "thisMonth" | "lastMonth" | "custom";
 
 export default function Bookings() {
   const { bookings, isLoading, createBooking, updateBookingStatus, startTrip, endTrip, extendBooking, approvers } = useBookings();
@@ -43,6 +44,9 @@ export default function Bookings() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [customDateFrom, setCustomDateFrom] = useState("");
+  const [customDateTo, setCustomDateTo] = useState("");
 
   const { data: users } = useQuery({
     queryKey: [api.users.list.path],
@@ -76,6 +80,29 @@ export default function Bookings() {
     return counts;
   }, [bookings]);
 
+  const getDateRange = useMemo(() => {
+    const now = new Date();
+    switch (dateFilter) {
+      case "today":
+        return { from: startOfDay(now), to: endOfDay(now) };
+      case "thisWeek":
+        return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
+      case "thisMonth":
+        return { from: startOfMonth(now), to: endOfMonth(now) };
+      case "lastMonth": {
+        const lastMonth = subMonths(now, 1);
+        return { from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) };
+      }
+      case "custom":
+        return {
+          from: customDateFrom ? startOfDay(new Date(customDateFrom)) : null,
+          to: customDateTo ? endOfDay(new Date(customDateTo)) : null,
+        };
+      default:
+        return { from: null, to: null };
+    }
+  }, [dateFilter, customDateFrom, customDateTo]);
+
   const filteredBookings = useMemo(() => {
     if (!bookings) return [];
     let filtered = [...bookings];
@@ -84,6 +111,16 @@ export default function Bookings() {
       filtered = filtered.filter(b => ['pending', 'approved', 'in_progress'].includes(b.status));
     } else if (statusFilter !== "all") {
       filtered = filtered.filter(b => b.status === statusFilter);
+    }
+
+    const { from, to } = getDateRange;
+    if (from || to) {
+      filtered = filtered.filter(b => {
+        const bookingStart = new Date(b.startTime);
+        if (from && bookingStart < from) return false;
+        if (to && bookingStart > to) return false;
+        return true;
+      });
     }
 
     if (searchQuery.trim()) {
@@ -104,7 +141,7 @@ export default function Bookings() {
     });
 
     return filtered;
-  }, [bookings, statusFilter, searchQuery, sortOrder]);
+  }, [bookings, statusFilter, searchQuery, sortOrder, getDateRange]);
 
   const form = useForm({
     resolver: zodResolver(insertBookingSchema),
@@ -306,6 +343,50 @@ export default function Bookings() {
             </button>
           );
         })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2" data-testid="booking-date-filters">
+        <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+        {([
+          { key: "all" as DateFilter, label: t.bookings.allDates },
+          { key: "today" as DateFilter, label: t.bookings.today },
+          { key: "thisWeek" as DateFilter, label: t.bookings.thisWeek },
+          { key: "thisMonth" as DateFilter, label: t.bookings.thisMonth },
+          { key: "lastMonth" as DateFilter, label: t.bookings.lastMonth },
+          { key: "custom" as DateFilter, label: t.bookings.customRange },
+        ]).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setDateFilter(tab.key)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              dateFilter === tab.key
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+            }`}
+            data-testid={`tab-date-${tab.key}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2 ml-2">
+            <Input
+              type="date"
+              value={customDateFrom}
+              onChange={(e) => setCustomDateFrom(e.target.value)}
+              className="h-8 w-36 text-sm"
+              data-testid="input-date-from"
+            />
+            <span className="text-muted-foreground text-sm">—</span>
+            <Input
+              type="date"
+              value={customDateTo}
+              onChange={(e) => setCustomDateTo(e.target.value)}
+              className="h-8 w-36 text-sm"
+              data-testid="input-date-to"
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
