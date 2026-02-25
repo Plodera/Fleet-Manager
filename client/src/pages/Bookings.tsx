@@ -24,7 +24,7 @@ import { api } from "@shared/routes";
 import { useLanguage } from "@/lib/i18n";
 
 type StatusFilter = "all" | "active" | "pending" | "approved" | "in_progress" | "completed" | "cancelled" | "rejected";
-type DateFilter = "all" | "today" | "thisWeek" | "thisMonth" | "lastMonth" | "custom";
+type DateFilter = string;
 
 export default function Bookings() {
   const { bookings, isLoading, createBooking, updateBookingStatus, startTrip, endTrip, extendBooking, approvers } = useBookings();
@@ -82,25 +82,26 @@ export default function Bookings() {
 
   const getDateRange = useMemo(() => {
     const now = new Date();
-    switch (dateFilter) {
-      case "today":
-        return { from: startOfDay(now), to: endOfDay(now) };
-      case "thisWeek":
-        return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
-      case "thisMonth":
-        return { from: startOfMonth(now), to: endOfMonth(now) };
-      case "lastMonth": {
-        const lastMonth = subMonths(now, 1);
-        return { from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) };
-      }
-      case "custom":
-        return {
-          from: customDateFrom ? startOfDay(new Date(customDateFrom)) : null,
-          to: customDateTo ? endOfDay(new Date(customDateTo)) : null,
-        };
-      default:
-        return { from: null, to: null };
+    if (dateFilter === "today") {
+      return { from: startOfDay(now), to: endOfDay(now) };
     }
+    if (dateFilter === "thisWeek") {
+      return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
+    }
+    if (dateFilter === "custom") {
+      return {
+        from: customDateFrom ? startOfDay(new Date(customDateFrom)) : null,
+        to: customDateTo ? endOfDay(new Date(customDateTo)) : null,
+      };
+    }
+    const monthMatch = dateFilter.match(/^month-(\d{4})-(\d{1,2})$/);
+    if (monthMatch) {
+      const year = parseInt(monthMatch[1]);
+      const month = parseInt(monthMatch[2]);
+      const target = new Date(year, month, 1);
+      return { from: startOfMonth(target), to: endOfMonth(target) };
+    }
+    return { from: null, to: null };
   }, [dateFilter, customDateFrom, customDateTo]);
 
   const filteredBookings = useMemo(() => {
@@ -345,50 +346,6 @@ export default function Bookings() {
         })}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2" data-testid="booking-date-filters">
-        <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
-        {([
-          { key: "all" as DateFilter, label: t.bookings.allDates },
-          { key: "today" as DateFilter, label: t.bookings.today },
-          { key: "thisWeek" as DateFilter, label: t.bookings.thisWeek },
-          { key: "thisMonth" as DateFilter, label: t.bookings.thisMonth },
-          { key: "lastMonth" as DateFilter, label: t.bookings.lastMonth },
-          { key: "custom" as DateFilter, label: t.bookings.customRange },
-        ]).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setDateFilter(tab.key)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              dateFilter === tab.key
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-            }`}
-            data-testid={`tab-date-${tab.key}`}
-          >
-            {tab.label}
-          </button>
-        ))}
-        {dateFilter === "custom" && (
-          <div className="flex items-center gap-2 ml-2">
-            <Input
-              type="date"
-              value={customDateFrom}
-              onChange={(e) => setCustomDateFrom(e.target.value)}
-              className="h-8 w-36 text-sm"
-              data-testid="input-date-from"
-            />
-            <span className="text-muted-foreground text-sm">—</span>
-            <Input
-              type="date"
-              value={customDateTo}
-              onChange={(e) => setCustomDateTo(e.target.value)}
-              className="h-8 w-36 text-sm"
-              data-testid="input-date-to"
-            />
-          </div>
-        )}
-      </div>
-
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -400,6 +357,53 @@ export default function Bookings() {
             data-testid="input-search-bookings"
           />
         </div>
+        <Select value={dateFilter} onValueChange={(val) => setDateFilter(val)}>
+          <SelectTrigger className="w-[180px] h-10 shrink-0" data-testid="select-date-filter">
+            <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder={t.bookings.allDates} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t.bookings.allDates}</SelectItem>
+            <SelectItem value="today">{t.bookings.today}</SelectItem>
+            <SelectItem value="thisWeek">{t.bookings.thisWeek}</SelectItem>
+            <SelectItem value="custom">{t.bookings.customRange}</SelectItem>
+            {(() => {
+              const now = new Date();
+              const currentYear = now.getFullYear();
+              const currentMonth = now.getMonth();
+              const monthItems = [];
+              for (let i = 0; i < 12; i++) {
+                let m = currentMonth - i;
+                let y = currentYear;
+                if (m < 0) { m += 12; y -= 1; }
+                const label = `${t.bookings.months[m]} ${y}`;
+                monthItems.push(
+                  <SelectItem key={`month-${y}-${m}`} value={`month-${y}-${m}`}>{label}</SelectItem>
+                );
+              }
+              return monthItems;
+            })()}
+          </SelectContent>
+        </Select>
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={customDateFrom}
+              onChange={(e) => setCustomDateFrom(e.target.value)}
+              className="h-10 w-36 text-sm"
+              data-testid="input-date-from"
+            />
+            <span className="text-muted-foreground text-sm">—</span>
+            <Input
+              type="date"
+              value={customDateTo}
+              onChange={(e) => setCustomDateTo(e.target.value)}
+              className="h-10 w-36 text-sm"
+              data-testid="input-date-to"
+            />
+          </div>
+        )}
         <Button
           variant="outline"
           size="sm"
