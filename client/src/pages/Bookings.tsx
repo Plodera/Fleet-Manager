@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useBookings } from "@/hooks/use-bookings";
 import { useVehicles } from "@/hooks/use-vehicles";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,13 +15,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon, Play, Printer, Plus } from "lucide-react";
+import { CalendarDays, Check, X, Clock, MapPin, CheckCircle, Ban, AlertTriangle, Users, Car, Flag, User as UserIcon, Play, Printer, Plus, Search, ArrowUpDown, SortAsc, SortDesc } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useLanguage } from "@/lib/i18n";
+
+type StatusFilter = "all" | "active" | "pending" | "approved" | "in_progress" | "completed" | "cancelled" | "rejected";
 
 export default function Bookings() {
   const { bookings, isLoading, createBooking, updateBookingStatus, startTrip, endTrip, extendBooking, approvers } = useBookings();
@@ -38,6 +40,9 @@ export default function Bookings() {
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
   const [extendBookingId, setExtendBookingId] = useState<number | null>(null);
   const [newEndTime, setNewEndTime] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
 
   const { data: users } = useQuery({
     queryKey: [api.users.list.path],
@@ -58,6 +63,48 @@ export default function Bookings() {
   });
 
   const availableVehicles = vehicles?.filter(v => v.status === "available");
+
+  const statusCounts = useMemo(() => {
+    if (!bookings) return {};
+    const counts: Record<string, number> = { all: bookings.length, active: 0 };
+    bookings.forEach(b => {
+      counts[b.status] = (counts[b.status] || 0) + 1;
+      if (b.status === 'pending' || b.status === 'approved' || b.status === 'in_progress') {
+        counts.active++;
+      }
+    });
+    return counts;
+  }, [bookings]);
+
+  const filteredBookings = useMemo(() => {
+    if (!bookings) return [];
+    let filtered = [...bookings];
+
+    if (statusFilter === "active") {
+      filtered = filtered.filter(b => ['pending', 'approved', 'in_progress'].includes(b.status));
+    } else if (statusFilter !== "all") {
+      filtered = filtered.filter(b => b.status === statusFilter);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(b =>
+        `${b.vehicle.make} ${b.vehicle.model}`.toLowerCase().includes(q) ||
+        (b.destination || '').toLowerCase().includes(q) ||
+        b.user.fullName.toLowerCase().includes(q) ||
+        (b.purpose || '').toLowerCase().includes(q) ||
+        (b.vehicle.licensePlate || '').toLowerCase().includes(q)
+      );
+    }
+
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.createdAt || a.startTime).getTime();
+      const dateB = new Date(b.createdAt || b.startTime).getTime();
+      return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
+    });
+
+    return filtered;
+  }, [bookings, statusFilter, searchQuery, sortOrder]);
 
   const form = useForm({
     resolver: zodResolver(insertBookingSchema),
@@ -186,17 +233,14 @@ export default function Bookings() {
   const selectedVehicle = selectedVehicleId ? vehicles?.find(v => v.id === Number(selectedVehicleId)) : null;
   const selectedVehicleCapacity = selectedVehicle ? (selectedVehicle as any).capacity || 5 : 5;
 
-  // Reset shareAllowed and validate passengerCount when vehicle changes
   useEffect(() => {
     const currentPassengerCount = form.getValues('passengerCount');
     const currentShareAllowed = form.getValues('shareAllowed');
     
-    // Reset sharing when switching to a smaller vehicle
     if (selectedVehicleCapacity <= 5 && currentShareAllowed) {
       form.setValue('shareAllowed', false);
     }
     
-    // Clamp passenger count to vehicle capacity
     if (currentPassengerCount > selectedVehicleCapacity) {
       form.setValue('passengerCount', selectedVehicleCapacity);
     }
@@ -216,195 +260,254 @@ export default function Bookings() {
 
   const cancellingBooking = bookings?.find(b => b.id === cancelBookingId);
 
+  const statusTabs: { key: StatusFilter; label: string; color: string }[] = [
+    { key: "all", label: t.bookings.allStatuses, color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+    { key: "active", label: t.bookings.active, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+    { key: "pending", label: t.status.pending, color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300" },
+    { key: "approved", label: t.status.approved, color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
+    { key: "in_progress", label: t.status.in_progress, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+    { key: "completed", label: t.status.completed, color: "bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300" },
+    { key: "cancelled", label: t.status.cancelled, color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
+    { key: "rejected", label: t.status.rejected, color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
+  ];
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <PageHeader
         title={t.bookings.title}
         description={t.bookings.subtitle}
         icon={<CalendarDays className="w-5 h-5 text-primary" />}
         actions={
-          <Button className="shadow-lg shadow-primary/25" onClick={() => setIsDialogOpen(true)} data-testid="button-new-booking">{t.bookings.newBooking}</Button>
+          <Button className="shadow-lg shadow-primary/25" onClick={() => setIsDialogOpen(true)} data-testid="button-new-booking">
+            <Plus className="w-4 h-4 mr-2" /> {t.bookings.newBooking}
+          </Button>
         }
       />
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t.bookings.requestVehicle}</DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="vehicleId" render={({ field }) => (
+      <div className="flex flex-wrap gap-2" data-testid="booking-status-tabs">
+        {statusTabs.map(tab => {
+          const count = statusCounts[tab.key] || 0;
+          const isActive = statusFilter === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setStatusFilter(tab.key)}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                isActive
+                  ? `${tab.color} ring-2 ring-offset-1 ring-primary/30`
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              }`}
+              data-testid={`tab-status-${tab.key}`}
+            >
+              {tab.label}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/50 dark:bg-black/20' : 'bg-muted-foreground/10'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder={t.bookings.searchPlaceholder}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-bookings"
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0 h-10"
+          onClick={() => setSortOrder(sortOrder === "newest" ? "oldest" : "newest")}
+          data-testid="button-sort-bookings"
+        >
+          {sortOrder === "newest" ? <SortDesc className="w-4 h-4 mr-2" /> : <SortAsc className="w-4 h-4 mr-2" />}
+          {sortOrder === "newest" ? t.bookings.sortNewest : t.bookings.sortOldest}
+        </Button>
+      </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t.bookings.requestVehicle}</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="vehicleId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t.bookings.selectVehicle}</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-vehicle">
+                        <SelectValue placeholder={t.bookings.chooseVehicle} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {availableVehicles?.map(v => (
+                        <SelectItem key={v.id} value={String(v.id)}>
+                          {v.make} {v.model} ({v.licensePlate}) - {(v as any).capacity || 5} {t.vehicles.seats}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="startTime" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t.bookings.selectVehicle}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value ? String(field.value) : undefined}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-vehicle">
-                          <SelectValue placeholder={t.bookings.chooseVehicle} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {availableVehicles?.map(v => (
-                          <SelectItem key={v.id} value={String(v.id)}>
-                            {v.make} {v.model} ({v.licensePlate}) - {(v as any).capacity || 5} {t.vehicles.seats}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>{t.bookings.startTime}</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} data-testid="input-start-time" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
+                <FormField control={form.control} name="endTime" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.bookings.endTime}</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" {...field} data-testid="input-end-time" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
 
+              <FormField control={form.control} name="destination" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t.bookings.destination}</FormLabel>
+                  <FormControl><Input placeholder={t.bookings.destinationPlaceholder} {...field} data-testid="input-destination" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="startTime" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t.bookings.startTime}</FormLabel>
-                      <FormControl>
-                        <Input type="datetime-local" {...field} data-testid="input-start-time" />
-                      </FormControl>
-                      <FormMessage />
+              <FormField control={form.control} name="purpose" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t.bookings.purpose}</FormLabel>
+                  <FormControl><Input placeholder={t.bookings.purposePlaceholder} {...field} data-testid="input-purpose" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="passengerCount" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.bookings.numberOfPassengers}</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1"
+                        max={selectedVehicleCapacity}
+                        placeholder="1" 
+                        {...field}
+                        onChange={(e) => field.onChange(Math.min(parseInt(e.target.value) || 1, selectedVehicleCapacity))}
+                        data-testid="input-passenger-count"
+                      />
+                    </FormControl>
+                    {selectedVehicle && (
+                      <p className="text-xs text-muted-foreground">
+                        {t.bookings.vehicleCapacity}: {(selectedVehicle as any).capacity || 5} {t.bookings.passengers}
+                      </p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                
+                {selectedVehicle && selectedVehicleCapacity > 5 && (
+                  <FormField control={form.control} name="shareAllowed" render={({ field }) => (
+                    <FormItem className="flex flex-col justify-end pb-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="shareAllowed" 
+                          checked={field.value} 
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-share-allowed"
+                        />
+                        <label htmlFor="shareAllowed" className="text-sm font-medium cursor-pointer">
+                          {t.bookings.allowCarSharing}
+                        </label>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t.bookings.sharingDescription}
+                      </p>
                     </FormItem>
                   )} />
-                  <FormField control={form.control} name="endTime" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t.bookings.endTime}</FormLabel>
-                      <FormControl>
-                        <Input type="datetime-local" {...field} data-testid="input-end-time" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
+                )}
+              </div>
 
-                <FormField control={form.control} name="destination" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t.bookings.destination}</FormLabel>
-                    <FormControl><Input placeholder={t.bookings.destinationPlaceholder} {...field} data-testid="input-destination" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+              <FormField control={form.control} name="driveType" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t.bookings.driveType}</FormLabel>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="driveType"
+                        value="self"
+                        checked={field.value === "self"}
+                        onChange={() => field.onChange("self")}
+                        className="w-4 h-4"
+                        data-testid="radio-self-driven"
+                      />
+                      <span className="text-sm">{t.bookings.selfDriven}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="driveType"
+                        value="driver"
+                        checked={field.value === "driver"}
+                        onChange={() => field.onChange("driver")}
+                        className="w-4 h-4"
+                        data-testid="radio-with-driver"
+                      />
+                      <span className="text-sm">{t.bookings.withDriver}</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {field.value === "self" 
+                      ? t.bookings.selfDrivenDesc
+                      : t.bookings.driverAssignedDesc}
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-                <FormField control={form.control} name="purpose" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t.bookings.purpose}</FormLabel>
-                    <FormControl><Input placeholder={t.bookings.purposePlaceholder} {...field} data-testid="input-purpose" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+              <FormField control={form.control} name="approverId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t.bookings.approver}</FormLabel>
+                  <Select onValueChange={(val) => field.onChange(val ? Number(val) : undefined)} defaultValue={field.value ? String(field.value) : undefined}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-approver">
+                        <SelectValue placeholder={t.bookings.selectApprover} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {approvers?.map(approver => (
+                        <SelectItem key={approver.id} value={String(approver.id)}>
+                          {approver.fullName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="passengerCount" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t.bookings.numberOfPassengers}</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="1"
-                          max={selectedVehicleCapacity}
-                          placeholder="1" 
-                          {...field}
-                          onChange={(e) => field.onChange(Math.min(parseInt(e.target.value) || 1, selectedVehicleCapacity))}
-                          data-testid="input-passenger-count"
-                        />
-                      </FormControl>
-                      {selectedVehicle && (
-                        <p className="text-xs text-muted-foreground">
-                          {t.bookings.vehicleCapacity}: {(selectedVehicle as any).capacity || 5} {t.bookings.passengers}
-                        </p>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  
-                  {selectedVehicle && selectedVehicleCapacity > 5 && (
-                    <FormField control={form.control} name="shareAllowed" render={({ field }) => (
-                      <FormItem className="flex flex-col justify-end pb-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="shareAllowed" 
-                            checked={field.value} 
-                            onCheckedChange={field.onChange}
-                            data-testid="checkbox-share-allowed"
-                          />
-                          <label htmlFor="shareAllowed" className="text-sm font-medium cursor-pointer">
-                            {t.bookings.allowCarSharing}
-                          </label>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {t.bookings.sharingDescription}
-                        </p>
-                      </FormItem>
-                    )} />
-                  )}
-                </div>
-
-                <FormField control={form.control} name="driveType" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t.bookings.driveType}</FormLabel>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="driveType"
-                          value="self"
-                          checked={field.value === "self"}
-                          onChange={() => field.onChange("self")}
-                          className="w-4 h-4"
-                          data-testid="radio-self-driven"
-                        />
-                        <span className="text-sm">{t.bookings.selfDriven}</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="driveType"
-                          value="driver"
-                          checked={field.value === "driver"}
-                          onChange={() => field.onChange("driver")}
-                          className="w-4 h-4"
-                          data-testid="radio-with-driver"
-                        />
-                        <span className="text-sm">{t.bookings.withDriver}</span>
-                      </label>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {field.value === "self" 
-                        ? t.bookings.selfDrivenDesc
-                        : t.bookings.driverAssignedDesc}
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="approverId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t.bookings.approver}</FormLabel>
-                    <Select onValueChange={(val) => field.onChange(val ? Number(val) : undefined)} defaultValue={field.value ? String(field.value) : undefined}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-approver">
-                          <SelectValue placeholder={t.bookings.selectApprover} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {approvers?.map(approver => (
-                          <SelectItem key={approver.id} value={String(approver.id)}>
-                            {approver.fullName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                <Button type="submit" className="w-full" disabled={createBooking.isPending} data-testid="button-submit-booking">
-                  {createBooking.isPending ? t.bookings.submitting : t.bookings.submitRequest}
-                </Button>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+              <Button type="submit" className="w-full" disabled={createBooking.isPending} data-testid="button-submit-booking">
+                {createBooking.isPending ? t.bookings.submitting : t.bookings.submitRequest}
+              </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
@@ -576,7 +679,8 @@ export default function Bookings() {
           <div className="space-y-4">
             {[1,2,3].map(i => <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />)}
           </div>
-        ) : bookings?.map((booking) => (
+        ) : filteredBookings.length > 0 ? (
+          filteredBookings.map((booking) => (
           <Card key={booking.id} className={`border-none shadow-sm hover:shadow-md transition-shadow ${isBookingOverdue(booking) ? 'ring-2 ring-red-300 dark:ring-red-700' : ''}`} data-testid={`card-booking-${booking.id}`}>
             <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-start gap-4 flex-1">
@@ -607,21 +711,21 @@ export default function Bookings() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Users className="w-4 h-4" />
-                      <span>{(booking as any).passengerCount || 1} passenger{((booking as any).passengerCount || 1) > 1 ? 's' : ''}</span>
+                      <span>{(booking as any).passengerCount || 1} {((booking as any).passengerCount || 1) > 1 ? t.bookings.passengers2 : t.bookings.passenger}</span>
                       {(booking as any).shareAllowed && (
-                        <Badge variant="outline" className="text-xs ml-1">Shareable</Badge>
+                        <Badge variant="outline" className="text-xs ml-1">{t.bookings.shareable}</Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <UserIcon className="w-4 h-4" />
-                      <span>{(booking as any).driveType === "driver" ? "With driver" : "Self-driven"}</span>
+                      <span>{(booking as any).driveType === "driver" ? t.bookings.withDriverLabel : t.bookings.selfDrive}</span>
                     </div>
                     <div className="hidden sm:inline text-muted-foreground/50">|</div>
-                    <div>Requested by: <span className="text-foreground font-medium">{booking.user.fullName}</span></div>
+                    <div>{t.bookings.requestedBy}: <span className="text-foreground font-medium">{booking.user.fullName}</span></div>
                     {booking.approver && (
                       <>
                         <div className="hidden sm:inline text-muted-foreground/50">|</div>
-                        <div>Approver: <span className="text-foreground font-medium">{booking.approver.fullName}</span></div>
+                        <div>{t.bookings.approverLabel}: <span className="text-foreground font-medium">{booking.approver.fullName}</span></div>
                       </>
                     )}
                     {(booking as any).driverId && users && (
@@ -629,7 +733,7 @@ export default function Bookings() {
                         <div className="hidden sm:inline text-muted-foreground/50">|</div>
                         <div className="flex items-center gap-1.5">
                           <Car className="w-4 h-4" />
-                          Driver: <span className="text-foreground font-medium">
+                          {t.bookings.driverLabel}: <span className="text-foreground font-medium">
                             {users.find(u => u.id === (booking as any).driverId)?.fullName || 'Unknown'}
                           </span>
                         </div>
@@ -639,7 +743,7 @@ export default function Bookings() {
                   {booking.status === 'cancelled' && booking.cancellationReason && (
                     <div className="mt-2 p-2 rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
                       <p className="text-sm text-orange-700 dark:text-orange-300">
-                        <span className="font-medium">Cancellation reason:</span> {booking.cancellationReason}
+                        <span className="font-medium">{t.bookings.cancellationReason}:</span> {booking.cancellationReason}
                       </p>
                     </div>
                   )}
@@ -684,7 +788,7 @@ export default function Bookings() {
               {booking.status === 'pending' && booking.approverId !== user?.id && user?.role !== 'admin' && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
                   <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Awaiting Approval</span>
+                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">{t.bookings.awaitingApproval}</span>
                 </div>
               )}
 
@@ -725,7 +829,7 @@ export default function Bookings() {
                         disabled={updateBookingStatus.isPending}
                         data-testid={`button-revert-pending-booking-${booking.id}`}
                       >
-                        Set Pending
+                        {t.bookings.setPending}
                       </Button>
                       <Button 
                         size="sm"
@@ -800,7 +904,7 @@ export default function Bookings() {
                     disabled={updateBookingStatus.isPending}
                     data-testid={`button-set-pending-cancelled-${booking.id}`}
                   >
-                    {t.buttons.setPending}
+                    {t.bookings.setPending}
                   </Button>
                 </div>
               )}
@@ -815,11 +919,12 @@ export default function Bookings() {
               </Button>
             </CardContent>
           </Card>
-        ))}
-        
-        {bookings?.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            No booking records found.
+        ))
+        ) : (
+          <div className="text-center py-16">
+            <CalendarDays className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-muted-foreground mb-1">{t.bookings.noBookingsFound}</h3>
+            <p className="text-sm text-muted-foreground/70">{t.bookings.noBookingsMatch}</p>
           </div>
         )}
       </div>
