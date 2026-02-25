@@ -23,7 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useLanguage } from "@/lib/i18n";
 
-type StatusFilter = "all" | "active" | "pending" | "approved" | "in_progress" | "completed" | "cancelled" | "rejected";
+type StatusFilter = "all" | "active" | "overdue" | "pending" | "approved" | "in_progress" | "completed" | "cancelled" | "rejected";
 type DateFilter = string;
 
 export default function Bookings() {
@@ -70,11 +70,15 @@ export default function Bookings() {
 
   const statusCounts = useMemo(() => {
     if (!bookings) return {};
-    const counts: Record<string, number> = { all: bookings.length, active: 0 };
+    const now = new Date();
+    const counts: Record<string, number> = { all: bookings.length, active: 0, overdue: 0 };
     bookings.forEach(b => {
       counts[b.status] = (counts[b.status] || 0) + 1;
       if (b.status === 'pending' || b.status === 'approved' || b.status === 'in_progress') {
         counts.active++;
+      }
+      if ((b.status === 'approved' || b.status === 'in_progress') && new Date(b.endTime) < now) {
+        counts.overdue++;
       }
     });
     return counts;
@@ -110,6 +114,9 @@ export default function Bookings() {
 
     if (statusFilter === "active") {
       filtered = filtered.filter(b => ['pending', 'approved', 'in_progress'].includes(b.status));
+    } else if (statusFilter === "overdue") {
+      const now = new Date();
+      filtered = filtered.filter(b => (b.status === 'approved' || b.status === 'in_progress') && new Date(b.endTime) < now);
     } else if (statusFilter !== "all") {
       filtered = filtered.filter(b => b.status === statusFilter);
     }
@@ -256,6 +263,23 @@ export default function Bookings() {
            new Date(booking.endTime) < new Date();
   };
 
+  const getOverdueText = (booking: any) => {
+    const now = new Date();
+    const end = new Date(booking.endTime);
+    const diffMs = now.getTime() - end.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    if (diffHours >= 24) {
+      const days = Math.floor(diffHours / 24);
+      const remainingHours = diffHours % 24;
+      return `${days}${t.bookings.overdueD} ${remainingHours}${t.bookings.overdueH}`;
+    }
+    if (diffHours > 0) {
+      return `${diffHours}${t.bookings.overdueH} ${diffMins}${t.bookings.overdueM}`;
+    }
+    return `${diffMins}${t.bookings.overdueM}`;
+  };
+
   const canExtendBooking = (booking: any) => {
     if (!user) return false;
     const isDriver = booking.driverId === user.id;
@@ -301,6 +325,7 @@ export default function Bookings() {
   const statusTabs: { key: StatusFilter; label: string; color: string }[] = [
     { key: "all", label: t.bookings.allStatuses, color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
     { key: "active", label: t.bookings.active, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+    { key: "overdue", label: t.status.overdue, color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
     { key: "pending", label: t.status.pending, color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300" },
     { key: "approved", label: t.status.approved, color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
     { key: "in_progress", label: t.status.in_progress, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
@@ -779,7 +804,7 @@ export default function Bookings() {
                     {isBookingOverdue(booking) && (
                       <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800 flex items-center gap-1" data-testid={`badge-overdue-booking-${booking.id}`}>
                         <AlertTriangle className="w-3 h-3" />
-                        {t.status.overdue}
+                        {t.status.overdue} — {getOverdueText(booking)}
                       </Badge>
                     )}
                   </div>
