@@ -84,7 +84,10 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      throw err;
+      if (err instanceof Error && 'code' in err && (err as any).code === '23505') {
+        return res.status(400).json({ message: "A vehicle with this VIN or license plate already exists" });
+      }
+      return res.status(500).json({ message: "Failed to create vehicle" });
     }
   });
 
@@ -109,6 +112,9 @@ export async function registerRoutes(
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
+      }
+      if (err instanceof Error && 'code' in err && (err as any).code === '23505') {
+        return res.status(400).json({ message: "A vehicle with this VIN or license plate already exists" });
       }
       res.status(404).json({ message: "Vehicle not found" });
     }

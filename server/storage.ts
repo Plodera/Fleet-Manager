@@ -178,7 +178,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createVehicle(insertVehicle: InsertVehicle): Promise<Vehicle> {
-    const [vehicle] = await getDb().insert(vehicles).values(insertVehicle).returning();
+    const cleaned = {
+      ...insertVehicle,
+      vin: insertVehicle.vin?.trim() || null,
+      licensePlate: insertVehicle.licensePlate?.trim() || null,
+    };
+    const [vehicle] = await getDb().insert(vehicles).values(cleaned).returning();
     return vehicle;
   }
 
