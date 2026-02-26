@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,13 @@ export default function Auth() {
   const [, setLocation] = useLocation();
   const [loginData, setLoginData] = useState({ username: "", password: "" });
 
+  useEffect(() => {
+    if (user) {
+      setLocation("/");
+    }
+  }, [user, setLocation]);
+
   if (user) {
-    setLocation("/");
     return null;
   }
 
