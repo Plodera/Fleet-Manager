@@ -11,6 +11,28 @@ process.on('unhandledRejection', (reason) => {
   console.error('UNHANDLED REJECTION:', reason);
 });
 
+process.on('SIGTERM', () => {
+  console.error('[server] Received SIGTERM — ignoring to keep server alive');
+});
+
+process.on('SIGINT', () => {
+  console.error('[server] Received SIGINT — ignoring to keep server alive');
+});
+
+process.on('SIGHUP', () => {
+  console.error('[server] Received SIGHUP — ignoring to keep server alive');
+});
+
+const originalExit = process.exit;
+process.exit = function (code?: number | string | null | undefined) {
+  if (code !== 0) {
+    console.error(`[server] process.exit(${code}) intercepted — keeping server alive`);
+    console.error(new Error().stack);
+    return undefined as never;
+  }
+  return originalExit.call(process, code);
+} as typeof process.exit;
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -103,7 +125,6 @@ import { initDatabase } from "./db";
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
     },
     () => {
       log(`serving on port ${port}`);
