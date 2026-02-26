@@ -23,15 +23,18 @@ export function useVehicles() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to create vehicle");
-      return api.vehicles.create.responses[201].parse(await res.json());
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body?.message || "Failed to create vehicle");
+      }
+      return api.vehicles.create.responses[201].parse(body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] });
       toast({ title: "Vehicle added", description: "The vehicle has been successfully registered." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to add vehicle.", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -43,12 +46,18 @@ export function useVehicles() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to update vehicle");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message || "Failed to update vehicle");
+      }
       return api.vehicles.update.responses[200].parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] });
       toast({ title: "Vehicle updated", description: "Changes saved successfully." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 

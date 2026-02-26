@@ -78,6 +78,25 @@ export async function registerRoutes(
     if (user.role !== 'admin' && !hasPermission(user, 'manage_vehicles')) return res.status(403).send("Access denied");
     try {
       const input = api.vehicles.create.input.parse(req.body);
+      const existingVehicles = await storage.getVehicles();
+      const duplicatePlate = existingVehicles.find(
+        v => v.licensePlate.toLowerCase() === input.licensePlate.toLowerCase()
+      );
+      if (duplicatePlate) {
+        return res.status(409).json({ 
+          message: `A vehicle with license plate "${input.licensePlate}" already exists (${duplicatePlate.make} ${duplicatePlate.model})` 
+        });
+      }
+      if (input.vin) {
+        const duplicateVin = existingVehicles.find(
+          v => v.vin && v.vin.toLowerCase() === input.vin!.toLowerCase()
+        );
+        if (duplicateVin) {
+          return res.status(409).json({ 
+            message: `A vehicle with this VIN already exists (${duplicateVin.make} ${duplicateVin.model})` 
+          });
+        }
+      }
       const vehicle = await storage.createVehicle(input);
       res.status(201).json(vehicle);
     } catch (err) {
@@ -85,7 +104,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       }
       if (err instanceof Error && 'code' in err && (err as any).code === '23505') {
-        return res.status(400).json({ message: "A vehicle with this VIN or license plate already exists" });
+        return res.status(409).json({ message: "A vehicle with this VIN or license plate already exists" });
       }
       return res.status(500).json({ message: "Failed to create vehicle" });
     }
@@ -107,14 +126,37 @@ export async function registerRoutes(
     
     try {
       const input = api.vehicles.update.input.parse(req.body);
-      const vehicle = await storage.updateVehicle(Number(req.params.id), input);
+      const vehicleId = Number(req.params.id);
+      if (input.licensePlate) {
+        const existingVehicles = await storage.getVehicles();
+        const duplicatePlate = existingVehicles.find(
+          v => v.id !== vehicleId && v.licensePlate.toLowerCase() === input.licensePlate!.toLowerCase()
+        );
+        if (duplicatePlate) {
+          return res.status(409).json({ 
+            message: `A vehicle with license plate "${input.licensePlate}" already exists (${duplicatePlate.make} ${duplicatePlate.model})` 
+          });
+        }
+      }
+      if (input.vin) {
+        const existingVehicles = await storage.getVehicles();
+        const duplicateVin = existingVehicles.find(
+          v => v.id !== vehicleId && v.vin && v.vin.toLowerCase() === input.vin!.toLowerCase()
+        );
+        if (duplicateVin) {
+          return res.status(409).json({ 
+            message: `A vehicle with this VIN already exists (${duplicateVin.make} ${duplicateVin.model})` 
+          });
+        }
+      }
+      const vehicle = await storage.updateVehicle(vehicleId, input);
       res.json(vehicle);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
       if (err instanceof Error && 'code' in err && (err as any).code === '23505') {
-        return res.status(400).json({ message: "A vehicle with this VIN or license plate already exists" });
+        return res.status(409).json({ message: "A vehicle with this VIN or license plate already exists" });
       }
       res.status(404).json({ message: "Vehicle not found" });
     }
