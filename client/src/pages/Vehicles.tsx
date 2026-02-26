@@ -470,18 +470,31 @@ export default function Vehicles() {
               </CardContent>
               {(isAdmin || canManageAvailability) && (
               <CardFooter className="p-6 pt-0 flex gap-2">
-                {canManageAvailability && vehicle.status !== 'in_use' && vehicle.status !== 'maintenance' && (
-                  <Button 
-                    variant={vehicle.status === 'available' ? 'destructive' : 'default'}
-                    className="flex-1"
-                    onClick={() => {
-                      const newStatus = vehicle.status === 'available' ? 'unavailable' : 'available';
-                      updateVehicle.mutate({ id: vehicle.id, status: newStatus });
-                    }}
-                    data-testid={`button-toggle-availability-${vehicle.id}`}
-                  >
-                    {vehicle.status === 'available' ? t.vehicles.markUnavailable : t.vehicles.markAvailable}
-                  </Button>
+                {canManageAvailability && vehicle.status !== 'maintenance' && (
+                  vehicle.status === 'in_use' ? (
+                    <Button 
+                      variant="default"
+                      className="flex-1"
+                      onClick={() => {
+                        updateVehicle.mutate({ id: vehicle.id, status: 'available' });
+                      }}
+                      data-testid={`button-mark-available-${vehicle.id}`}
+                    >
+                      {t.vehicles.markAvailable}
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant={vehicle.status === 'available' ? 'destructive' : 'default'}
+                      className="flex-1"
+                      onClick={() => {
+                        const newStatus = vehicle.status === 'available' ? 'unavailable' : 'available';
+                        updateVehicle.mutate({ id: vehicle.id, status: newStatus });
+                      }}
+                      data-testid={`button-toggle-availability-${vehicle.id}`}
+                    >
+                      {vehicle.status === 'available' ? t.vehicles.markUnavailable : t.vehicles.markAvailable}
+                    </Button>
+                  )
                 )}
                 {canManageVehicles && (
                   <>

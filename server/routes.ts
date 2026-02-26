@@ -99,7 +99,7 @@ export async function registerRoutes(
     const isApproverStatusChange = user.isApprover && 
       Object.keys(req.body).length === 1 && 
       req.body.status && 
-      ['available', 'unavailable'].includes(req.body.status);
+      ['available', 'unavailable', 'in_use'].includes(req.body.status);
     
     if (!canManageVehicles && !isApproverStatusChange) {
       return res.status(403).send("Access denied");
