@@ -21,6 +21,19 @@ import { Plus, Pencil, Trash2, Cog } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import type { Shift, ActivityType, SubEquipment, MaintenanceTypeConfig } from "@shared/schema";
 
+function extractErrorMessage(error: Error): string {
+  const match = error.message.match(/\d+:\s*(.+)/);
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (parsed.message) return parsed.message;
+    } catch {
+      return match[1];
+    }
+  }
+  return error.message;
+}
+
 export default function WorkOrderConfig() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
@@ -66,7 +79,10 @@ export default function WorkOrderConfig() {
       setShiftDialog({ open: false, editing: null });
       toast({ title: t.adminConfig.shifts });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const updateShift = useMutation({
@@ -79,7 +95,10 @@ export default function WorkOrderConfig() {
       setShiftDialog({ open: false, editing: null });
       toast({ title: t.adminConfig.shifts });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const deleteShiftMut = useMutation({
@@ -91,7 +110,10 @@ export default function WorkOrderConfig() {
       setDeleteDialog({ open: false, type: "", id: null });
       toast({ title: t.buttons.delete });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const createActivityType = useMutation({
@@ -104,7 +126,10 @@ export default function WorkOrderConfig() {
       setActivityDialog({ open: false, editing: null });
       toast({ title: t.adminConfig.activityTypes });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const updateActivityType = useMutation({
@@ -117,7 +142,10 @@ export default function WorkOrderConfig() {
       setActivityDialog({ open: false, editing: null });
       toast({ title: t.adminConfig.activityTypes });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const deleteActivityTypeMut = useMutation({
@@ -129,7 +157,10 @@ export default function WorkOrderConfig() {
       setDeleteDialog({ open: false, type: "", id: null });
       toast({ title: t.buttons.delete });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const createSubEquipment = useMutation({
@@ -142,7 +173,10 @@ export default function WorkOrderConfig() {
       setSubEquipDialog({ open: false, editing: null });
       toast({ title: t.adminConfig.subEquipment });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const updateSubEquipment = useMutation({
@@ -155,7 +189,10 @@ export default function WorkOrderConfig() {
       setSubEquipDialog({ open: false, editing: null });
       toast({ title: t.adminConfig.subEquipment });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const deleteSubEquipmentMut = useMutation({
@@ -167,7 +204,10 @@ export default function WorkOrderConfig() {
       setDeleteDialog({ open: false, type: "", id: null });
       toast({ title: t.buttons.delete });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const createMtConfig = useMutation({
@@ -180,7 +220,10 @@ export default function WorkOrderConfig() {
       setMtDialog({ open: false, editing: null });
       toast({ title: t.adminConfig.maintenanceTypes });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const updateMtConfig = useMutation({
@@ -193,7 +236,10 @@ export default function WorkOrderConfig() {
       setMtDialog({ open: false, editing: null });
       toast({ title: t.adminConfig.maintenanceTypes });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const deleteMtConfigMut = useMutation({
@@ -205,7 +251,10 @@ export default function WorkOrderConfig() {
       setDeleteDialog({ open: false, type: "", id: null });
       toast({ title: t.buttons.delete });
     },
-    onError: () => toast({ title: t.labels.error, variant: "destructive" }),
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
   });
 
   const openAddShift = () => {

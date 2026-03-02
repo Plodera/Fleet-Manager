@@ -46,11 +46,11 @@ export function useVehicles() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      const body = await res.json();
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
         throw new Error(body?.message || "Failed to update vehicle");
       }
-      return api.vehicles.update.responses[200].parse(await res.json());
+      return api.vehicles.update.responses[200].parse(body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] });

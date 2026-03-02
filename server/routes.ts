@@ -79,17 +79,19 @@ export async function registerRoutes(
     try {
       const input = api.vehicles.create.input.parse(req.body);
       const existingVehicles = await storage.getVehicles();
+      const plateTrimmed = input.licensePlate.trim().toLowerCase();
       const duplicatePlate = existingVehicles.find(
-        v => v.licensePlate.toLowerCase() === input.licensePlate.toLowerCase()
+        v => v.licensePlate.trim().toLowerCase() === plateTrimmed
       );
       if (duplicatePlate) {
         return res.status(409).json({ 
           message: `A vehicle with license plate "${input.licensePlate}" already exists (${duplicatePlate.make} ${duplicatePlate.model})` 
         });
       }
-      if (input.vin) {
+      if (input.vin?.trim()) {
+        const vinTrimmed = input.vin.trim().toLowerCase();
         const duplicateVin = existingVehicles.find(
-          v => v.vin && v.vin.toLowerCase() === input.vin!.toLowerCase()
+          v => v.vin && v.vin.trim().toLowerCase() === vinTrimmed
         );
         if (duplicateVin) {
           return res.status(409).json({ 
@@ -127,10 +129,11 @@ export async function registerRoutes(
     try {
       const input = api.vehicles.update.input.parse(req.body);
       const vehicleId = Number(req.params.id);
+      const existingVehicles = await storage.getVehicles();
       if (input.licensePlate) {
-        const existingVehicles = await storage.getVehicles();
+        const plateTrimmed = input.licensePlate.trim().toLowerCase();
         const duplicatePlate = existingVehicles.find(
-          v => v.id !== vehicleId && v.licensePlate.toLowerCase() === input.licensePlate!.toLowerCase()
+          v => v.id !== vehicleId && v.licensePlate.trim().toLowerCase() === plateTrimmed
         );
         if (duplicatePlate) {
           return res.status(409).json({ 
@@ -138,10 +141,10 @@ export async function registerRoutes(
           });
         }
       }
-      if (input.vin) {
-        const existingVehicles = await storage.getVehicles();
+      if (input.vin?.trim()) {
+        const vinTrimmed = input.vin.trim().toLowerCase();
         const duplicateVin = existingVehicles.find(
-          v => v.id !== vehicleId && v.vin && v.vin.toLowerCase() === input.vin!.toLowerCase()
+          v => v.id !== vehicleId && v.vin && v.vin.trim().toLowerCase() === vinTrimmed
         );
         if (duplicateVin) {
           return res.status(409).json({ 
@@ -1306,9 +1309,19 @@ export async function registerRoutes(
     if (user.role !== 'admin') return res.status(403).send("Admin access required");
     try {
       const input = api.maintenanceTypeConfigs.create.input.parse(req.body);
+      const existing = await storage.getMaintenanceTypeConfigs();
+      const duplicate = existing.find(m => m.name.toLowerCase() === input.name.toLowerCase());
+      if (duplicate) {
+        return res.status(409).json({ message: `A maintenance type with the name "${input.name}" already exists` });
+      }
       const item = await storage.createMaintenanceTypeConfig(input);
       res.status(201).json(item);
-    } catch (e: any) { res.status(400).json({ message: e.message }); }
+    } catch (e: any) {
+      if (e?.code === '23505') {
+        return res.status(409).json({ message: `A maintenance type with this name already exists` });
+      }
+      res.status(400).json({ message: e.message });
+    }
   });
 
   app.patch(api.maintenanceTypeConfigs.update.path, async (req, res) => {
@@ -1317,9 +1330,22 @@ export async function registerRoutes(
     if (user.role !== 'admin') return res.status(403).send("Admin access required");
     try {
       const input = api.maintenanceTypeConfigs.update.input.parse(req.body);
-      const item = await storage.updateMaintenanceTypeConfig(Number(req.params.id), input);
+      const configId = Number(req.params.id);
+      if (input.name) {
+        const existing = await storage.getMaintenanceTypeConfigs();
+        const duplicate = existing.find(m => m.id !== configId && m.name.toLowerCase().trim() === input.name!.toLowerCase().trim());
+        if (duplicate) {
+          return res.status(409).json({ message: `A maintenance type with the name "${input.name}" already exists` });
+        }
+      }
+      const item = await storage.updateMaintenanceTypeConfig(configId, input);
       res.json(item);
-    } catch (e: any) { res.status(400).json({ message: e.message }); }
+    } catch (e: any) {
+      if (e?.code === '23505') {
+        return res.status(409).json({ message: `A maintenance type with this name already exists` });
+      }
+      res.status(400).json({ message: e.message });
+    }
   });
 
   app.delete(api.maintenanceTypeConfigs.delete.path, async (req, res) => {
