@@ -18,14 +18,21 @@ import {
   ClipboardCheck,
   ClipboardList,
   Cog,
-  BarChart3
+  BarChart3,
+  KeyRound
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
 import { useLanguage } from "@/lib/i18n";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { api } from "@shared/routes";
 
 interface NavLink {
   href: string;
@@ -44,7 +51,45 @@ export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const { language, setLanguage, t } = useLanguage();
+  const { toast } = useToast();
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({ title: t.users.changePassword, description: t.users.passwordMismatch, variant: "destructive" });
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast({ title: t.users.changePassword, description: t.users.passwordPlaceholder, variant: "destructive" });
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await apiRequest(api.users.changeOwnPassword.method, api.users.changeOwnPassword.path, {
+        currentPassword,
+        newPassword,
+      });
+      toast({ title: t.users.changePassword, description: t.users.passwordChanged });
+      setPasswordDialogOpen(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg.includes("Current password is incorrect") || msg.includes("400")) {
+        toast({ title: t.users.changePassword, description: t.users.currentPasswordIncorrect, variant: "destructive" });
+      } else {
+        toast({ title: t.users.changePassword, description: msg || "Failed to change password", variant: "destructive" });
+      }
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   const userPermissions: string[] = (() => {
     if (!user?.permissions) return [];
@@ -115,7 +160,7 @@ export function Sidebar() {
     }))
     .filter(section => section.links.length > 0);
 
-  const NavContent = () => (
+  const navContent = (
     <div className="flex flex-col h-full">
       <div className="p-6 border-b border-border/50">
         <div className="flex items-center gap-3">
@@ -183,6 +228,64 @@ export function Sidebar() {
             PT
           </Button>
         </div>
+        <Dialog open={passwordDialogOpen} onOpenChange={(open) => {
+          setPasswordDialogOpen(open);
+          if (!open) { setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }
+        }}>
+          <DialogTrigger asChild>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-2 mb-2"
+              data-testid="button-change-password"
+            >
+              <KeyRound className="w-4 h-4" />
+              {t.users.changePassword}
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t.users.changePassword}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>{t.users.currentPassword}</Label>
+                <Input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  data-testid="input-current-password"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t.users.newPassword}</Label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder={t.users.passwordPlaceholder}
+                  data-testid="input-new-password"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t.users.confirmNewPassword}</Label>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  data-testid="input-confirm-password"
+                />
+              </div>
+              <Button
+                className="w-full"
+                onClick={handleChangePassword}
+                disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+                data-testid="button-submit-change-password"
+              >
+                {isChangingPassword ? "..." : t.users.updatePassword}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         <Button 
           variant="outline" 
           className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
@@ -205,13 +308,13 @@ export function Sidebar() {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 w-72">
-            <NavContent />
+            {navContent}
           </SheetContent>
         </Sheet>
       </div>
 
       <aside className="hidden lg:flex flex-col w-64 border-r border-border h-screen bg-card sticky top-0">
-        <NavContent />
+        {navContent}
       </aside>
     </>
   );

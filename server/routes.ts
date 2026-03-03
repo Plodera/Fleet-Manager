@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, validateSession } from "./auth";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { scrypt, randomBytes } from "crypto";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { sendBookingNotification, sendBookingStatusUpdate, sendTripStatusToApprover } from "./email";
 import type { User } from "@shared/schema";
@@ -15,6 +15,13 @@ async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
+}
+
+async function comparePasswords(supplied: string, stored: string) {
+  const [hashed, salt] = stored.split(".");
+  const hashedBuf = Buffer.from(hashed, "hex");
+  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+  return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
 // Helper to check if user has a specific permission
@@ -690,6 +697,31 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       }
       res.status(404).json({ message: "User not found" });
+    }
+  });
+
+  // Change own password (any authenticated user)
+  app.put(api.users.changeOwnPassword.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    try {
+      const input = api.users.changeOwnPassword.input.parse(req.body);
+      const dbUser = await storage.getUser(user.id);
+      if (!dbUser) return res.status(404).json({ message: "User not found" });
+
+      const isValid = await comparePasswords(input.currentPassword, dbUser.password);
+      if (!isValid) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      const hashedPassword = await hashPassword(input.newPassword);
+      await storage.updateUserPassword(user.id, hashedPassword);
+      res.json({ message: "Password changed successfully" });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Failed to change password" });
     }
   });
 

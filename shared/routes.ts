@@ -300,6 +300,19 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    changeOwnPassword: {
+      method: 'PUT' as const,
+      path: '/api/user/change-password',
+      input: z.object({
+        currentPassword: z.string().min(1, "Current password is required"),
+        newPassword: z.string().min(6, "New password must be at least 6 characters"),
+      }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: errorSchemas.validation,
+        401: errorSchemas.unauthorized,
+      },
+    },
     updateEmail: {
       method: 'PUT' as const,
       path: '/api/users/:id/email',
