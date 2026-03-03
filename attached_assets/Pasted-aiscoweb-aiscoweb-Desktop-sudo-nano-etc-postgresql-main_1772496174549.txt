@@ -1,0 +1,576 @@
+aiscoweb@aiscoweb:~/Desktop$ sudo nano /etc/postgresql/*/main/pg_hba.conf
+[sudo] password for aiscoweb: 
+aiscoweb@aiscoweb:~/Desktop$ sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'newpassword123';"
+sudo systemctl restart postgresql
+PGPASSWORD=newpassword123 psql -U postgres -h localhost -d fleetcmd -c "SELECT 1;"
+ALTER ROLE
+ ?column? 
+----------
+        1
+(1 row)
+
+aiscoweb@aiscoweb:~/Desktop$ pm2 restart all
+pm2 status
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [all](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 76   │ online    │ 0%       │ 19.5mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 76   │ online    │ 0%       │ 57.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+aiscoweb@aiscoweb:~/Desktop$ PGPASSWORD=newpassword123 psql -U postgres -h localhost -d fleetcmd -c "SELECT 1;"
+ ?column? 
+----------
+        1
+(1 row)
+
+aiscoweb@aiscoweb:~/Desktop$ cd /opt/fleetcmd
+pm2 restart all
+pm2 logs --lines 10
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [all](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ fleetcmd           │ fork     │ 91   │ online    │ 0%       │ 18.4mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[TAILING] Tailing last 10 lines for [all] processes (change the value with --lines option)
+/home/aiscoweb/.pm2/pm2.log last 10 lines:
+PM2        | 2026-03-03T00:59:50: PM2 log: App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-03-03T00:59:50: PM2 log: App [fleetcmd:0] starting in -fork mode-
+PM2        | 2026-03-03T00:59:50: PM2 log: App [fleetcmd:0] online
+PM2        | 2026-03-03T00:59:50: PM2 log: App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-03-03T00:59:50: PM2 log: App [fleetcmd:0] starting in -fork mode-
+PM2        | 2026-03-03T00:59:50: PM2 log: App [fleetcmd:0] online
+PM2        | 2026-03-03T00:59:51: PM2 log: App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2        | 2026-03-03T00:59:51: PM2 log: Script /usr/bin/npm had too many unstable restarts (16). Stopped. "errored"
+PM2        | 2026-03-03T01:02:17: PM2 log: App [fleetcmd:0] starting in -fork mode-
+PM2        | 2026-03-03T01:02:17: PM2 log: App [fleetcmd:0] online
+
+/home/aiscoweb/.pm2/logs/fleetcmd-out.log last 10 lines:
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+
+/home/aiscoweb/.pm2/logs/fleetcmd-error.log last 10 lines:
+0|fleetcmd |   where: undefined,
+0|fleetcmd |   schema: undefined,
+0|fleetcmd |   table: undefined,
+0|fleetcmd |   column: undefined,
+0|fleetcmd |   dataType: undefined,
+0|fleetcmd |   constraint: undefined,
+0|fleetcmd |   file: 'auth.c',
+0|fleetcmd |   line: '331',
+0|fleetcmd |   routine: 'auth_failed'
+0|fleetcmd | }
+
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | App [fleetcmd:0] starting in -fork mode-
+PM2         | App [fleetcmd:0] online
+0|fleetcmd  | > rest-express@1.0.0 start
+0|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd  | Database: Using local PostgreSQL driver
+0|fleetcmd  | UNHANDLED REJECTION: error: password authentication failed for user "postgres"
+0|fleetcmd  |     at /opt/fleetcmd/dist/index.cjs:70:13330
+0|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:70:28867
+0|fleetcmd  |     at async zx.getUsers (/opt/fleetcmd/dist/index.cjs:84:11447)
+0|fleetcmd  |     at async vN (/opt/fleetcmd/dist/index.cjs:188:46840)
+0|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:188:49588 {
+0|fleetcmd  |   length: 104,
+0|fleetcmd  |   severity: 'FATAL',
+0|fleetcmd  |   code: '28P01',
+0|fleetcmd  |   detail: undefined,
+0|fleetcmd  |   hint: undefined,
+0|fleetcmd  |   position: undefined,
+0|fleetcmd  |   internalPosition: undefined,
+0|fleetcmd  |   internalQuery: undefined,
+0|fleetcmd  |   where: undefined,
+0|fleetcmd  |   schema: undefined,
+0|fleetcmd  |   table: undefined,
+0|fleetcmd  |   column: undefined,
+0|fleetcmd  |   dataType: undefined,
+0|fleetcmd  |   constraint: undefined,
+0|fleetcmd  |   file: 'auth.c',
+0|fleetcmd  |   line: '331',
+0|fleetcmd  |   routine: 'auth_failed'
+0|fleetcmd  | }
+PM2         | App [fleetcmd:0] exited with code [0] via signal [SIGINT]
+PM2         | Script /usr/bin/npm had too many unstable restarts (16). Stopped. "errored"
+
