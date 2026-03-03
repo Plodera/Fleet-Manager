@@ -20,6 +20,7 @@ A vehicle management and booking system for organizational vehicles with user au
 - Booking Approval Workflow: Designate approvers, bookings require approval before use
 - Driver Dashboard: Dedicated view for drivers showing only their assigned trips with Start/End Trip actions
 - Work Order Reports: Custom report generation with selectable fields, date/status/type filters, print and CSV export
+- Vehicle Types Configuration: Admin-configurable vehicle type groups (e.g., "Passenger Vehicles" → car/van/bus, "Equipment/Industrial" → truck) that filter the vehicle dropdown in Work Orders
 - Configurable Maintenance Types: Admin-managed maintenance types with bilingual labels (no code changes needed)
 - Bilingual Support: English/Portuguese for navigation, buttons, and status labels
 

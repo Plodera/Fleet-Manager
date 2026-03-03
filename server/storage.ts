@@ -1,6 +1,6 @@
 import { 
   users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
-  maintenanceTypeConfig, shifts, activityTypes, subEquipment, workOrders, workOrderItems,
+  maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -12,6 +12,7 @@ import {
   type Shift, type InsertShift,
   type ActivityType, type InsertActivityType,
   type SubEquipment, type InsertSubEquipment,
+  type VehicleType, type InsertVehicleType,
   type WorkOrder, type InsertWorkOrder,
   type WorkOrderItem, type InsertWorkOrderItem,
 } from "@shared/schema";
@@ -111,6 +112,12 @@ export interface IStorage {
   createSubEquipment(item: InsertSubEquipment): Promise<SubEquipment>;
   updateSubEquipment(id: number, updates: Partial<InsertSubEquipment>): Promise<SubEquipment>;
   deleteSubEquipment(id: number): Promise<void>;
+
+  // Vehicle Types
+  getVehicleTypes(): Promise<VehicleType[]>;
+  createVehicleType(item: InsertVehicleType): Promise<VehicleType>;
+  updateVehicleType(id: number, updates: Partial<InsertVehicleType>): Promise<VehicleType>;
+  deleteVehicleType(id: number): Promise<void>;
 
   // Work Orders
   getWorkOrders(): Promise<(WorkOrder & { vehicle: Vehicle; shift?: Shift; createdBy: User; items: (WorkOrderItem & { subEquipment?: SubEquipment; activityType?: ActivityType })[] })[]>;
@@ -539,6 +546,25 @@ export class DatabaseStorage implements IStorage {
     await getDb().delete(subEquipment).where(eq(subEquipment.id, id));
   }
 
+  // Vehicle Types
+  async getVehicleTypes(): Promise<VehicleType[]> {
+    return await getDb().select().from(vehicleTypes);
+  }
+
+  async createVehicleType(item: InsertVehicleType): Promise<VehicleType> {
+    const [created] = await getDb().insert(vehicleTypes).values(item).returning();
+    return created;
+  }
+
+  async updateVehicleType(id: number, updates: Partial<InsertVehicleType>): Promise<VehicleType> {
+    const [updated] = await getDb().update(vehicleTypes).set(updates).where(eq(vehicleTypes.id, id)).returning();
+    return updated;
+  }
+
+  async deleteVehicleType(id: number): Promise<void> {
+    await getDb().delete(vehicleTypes).where(eq(vehicleTypes.id, id));
+  }
+
   // Work Orders
   async getWorkOrders(): Promise<(WorkOrder & { vehicle: Vehicle; shift?: Shift; createdBy: User; items: (WorkOrderItem & { subEquipment?: SubEquipment; activityType?: ActivityType })[] })[]> {
     const orders = await getDb().select().from(workOrders).orderBy(desc(workOrders.createdAt));
@@ -708,6 +734,10 @@ export const storage = {
   createSubEquipment: (...args: Parameters<DatabaseStorage['createSubEquipment']>) => getStorage().createSubEquipment(...args),
   updateSubEquipment: (...args: Parameters<DatabaseStorage['updateSubEquipment']>) => getStorage().updateSubEquipment(...args),
   deleteSubEquipment: (...args: Parameters<DatabaseStorage['deleteSubEquipment']>) => getStorage().deleteSubEquipment(...args),
+  getVehicleTypes: () => getStorage().getVehicleTypes(),
+  createVehicleType: (...args: Parameters<DatabaseStorage['createVehicleType']>) => getStorage().createVehicleType(...args),
+  updateVehicleType: (...args: Parameters<DatabaseStorage['updateVehicleType']>) => getStorage().updateVehicleType(...args),
+  deleteVehicleType: (...args: Parameters<DatabaseStorage['deleteVehicleType']>) => getStorage().deleteVehicleType(...args),
   getWorkOrders: () => getStorage().getWorkOrders(),
   getWorkOrder: (...args: Parameters<DatabaseStorage['getWorkOrder']>) => getStorage().getWorkOrder(...args),
   createWorkOrder: (...args: Parameters<DatabaseStorage['createWorkOrder']>) => getStorage().createWorkOrder(...args),

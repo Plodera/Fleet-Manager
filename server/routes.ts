@@ -1424,6 +1424,50 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Vehicle Types
+  app.get(api.vehicleTypes.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    res.json(await storage.getVehicleTypes());
+  });
+
+  const validVehicleCategories = ["car", "van", "bus", "truck"];
+
+  app.post(api.vehicleTypes.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.vehicleTypes.create.input.parse(req.body);
+      if (input.categories?.some((c: string) => !validVehicleCategories.includes(c))) {
+        return res.status(400).json({ message: "Invalid vehicle category" });
+      }
+      const item = await storage.createVehicleType(input);
+      res.status(201).json(item);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.patch(api.vehicleTypes.update.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    try {
+      const input = api.vehicleTypes.update.input.parse(req.body);
+      if (input.categories?.some((c: string) => !validVehicleCategories.includes(c))) {
+        return res.status(400).json({ message: "Invalid vehicle category" });
+      }
+      const item = await storage.updateVehicleType(Number(req.params.id), input);
+      res.json(item);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete(api.vehicleTypes.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    await storage.deleteVehicleType(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // Work Orders
   app.get(api.workOrders.list.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

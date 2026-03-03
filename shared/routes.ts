@@ -14,6 +14,7 @@ import {
   insertShiftSchema,
   insertActivityTypeSchema,
   insertSubEquipmentSchema,
+  insertVehicleTypeSchema,
   insertWorkOrderSchema,
   insertWorkOrderItemSchema,
   users,
@@ -30,6 +31,7 @@ import {
   shifts,
   activityTypes,
   subEquipment,
+  vehicleTypes,
   workOrders,
   workOrderItems,
 } from './schema';
@@ -576,6 +578,12 @@ export const api = {
     create: { method: 'POST' as const, path: '/api/sub-equipment', input: insertSubEquipmentSchema, responses: { 201: z.custom<typeof subEquipment.$inferSelect>(), 400: errorSchemas.validation } },
     update: { method: 'PATCH' as const, path: '/api/sub-equipment/:id', input: insertSubEquipmentSchema.partial(), responses: { 200: z.custom<typeof subEquipment.$inferSelect>(), 404: errorSchemas.notFound } },
     delete: { method: 'DELETE' as const, path: '/api/sub-equipment/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
+  },
+  vehicleTypes: {
+    list: { method: 'GET' as const, path: '/api/vehicle-types', responses: { 200: z.array(z.custom<typeof vehicleTypes.$inferSelect>()) } },
+    create: { method: 'POST' as const, path: '/api/vehicle-types', input: insertVehicleTypeSchema, responses: { 201: z.custom<typeof vehicleTypes.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: 'PATCH' as const, path: '/api/vehicle-types/:id', input: insertVehicleTypeSchema.partial(), responses: { 200: z.custom<typeof vehicleTypes.$inferSelect>(), 404: errorSchemas.notFound } },
+    delete: { method: 'DELETE' as const, path: '/api/vehicle-types/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
   },
   workOrders: {
     list: { method: 'GET' as const, path: '/api/work-orders', responses: { 200: z.array(z.any()) } },

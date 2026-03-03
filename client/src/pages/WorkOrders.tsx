@@ -48,6 +48,7 @@ export default function WorkOrders() {
   const [viewWorkOrder, setViewWorkOrder] = useState<any>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
 
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [maintenanceType, setMaintenanceType] = useState<string>("");
   const [shiftId, setShiftId] = useState("");
@@ -75,6 +76,10 @@ export default function WorkOrders() {
 
   const { data: maintenanceTypeConfigs } = useQuery<any[]>({
     queryKey: [api.maintenanceTypeConfigs.list.path],
+  });
+
+  const { data: vehicleTypesData } = useQuery<any[]>({
+    queryKey: [api.vehicleTypes.list.path],
   });
 
   const createMutation = useMutation({
@@ -107,7 +112,15 @@ export default function WorkOrders() {
     },
   });
 
+  const filteredVehicles = (vehicleTypeFilter && vehicleTypeFilter !== "all")
+    ? vehicles?.filter((v: any) => {
+        const selectedType = vehicleTypesData?.find((vt: any) => String(vt.id) === vehicleTypeFilter);
+        return selectedType?.categories?.includes(v.category);
+      })
+    : vehicles;
+
   const resetForm = () => {
+    setVehicleTypeFilter("");
     setVehicleId("");
     setMaintenanceType("");
     setShiftId("");
@@ -213,6 +226,24 @@ export default function WorkOrders() {
               <DialogTitle>{t.workOrders.newWorkOrder}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              {vehicleTypesData && vehicleTypesData.length > 0 && (
+                <div className="space-y-2">
+                  <Label>{t.workOrders.vehicleTypeFilter}</Label>
+                  <Select value={vehicleTypeFilter} onValueChange={(v) => { setVehicleTypeFilter(v); setVehicleId(""); }}>
+                    <SelectTrigger data-testid="select-vehicle-type-filter">
+                      <SelectValue placeholder={t.workOrders.selectVehicleType} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" data-testid="select-vehicle-type-all">{t.workOrders.allVehicleTypes}</SelectItem>
+                      {vehicleTypesData.map((vt: any) => (
+                        <SelectItem key={vt.id} value={String(vt.id)} data-testid={`select-vehicle-type-${vt.id}`}>
+                          {language === "pt" ? vt.labelPt : vt.labelEn}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{t.workOrders.equipment}</Label>
@@ -221,7 +252,7 @@ export default function WorkOrders() {
                       <SelectValue placeholder={t.workOrders.selectVehicle} />
                     </SelectTrigger>
                     <SelectContent>
-                      {vehicles?.map((v: any) => (
+                      {filteredVehicles?.map((v: any) => (
                         <SelectItem key={v.id} value={String(v.id)} data-testid={`select-vehicle-option-${v.id}`}>
                           {v.make} {v.model} ({v.licensePlate || v.vin})
                         </SelectItem>

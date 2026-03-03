@@ -288,6 +288,16 @@ export const subEquipment = pgTable("sub_equipment", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const vehicleTypes = pgTable("vehicle_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  labelEn: text("label_en").notNull(),
+  labelPt: text("label_pt").notNull(),
+  categories: text("categories").array().default([]).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const workOrders = pgTable("work_orders", {
   id: serial("id").primaryKey(),
   jobNo: text("job_no").notNull().unique(),
@@ -423,6 +433,7 @@ export const insertMaintenanceTypeConfigSchema = createInsertSchema(maintenanceT
 export const insertShiftSchema = createInsertSchema(shifts).omit({ id: true, createdAt: true });
 export const insertActivityTypeSchema = createInsertSchema(activityTypes).omit({ id: true, createdAt: true });
 export const insertSubEquipmentSchema = createInsertSchema(subEquipment).omit({ id: true, createdAt: true });
+export const insertVehicleTypeSchema = createInsertSchema(vehicleTypes).omit({ id: true, createdAt: true });
 export const insertWorkOrderSchema = createInsertSchema(workOrders)
   .omit({ id: true, createdAt: true, jobNo: true })
   .extend({
@@ -470,6 +481,8 @@ export type ActivityType = typeof activityTypes.$inferSelect;
 export type InsertActivityType = z.infer<typeof insertActivityTypeSchema>;
 export type SubEquipment = typeof subEquipment.$inferSelect;
 export type InsertSubEquipment = z.infer<typeof insertSubEquipmentSchema>;
+export type VehicleType = typeof vehicleTypes.$inferSelect;
+export type InsertVehicleType = z.infer<typeof insertVehicleTypeSchema>;
 export type WorkOrder = typeof workOrders.$inferSelect;
 export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
 export type WorkOrderItem = typeof workOrderItems.$inferSelect;

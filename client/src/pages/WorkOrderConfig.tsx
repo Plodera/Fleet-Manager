@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Cog } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import type { Shift, ActivityType, SubEquipment, MaintenanceTypeConfig } from "@shared/schema";
+import type { Shift, ActivityType, SubEquipment, MaintenanceTypeConfig, VehicleType } from "@shared/schema";
 
 function extractErrorMessage(error: Error): string {
   const match = error.message.match(/\d+:\s*(.+)/);
@@ -55,6 +55,10 @@ export default function WorkOrderConfig() {
     queryKey: [api.maintenanceTypeConfigs.list.path],
   });
 
+  const { data: vehicleTypesList, isLoading: vehicleTypesLoading } = useQuery<VehicleType[]>({
+    queryKey: [api.vehicleTypes.list.path],
+  });
+
   const [shiftDialog, setShiftDialog] = useState<{ open: boolean; editing: Shift | null }>({ open: false, editing: null });
   const [shiftForm, setShiftForm] = useState({ name: "", nameEn: "", namePt: "", startTime: "", endTime: "" });
 
@@ -66,6 +70,9 @@ export default function WorkOrderConfig() {
 
   const [mtDialog, setMtDialog] = useState<{ open: boolean; editing: MaintenanceTypeConfig | null }>({ open: false, editing: null });
   const [mtForm, setMtForm] = useState({ name: "", labelEn: "", labelPt: "" });
+
+  const [vtDialog, setVtDialog] = useState<{ open: boolean; editing: VehicleType | null }>({ open: false, editing: null });
+  const [vtForm, setVtForm] = useState({ name: "", labelEn: "", labelPt: "", categories: [] as string[] });
 
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; type: string; id: number | null }>({ open: false, type: "", id: null });
 
@@ -257,6 +264,53 @@ export default function WorkOrderConfig() {
     },
   });
 
+  const createVehicleType = useMutation({
+    mutationFn: async (data: typeof vtForm) => {
+      const res = await apiRequest("POST", api.vehicleTypes.create.path, { ...data, isActive: true });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.vehicleTypes.list.path] });
+      setVtDialog({ open: false, editing: null });
+      toast({ title: t.adminConfig.vehicleTypes });
+    },
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
+  });
+
+  const updateVehicleType = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number } & typeof vtForm) => {
+      const res = await apiRequest("PATCH", buildUrl(api.vehicleTypes.update.path, { id }), data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.vehicleTypes.list.path] });
+      setVtDialog({ open: false, editing: null });
+      toast({ title: t.adminConfig.vehicleTypes });
+    },
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
+  });
+
+  const deleteVehicleTypeMut = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", buildUrl(api.vehicleTypes.delete.path, { id }));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.vehicleTypes.list.path] });
+      setDeleteDialog({ open: false, type: "", id: null });
+      toast({ title: t.buttons.delete });
+    },
+    onError: (error: Error) => {
+      const msg = extractErrorMessage(error);
+      toast({ title: t.labels.error, description: msg, variant: "destructive" });
+    },
+  });
+
   const openAddShift = () => {
     setShiftForm({ name: "", nameEn: "", namePt: "", startTime: "", endTime: "" });
     setShiftDialog({ open: true, editing: null });
@@ -338,12 +392,48 @@ export default function WorkOrderConfig() {
     }
   };
 
+  const vehicleCategoryOptions = ["car", "van", "bus", "truck"];
+  const vehicleCategoryLabels: Record<string, { en: string; pt: string }> = {
+    car: { en: "Car", pt: "Carro" },
+    van: { en: "Van", pt: "Carrinha" },
+    bus: { en: "Bus", pt: "Autocarro" },
+    truck: { en: "Truck", pt: "Camião" },
+  };
+
+  const openAddVehicleType = () => {
+    setVtForm({ name: "", labelEn: "", labelPt: "", categories: [] });
+    setVtDialog({ open: true, editing: null });
+  };
+
+  const openEditVehicleType = (vt: VehicleType) => {
+    setVtForm({ name: vt.name, labelEn: vt.labelEn, labelPt: vt.labelPt, categories: vt.categories || [] });
+    setVtDialog({ open: true, editing: vt });
+  };
+
+  const toggleVehicleCategory = (cat: string) => {
+    setVtForm(prev => ({
+      ...prev,
+      categories: prev.categories.includes(cat)
+        ? prev.categories.filter(c => c !== cat)
+        : [...prev.categories, cat]
+    }));
+  };
+
+  const handleVtSubmit = () => {
+    if (vtDialog.editing) {
+      updateVehicleType.mutate({ id: vtDialog.editing.id, ...vtForm });
+    } else {
+      createVehicleType.mutate(vtForm);
+    }
+  };
+
   const handleDelete = () => {
     if (!deleteDialog.id) return;
     if (deleteDialog.type === "shift") deleteShiftMut.mutate(deleteDialog.id);
     else if (deleteDialog.type === "activity") deleteActivityTypeMut.mutate(deleteDialog.id);
     else if (deleteDialog.type === "subequip") deleteSubEquipmentMut.mutate(deleteDialog.id);
     else if (deleteDialog.type === "mtconfig") deleteMtConfigMut.mutate(deleteDialog.id);
+    else if (deleteDialog.type === "vehicletype") deleteVehicleTypeMut.mutate(deleteDialog.id);
   };
 
   return (
@@ -360,6 +450,7 @@ export default function WorkOrderConfig() {
           <TabsTrigger value="shifts" data-testid="tab-shifts">{t.adminConfig.shifts}</TabsTrigger>
           <TabsTrigger value="activityTypes" data-testid="tab-activity-types">{t.adminConfig.activityTypes}</TabsTrigger>
           <TabsTrigger value="subEquipment" data-testid="tab-sub-equipment">{t.adminConfig.subEquipment}</TabsTrigger>
+          <TabsTrigger value="vehicleTypes" data-testid="tab-vehicle-types">{t.adminConfig.vehicleTypes}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="maintenanceTypes" className="space-y-4">
@@ -560,6 +651,67 @@ export default function WorkOrderConfig() {
                           <Pencil className="w-4 h-4" />
                         </Button>
                         <Button size="icon" variant="ghost" onClick={() => setDeleteDialog({ open: true, type: "subequip", id: se.id })} data-testid={`button-delete-sub-equipment-${se.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="vehicleTypes" className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h2 className="text-xl font-semibold" data-testid="text-vehicle-types-title">{t.adminConfig.vehicleTypes}</h2>
+              <p className="text-sm text-muted-foreground">{t.adminConfig.vehicleTypesSubtitle}</p>
+            </div>
+            <Button onClick={openAddVehicleType} data-testid="button-add-vehicle-type">
+              <Plus className="w-4 h-4 mr-2" /> {t.adminConfig.addVehicleType}
+            </Button>
+          </div>
+          <Card className="border-none shadow-md overflow-visible">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead>{t.adminConfig.vehicleTypeName}</TableHead>
+                  <TableHead>Label (EN)</TableHead>
+                  <TableHead>Label (PT)</TableHead>
+                  <TableHead>{t.adminConfig.vehicleTypeCategories}</TableHead>
+                  <TableHead className="text-right">{t.buttons.edit}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vehicleTypesLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center" data-testid="text-vehicle-types-loading">{t.labels.loading}</TableCell>
+                  </TableRow>
+                ) : vehicleTypesList?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground" data-testid="text-vehicle-types-empty">{t.labels.noRecords}</TableCell>
+                  </TableRow>
+                ) : vehicleTypesList?.map((vt) => (
+                  <TableRow key={vt.id} data-testid={`row-vehicle-type-${vt.id}`}>
+                    <TableCell className="font-medium">{vt.name}</TableCell>
+                    <TableCell>{vt.labelEn}</TableCell>
+                    <TableCell>{vt.labelPt}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {(vt.categories || []).map((cat: string) => (
+                          <Badge key={cat} variant="outline" data-testid={`badge-vehicle-type-cat-${vt.id}-${cat}`}>
+                            {vehicleCategoryLabels[cat] ? (language === "pt" ? vehicleCategoryLabels[cat].pt : vehicleCategoryLabels[cat].en) : cat}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEditVehicleType(vt)} data-testid={`button-edit-vehicle-type-${vt.id}`}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => setDeleteDialog({ open: true, type: "vehicletype", id: vt.id })} data-testid={`button-delete-vehicle-type-${vt.id}`}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -810,6 +962,74 @@ export default function WorkOrderConfig() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={vtDialog.open} onOpenChange={(open) => setVtDialog({ ...vtDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle data-testid="text-vt-dialog-title">
+              {vtDialog.editing ? t.adminConfig.editVehicleType : t.adminConfig.addVehicleType}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">{t.adminConfig.vehicleTypeName}</label>
+              <Input
+                value={vtForm.name}
+                onChange={(e) => setVtForm({ ...vtForm, name: e.target.value })}
+                data-testid="input-vehicle-type-name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Label (EN)</label>
+                <Input
+                  value={vtForm.labelEn}
+                  onChange={(e) => setVtForm({ ...vtForm, labelEn: e.target.value })}
+                  data-testid="input-vehicle-type-label-en"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Label (PT)</label>
+                <Input
+                  value={vtForm.labelPt}
+                  onChange={(e) => setVtForm({ ...vtForm, labelPt: e.target.value })}
+                  data-testid="input-vehicle-type-label-pt"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">{t.adminConfig.vehicleTypeCategories}</label>
+              <div className="flex flex-wrap gap-4 mt-2">
+                {vehicleCategoryOptions.map(cat => (
+                  <div key={cat} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`vt-cat-${cat}`}
+                      checked={vtForm.categories.includes(cat)}
+                      onCheckedChange={() => toggleVehicleCategory(cat)}
+                      data-testid={`checkbox-vehicle-category-${cat}`}
+                    />
+                    <Label htmlFor={`vt-cat-${cat}`} className="text-sm cursor-pointer">
+                      {language === "pt" ? vehicleCategoryLabels[cat].pt : vehicleCategoryLabels[cat].en}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setVtDialog({ open: false, editing: null })} data-testid="button-vt-cancel">
+              {t.buttons.cancel}
+            </Button>
+            <Button
+              onClick={handleVtSubmit}
+              disabled={createVehicleType.isPending || updateVehicleType.isPending}
+              data-testid="button-vt-save"
+            >
+              {(createVehicleType.isPending || updateVehicleType.isPending) ? t.labels.loading : t.buttons.save}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
         <DialogContent>
           <DialogHeader>
@@ -823,7 +1043,7 @@ export default function WorkOrderConfig() {
             <Button
               variant="destructive"
               onClick={handleDelete}
-              disabled={deleteShiftMut.isPending || deleteActivityTypeMut.isPending || deleteSubEquipmentMut.isPending}
+              disabled={deleteShiftMut.isPending || deleteActivityTypeMut.isPending || deleteSubEquipmentMut.isPending || deleteVehicleTypeMut.isPending}
               data-testid="button-delete-confirm"
             >
               {(deleteShiftMut.isPending || deleteActivityTypeMut.isPending || deleteSubEquipmentMut.isPending) ? t.labels.loading : t.buttons.delete}
