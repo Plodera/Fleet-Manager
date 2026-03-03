@@ -1,0 +1,63 @@
+iscoweb@aiscoweb:/opt/fleetcmd$ pm2 logs --lines 20
+[TAILING] Tailing last 20 lines for [all] processes (change the value with --lines option)
+/home/aiscoweb/.pm2/pm2.log last 20 lines:
+PM2        | 2026-03-03T01:05:04: PM2 log: App [fleetcmd:0] starting in -fork mode-
+PM2        | 2026-03-03T01:05:04: PM2 log: App [fleetcmd:0] online
+PM2        | 2026-03-03T01:05:04: PM2 log: App [fleetcmd:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-03-03T01:05:04: PM2 log: App [fleetcmd:0] starting in -fork mode-
+PM2        | 2026-03-03T01:05:04: PM2 log: App [fleetcmd:0] online
+PM2        | 2026-03-03T01:05:05: PM2 log: App [fleetcmd:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-03-03T01:05:05: PM2 log: App [fleetcmd:0] starting in -fork mode-
+PM2        | 2026-03-03T01:05:05: PM2 log: App [fleetcmd:0] online
+PM2        | 2026-03-03T01:05:05: PM2 log: App [fleetcmd:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-03-03T01:05:05: PM2 log: App [fleetcmd:0] starting in -fork mode-
+PM2        | 2026-03-03T01:05:05: PM2 log: App [fleetcmd:0] online
+PM2        | 2026-03-03T01:05:06: PM2 log: App [fleetcmd:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-03-03T01:05:06: PM2 log: App [fleetcmd:0] starting in -fork mode-
+PM2        | 2026-03-03T01:05:06: PM2 log: App [fleetcmd:0] online
+PM2        | 2026-03-03T01:05:06: PM2 log: App [fleetcmd:0] exited with code [1] via signal [SIGINT]
+PM2        | 2026-03-03T01:05:06: PM2 log: Script /usr/bin/npm had too many unstable restarts (16). Stopped. "errored"
+PM2        | 2026-03-03T01:08:34: PM2 log: Stopping app:fleetcmd id:0
+PM2        | 2026-03-03T01:08:34: PM2 error: app=fleetcmd id=0 does not have a pid
+PM2        | 2026-03-03T01:08:48: PM2 log: App [fleetcmd:0] starting in -fork mode-
+PM2        | 2026-03-03T01:08:48: PM2 log: App [fleetcmd:0] online
+
+/home/aiscoweb/.pm2/logs/fleetcmd-error.log last 20 lines:
+0|fleetcmd | cumentElement&&document.documentElement.style&&document.documentElement.style.WebkitAppearance||typeof window<"u"&&window.console&&(window.console.firebug||window.console.exception&&window.console.table)||typeof navigator<"u"&&navigator.userAgent&&navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)&&parseInt(RegExp.$1,10)>=31||typeof navigator<"u"&&navigator.userAgent&&navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/)}_t.formatters.j=function(t){try{return JSON.stringify(t)}catch(e){return"[UnexpectedJSONParseError]: "+e.message}};function mH(t){var e=this.useColors;if(t[0]=(e?"%c":"")+this.namespace+(e?" %c":" ")+t[0]+(e?"%c ":" ")+"+"+_t.humanize(this.diff),!!e){var i="color: "+this.color;t.splice(1,0,i,"color: inherit");var r=0,n=0;t[0].replace(/%[a-zA-Z%]/g,function(s){s!=="%%"&&(r++,s==="%c"&&(n=r))}),t.splice(n,0,i)}}function hH(){return typeof console=="object"&&console.log&&Function.prototype.apply.call(console.log,console,arguments)}function gH(t){try{t==null?_t.storage.removeItem("debug"):_t.storage.debug=t}catch{}}function e8(){var t;try{t=_t.storage.debug}catch{}return!t&&typeof process<"u"&&"env"in process&&(t=process.env.DEBUG),t}_t.enable(e8());function vH(){try{return window.localStorage}catch{}}});var a8=g((nt,s8)=>{var r8=require("tty"),ac=require("util");nt=s8.exports=Ax();nt.init=EH;nt.log=wH;nt.formatArgs=bH;nt.save=_H;nt.load=n8;nt.useColors=yH;nt.colors=[6,2,3,4,5,1];nt.inspectOpts=Object.keys(process.env).filter(function(t){return/^debug_/i.test(t)}).reduce(function(t,e){var i=e.substring(6).toLowerCase().replace(/_([a-z])/g,function(n,s){return s.toUpperCase()}),r=process.env[e];return/^(yes|on|true|enabled)$/i.test(r)?r=!0:/^(no|off|false|disabled)$/i.test(r)?r=!1:r==="null"?r=null:r=Number(r),t[i]=r,t},{});var Js=parseInt(process.env.DEBUG_FD,10)||2;Js!==1&&Js!==2&&ac.deprecate(function(){},"except for stderr(2) and stdout(1), any other usage of DEBUG_FD is deprecated. Override debug.log if you want to use a different log function (https://git.io/debug_fd)")();var xH=Js===1?process.stdout:Js===2?process.stderr:SH(Js);function yH(){return"colors"in nt.inspectOpts?!!nt.inspectOpts.colors:r8.isatty(Js)}nt.formatters.o=function(t){return this.inspectOpts.colors=this.useColors,ac.inspect(t,this.inspectOpts).split(`
+0|fleetcmd |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+0|fleetcmd | 
+0|fleetcmd | Error: DATABASE_URL must be set. Did you forget to provision a database?
+0|fleetcmd |     at /opt/fleetcmd/dist/index.cjs:78:1403
+0|fleetcmd |     at /opt/fleetcmd/dist/index.cjs:1:225
+0|fleetcmd |     at /opt/fleetcmd/dist/index.cjs:84:9490
+0|fleetcmd |     at /opt/fleetcmd/dist/index.cjs:1:225
+0|fleetcmd |     at Object.<anonymous> (/opt/fleetcmd/dist/index.cjs:188:748)
+0|fleetcmd |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+0|fleetcmd |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+0|fleetcmd |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+0|fleetcmd |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+0|fleetcmd |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+0|fleetcmd | 
+0|fleetcmd | Node.js v20.20.0
+
+/home/aiscoweb/.pm2/logs/fleetcmd-out.log last 20 lines:
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | 
+0|fleetcmd | > rest-express@1.0.0 start
+0|fleetcmd | > NODE_ENV=production node dist/index.cjs
+0|fleetcmd | 
+0|fleetcmd | Database: Using local PostgreSQL driver
+0|fleetcmd | 1:08:49 AM [express] serving on port 5000
