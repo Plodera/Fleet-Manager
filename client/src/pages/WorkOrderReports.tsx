@@ -40,7 +40,7 @@ export default function WorkOrderReports() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [showReport, setShowReport] = useState(false);
 
-  const { data: workOrders, isLoading } = useQuery<any[]>({
+  const { data: workOrders, isLoading, isError } = useQuery<any[]>({
     queryKey: [api.workOrders.list.path],
   });
 
@@ -209,7 +209,7 @@ export default function WorkOrderReports() {
     return Array.from(types);
   }, [workOrders]);
 
-  if (isLoading) {
+  if (isLoading && !isError) {
     return (
       <div className="space-y-6">
         <div className="space-y-1">
