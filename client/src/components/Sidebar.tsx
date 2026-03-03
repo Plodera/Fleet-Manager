@@ -59,13 +59,15 @@ export function Sidebar() {
   const { language, setLanguage, t } = useLanguage();
   const { toast } = useToast();
 
+  const usersT = t?.users || {} as any;
+
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
-      toast({ title: t.users.changePassword, description: t.users.passwordMismatch, variant: "destructive" });
+      toast({ title: usersT.changePassword, description: usersT.passwordMismatch, variant: "destructive" });
       return;
     }
     if (newPassword.length < 6) {
-      toast({ title: t.users.changePassword, description: t.users.passwordPlaceholder, variant: "destructive" });
+      toast({ title: usersT.changePassword, description: usersT.passwordPlaceholder, variant: "destructive" });
       return;
     }
     setIsChangingPassword(true);
@@ -74,7 +76,7 @@ export function Sidebar() {
         currentPassword,
         newPassword,
       });
-      toast({ title: t.users.changePassword, description: t.users.passwordChanged });
+      toast({ title: usersT.changePassword, description: usersT.passwordChanged });
       setPasswordDialogOpen(false);
       setCurrentPassword("");
       setNewPassword("");
@@ -82,9 +84,9 @@ export function Sidebar() {
     } catch (err: any) {
       const msg = err?.message || "";
       if (msg.includes("Current password is incorrect") || msg.includes("400")) {
-        toast({ title: t.users.changePassword, description: t.users.currentPasswordIncorrect, variant: "destructive" });
+        toast({ title: usersT.changePassword, description: usersT.currentPasswordIncorrect, variant: "destructive" });
       } else {
-        toast({ title: t.users.changePassword, description: msg || "Failed to change password", variant: "destructive" });
+        toast({ title: usersT.changePassword, description: msg || "Failed to change password", variant: "destructive" });
       }
     } finally {
       setIsChangingPassword(false);
@@ -239,16 +241,16 @@ export function Sidebar() {
               data-testid="button-change-password"
             >
               <KeyRound className="w-4 h-4" />
-              {t.users.changePassword}
+              {usersT.changePassword || "Change Password"}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{t.users.changePassword}</DialogTitle>
+              <DialogTitle>{usersT.changePassword || "Change Password"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
-                <Label>{t.users.currentPassword}</Label>
+                <Label>{usersT.currentPassword || "Current Password"}</Label>
                 <Input
                   type="password"
                   value={currentPassword}
@@ -257,17 +259,17 @@ export function Sidebar() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t.users.newPassword}</Label>
+                <Label>{usersT.newPassword || "New Password"}</Label>
                 <Input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder={t.users.passwordPlaceholder}
+                  placeholder={usersT.passwordPlaceholder || "Enter new password (min 6 characters)"}
                   data-testid="input-new-password"
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t.users.confirmNewPassword}</Label>
+                <Label>{usersT.confirmNewPassword || "Confirm New Password"}</Label>
                 <Input
                   type="password"
                   value={confirmPassword}
@@ -281,7 +283,7 @@ export function Sidebar() {
                 disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
                 data-testid="button-submit-change-password"
               >
-                {isChangingPassword ? "..." : t.users.updatePassword}
+                {isChangingPassword ? "..." : (usersT.updatePassword || "Update Password")}
               </Button>
             </div>
           </DialogContent>
