@@ -327,24 +327,22 @@ export default function WorkOrders() {
                           </SelectContent>
                         </Select>
                       </div>
-                      {maintenanceType === "breakdown" && (
-                        <div className="space-y-1">
-                          <Label className="text-xs">{t.workOrders.activityType}</Label>
-                          <Select
-                            value={item.activityTypeId ? String(item.activityTypeId) : ""}
-                            onValueChange={(v) => updateItem(index, "activityTypeId", v ? Number(v) : null)}
-                          >
-                            <SelectTrigger data-testid={`select-activity-type-${index}`}>
-                              <SelectValue placeholder={t.workOrders.selectActivityType} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {activityTypesData?.map((at: any) => (
-                                <SelectItem key={at.id} value={String(at.id)}>{at.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t.workOrders.activityType}</Label>
+                        <Select
+                          value={item.activityTypeId ? String(item.activityTypeId) : ""}
+                          onValueChange={(v) => updateItem(index, "activityTypeId", v ? Number(v) : null)}
+                        >
+                          <SelectTrigger data-testid={`select-activity-type-${index}`}>
+                            <SelectValue placeholder={t.workOrders.selectActivityType} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activityTypesData?.map((at: any) => (
+                              <SelectItem key={at.id} value={String(at.id)}>{at.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
