@@ -16,9 +16,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, AVAILABLE_PERMISSIONS, type Department } from "@shared/schema";
-import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail, Building2, Trash2, Plus, User, Info, Car, FileCheck, Eye } from "lucide-react";
+import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail, Building2, Trash2, Plus, User, Info, Car, FileCheck, Eye, PackageSearch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
+import { Label } from "@/components/ui/label";
 
 export default function Users() {
   const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updateDriver, isUpdatingDriver, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser, updateProfile, isUpdatingProfile } = useUsers();
@@ -43,9 +44,32 @@ export default function Users() {
   const [editProfileUserId, setEditProfileUserId] = useState<number | null>(null);
   const [editUsername, setEditUsername] = useState("");
   const [editFullName, setEditFullName] = useState("");
+  const [indentApproverUserId, setIndentApproverUserId] = useState<number | null>(null);
+  const [pendingApproverDepts, setPendingApproverDepts] = useState<number[]>([]);
 
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["/api/departments"],
+  });
+
+  const { data: approverAssignments = [] } = useQuery<any[]>({
+    queryKey: ["/api/indent-approvers"],
+    enabled: currentUser?.role === "admin",
+  });
+
+  const saveApproverDeptsMutation = useMutation({
+    mutationFn: async (data: { userId: number; departmentIds: number[] }) => {
+      const res = await apiRequest("POST", "/api/indent-approvers", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/indent-approvers"] });
+      setIndentApproverUserId(null);
+      setPendingApproverDepts([]);
+      toast({ title: language === "pt" ? "Departamentos de aprovação guardados" : "Approver departments saved" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const createDeptMutation = useMutation({
@@ -578,6 +602,21 @@ export default function Users() {
                             >
                               <Lock className="w-4 h-4" />
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setIndentApproverUserId(user.id);
+                                const userDepts = approverAssignments
+                                  .filter((a: any) => a.userId === user.id)
+                                  .map((a: any) => a.departmentId);
+                                setPendingApproverDepts(userDepts);
+                              }}
+                              data-testid={`button-indent-approver-${user.id}`}
+                              title={language === "pt" ? "Departamentos de Aprovação de Requisições" : "Indent Approval Departments"}
+                            >
+                              <PackageSearch className="w-4 h-4" />
+                            </Button>
                             <Dialog open={editEmailUserId === user.id} onOpenChange={(open) => {
                               if (!open) {
                                 setEditEmailUserId(null);
@@ -789,6 +828,70 @@ export default function Users() {
           </CardContent>
         </Card>
       )}
+
+      {/* Indent Approver Departments Dialog */}
+      <Dialog open={indentApproverUserId !== null} onOpenChange={(open) => {
+        if (!open) {
+          setIndentApproverUserId(null);
+          setPendingApproverDepts([]);
+        }
+      }}>
+        <DialogContent data-testid="dialog-indent-approver-depts">
+          <DialogHeader>
+            <DialogTitle>
+              {language === "pt" ? "Departamentos de Aprovação de Requisições" : "Indent Approval Departments"}
+              {indentApproverUserId && (() => {
+                const u = users?.find((u) => u.id === indentApproverUserId);
+                return u ? ` — ${u.fullName}` : "";
+              })()}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {language === "pt"
+              ? "Selecione os departamentos para os quais este utilizador pode aprovar requisições."
+              : "Select which departments this user can approve indents for."}
+          </p>
+          <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+            {departments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {language === "pt" ? "Nenhum departamento configurado" : "No departments configured"}
+              </p>
+            ) : (
+              departments.map((dept) => (
+                <div key={dept.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`approver-dept-${dept.id}`}
+                    checked={pendingApproverDepts.includes(dept.id)}
+                    onCheckedChange={(checked) => {
+                      setPendingApproverDepts(prev =>
+                        checked ? [...prev, dept.id] : prev.filter(d => d !== dept.id)
+                      );
+                    }}
+                    data-testid={`checkbox-approver-dept-${dept.id}`}
+                  />
+                  <label htmlFor={`approver-dept-${dept.id}`} className="text-sm font-medium cursor-pointer">{dept.name}</label>
+                </div>
+              ))
+            )}
+          </div>
+          <Button
+            onClick={() => {
+              if (indentApproverUserId) {
+                saveApproverDeptsMutation.mutate({
+                  userId: indentApproverUserId,
+                  departmentIds: pendingApproverDepts,
+                });
+              }
+            }}
+            disabled={saveApproverDeptsMutation.isPending}
+            data-testid="button-save-approver-depts"
+          >
+            {saveApproverDeptsMutation.isPending
+              ? (language === "pt" ? "Guardando..." : "Saving...")
+              : t.buttons.save}
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
