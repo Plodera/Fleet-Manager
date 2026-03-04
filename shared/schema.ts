@@ -294,6 +294,7 @@ export const vehicleTypes = pgTable("vehicle_types", {
   labelEn: text("label_en").notNull(),
   labelPt: text("label_pt").notNull(),
   categories: text("categories").array().default([]).notNull(),
+  availableForBooking: boolean("available_for_booking").default(true).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });

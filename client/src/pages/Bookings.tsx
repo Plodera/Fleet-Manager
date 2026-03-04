@@ -66,7 +66,28 @@ export default function Bookings() {
     },
   });
 
-  const availableVehicles = vehicles?.filter(v => v.status === "available");
+  const { data: vehicleTypes } = useQuery<any[]>({
+    queryKey: ["/api/vehicle-types"],
+  });
+
+  const bookableCategories = useMemo(() => {
+    if (!vehicleTypes || vehicleTypes.length === 0) return null;
+    const cats: string[] = [];
+    vehicleTypes.forEach((vt: any) => {
+      if (vt.availableForBooking && vt.categories) {
+        cats.push(...vt.categories);
+      }
+    });
+    return cats;
+  }, [vehicleTypes]);
+
+  const availableVehicles = useMemo(() => {
+    let filtered = vehicles?.filter(v => v.status === "available") || [];
+    if (bookableCategories) {
+      filtered = filtered.filter(v => bookableCategories.includes(v.category));
+    }
+    return filtered;
+  }, [vehicles, bookableCategories]);
 
   const statusCounts = useMemo(() => {
     if (!bookings) return {};

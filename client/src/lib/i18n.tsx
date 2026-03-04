@@ -363,6 +363,7 @@ const translations = {
       editVehicleType: "Edit Vehicle Type",
       vehicleTypeName: "Type Name",
       vehicleTypeCategories: "Vehicle Categories",
+      availableForBooking: "Available for Booking",
     },
     // User Management
     userManagement: {
@@ -803,6 +804,7 @@ const translations = {
       editVehicleType: "Editar Tipo de Veículo",
       vehicleTypeName: "Nome do Tipo",
       vehicleTypeCategories: "Categorias de Veículo",
+      availableForBooking: "Disponível para Reserva",
     },
     // User Management
     userManagement: {

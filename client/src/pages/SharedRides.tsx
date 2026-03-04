@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,28 @@ export default function SharedRides() {
     },
   });
 
-  const largeVehicles = vehicles?.filter((v: any) => v.capacity > 5 && v.status === 'available') || [];
+  const { data: vehicleTypes } = useQuery<any[]>({
+    queryKey: ["/api/vehicle-types"],
+  });
+
+  const bookableCategories = useMemo(() => {
+    if (!vehicleTypes || vehicleTypes.length === 0) return null;
+    const cats: string[] = [];
+    vehicleTypes.forEach((vt: any) => {
+      if (vt.availableForBooking && vt.categories) {
+        cats.push(...vt.categories);
+      }
+    });
+    return cats;
+  }, [vehicleTypes]);
+
+  const largeVehicles = useMemo(() => {
+    let filtered = vehicles?.filter((v: any) => v.capacity > 5 && v.status === 'available') || [];
+    if (bookableCategories) {
+      filtered = filtered.filter((v: any) => bookableCategories.includes(v.category));
+    }
+    return filtered;
+  }, [vehicles, bookableCategories]);
 
   const joinForm = useForm({
     resolver: zodResolver(joinTripSchema),

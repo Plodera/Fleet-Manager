@@ -72,7 +72,7 @@ export default function WorkOrderConfig() {
   const [mtForm, setMtForm] = useState({ name: "", labelEn: "", labelPt: "" });
 
   const [vtDialog, setVtDialog] = useState<{ open: boolean; editing: VehicleType | null }>({ open: false, editing: null });
-  const [vtForm, setVtForm] = useState({ name: "", labelEn: "", labelPt: "", categories: [] as string[] });
+  const [vtForm, setVtForm] = useState({ name: "", labelEn: "", labelPt: "", categories: [] as string[], availableForBooking: true });
 
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; type: string; id: number | null }>({ open: false, type: "", id: null });
 
@@ -401,12 +401,12 @@ export default function WorkOrderConfig() {
   };
 
   const openAddVehicleType = () => {
-    setVtForm({ name: "", labelEn: "", labelPt: "", categories: [] });
+    setVtForm({ name: "", labelEn: "", labelPt: "", categories: [], availableForBooking: true });
     setVtDialog({ open: true, editing: null });
   };
 
   const openEditVehicleType = (vt: VehicleType) => {
-    setVtForm({ name: vt.name, labelEn: vt.labelEn, labelPt: vt.labelPt, categories: vt.categories || [] });
+    setVtForm({ name: vt.name, labelEn: vt.labelEn, labelPt: vt.labelPt, categories: vt.categories || [], availableForBooking: vt.availableForBooking ?? true });
     setVtDialog({ open: true, editing: vt });
   };
 
@@ -680,17 +680,18 @@ export default function WorkOrderConfig() {
                   <TableHead>Label (EN)</TableHead>
                   <TableHead>Label (PT)</TableHead>
                   <TableHead>{t.adminConfig.vehicleTypeCategories}</TableHead>
+                  <TableHead>{t.adminConfig.availableForBooking}</TableHead>
                   <TableHead className="text-right">{t.buttons.edit}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {vehicleTypesLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center" data-testid="text-vehicle-types-loading">{t.labels.loading}</TableCell>
+                    <TableCell colSpan={6} className="h-24 text-center" data-testid="text-vehicle-types-loading">{t.labels.loading}</TableCell>
                   </TableRow>
                 ) : vehicleTypesList?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground" data-testid="text-vehicle-types-empty">{t.labels.noRecords}</TableCell>
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground" data-testid="text-vehicle-types-empty">{t.labels.noRecords}</TableCell>
                   </TableRow>
                 ) : vehicleTypesList?.map((vt) => (
                   <TableRow key={vt.id} data-testid={`row-vehicle-type-${vt.id}`}>
@@ -705,6 +706,11 @@ export default function WorkOrderConfig() {
                           </Badge>
                         ))}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={vt.availableForBooking ? "default" : "secondary"} data-testid={`badge-bookable-${vt.id}`}>
+                        {vt.availableForBooking ? (language === "pt" ? "Sim" : "Yes") : (language === "pt" ? "Não" : "No")}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -1013,6 +1019,17 @@ export default function WorkOrderConfig() {
                   </div>
                 ))}
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="vt-available-for-booking"
+                checked={vtForm.availableForBooking}
+                onCheckedChange={(checked) => setVtForm({ ...vtForm, availableForBooking: !!checked })}
+                data-testid="checkbox-available-for-booking"
+              />
+              <Label htmlFor="vt-available-for-booking" className="text-sm cursor-pointer">
+                {t.adminConfig.availableForBooking}
+              </Label>
             </div>
           </div>
           <DialogFooter className="gap-2">
