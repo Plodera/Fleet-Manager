@@ -639,10 +639,9 @@ export const api = {
       path: '/api/indents',
       input: z.object({
         vehicleId: z.coerce.number().optional().nullable(),
-        purpose: z.string().min(1),
+        purpose: z.string().optional().nullable(),
         priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
         departmentId: z.coerce.number().optional().nullable(),
-        notes: z.string().optional().nullable(),
         items: z.array(z.object({
           itemName: z.string().min(1),
           quantity: z.coerce.number().min(1),

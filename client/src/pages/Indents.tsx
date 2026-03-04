@@ -58,10 +58,8 @@ export default function Indents() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [vehicleId, setVehicleId] = useState("");
-  const [purpose, setPurpose] = useState("");
   const [priority, setPriority] = useState("medium");
   const [departmentId, setDepartmentId] = useState("");
-  const [notes, setNotes] = useState("");
   const [items, setItems] = useState<IndentItem[]>([{ itemName: "", quantity: 1, unit: "pcs", notes: "" }]);
 
   const [erpIndentNo, setErpIndentNo] = useState("");
@@ -122,10 +120,8 @@ export default function Indents() {
 
   function resetForm() {
     setVehicleId("");
-    setPurpose("");
     setPriority("medium");
     setDepartmentId("");
-    setNotes("");
     setItems([{ itemName: "", quantity: 1, unit: "pcs", notes: "" }]);
   }
 
@@ -147,16 +143,14 @@ export default function Indents() {
 
   function handleCreate() {
     const validItems = items.filter(i => i.itemName.trim());
-    if (!purpose.trim() || validItems.length === 0) {
+    if (validItems.length === 0) {
       toast({ title: "Error", description: it.noItems, variant: "destructive" });
       return;
     }
     createMutation.mutate({
       vehicleId: vehicleId && vehicleId !== "none" ? Number(vehicleId) : null,
-      purpose,
       priority,
       departmentId: departmentId && departmentId !== "none" ? Number(departmentId) : null,
-      notes: notes || null,
       items: validItems,
     });
   }
@@ -214,8 +208,8 @@ export default function Indents() {
       const q = searchQuery.toLowerCase();
       const match = indent.indentNo?.toLowerCase().includes(q)
         || indent.erpIndentNo?.toLowerCase().includes(q)
-        || indent.purpose?.toLowerCase().includes(q)
-        || indent.requestedBy?.fullName?.toLowerCase().includes(q);
+        || indent.requestedBy?.fullName?.toLowerCase().includes(q)
+        || indent.items?.some((i: any) => i.itemName?.toLowerCase().includes(q));
       if (!match) return false;
     }
     return true;
@@ -291,7 +285,6 @@ export default function Indents() {
               <TableRow>
                 <TableHead>{it.indentNo}</TableHead>
                 <TableHead>{it.erpIndentNo}</TableHead>
-                <TableHead>{it.purpose}</TableHead>
                 <TableHead>{it.vehicle}</TableHead>
                 <TableHead>{it.department}</TableHead>
                 <TableHead>{it.requestedBy}</TableHead>
@@ -307,7 +300,6 @@ export default function Indents() {
                 <TableRow key={indent.id} data-testid={`row-indent-${indent.id}`}>
                   <TableCell className="font-mono text-sm" data-testid={`text-indent-no-${indent.id}`}>{indent.indentNo}</TableCell>
                   <TableCell className="font-mono text-sm" data-testid={`text-erp-no-${indent.id}`}>{indent.erpIndentNo || "—"}</TableCell>
-                  <TableCell className="max-w-[200px] truncate" data-testid={`text-purpose-${indent.id}`}>{indent.purpose}</TableCell>
                   <TableCell>{indent.vehicle ? `${indent.vehicle.make} ${indent.vehicle.model}` : "—"}</TableCell>
                   <TableCell>{indent.department?.name || "—"}</TableCell>
                   <TableCell>{indent.requestedBy?.fullName}</TableCell>
@@ -397,71 +389,51 @@ export default function Indents() {
             <DialogTitle>{it.newIndent}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <Label>{it.purpose} *</Label>
-                <Textarea
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  placeholder={it.purposePlaceholder}
-                  data-testid="input-purpose"
-                />
+                <Label>{it.priority}</Label>
+                <Select value={priority} onValueChange={setPriority}>
+                  <SelectTrigger data-testid="select-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">{it.low}</SelectItem>
+                    <SelectItem value="medium">{it.medium}</SelectItem>
+                    <SelectItem value="high">{it.high}</SelectItem>
+                    <SelectItem value="urgent">{it.urgent}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="space-y-3">
-                <div>
-                  <Label>{it.priority}</Label>
-                  <Select value={priority} onValueChange={setPriority}>
-                    <SelectTrigger data-testid="select-priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">{it.low}</SelectItem>
-                      <SelectItem value="medium">{it.medium}</SelectItem>
-                      <SelectItem value="high">{it.high}</SelectItem>
-                      <SelectItem value="urgent">{it.urgent}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>{it.department}</Label>
-                  <Select value={departmentId} onValueChange={setDepartmentId}>
-                    <SelectTrigger data-testid="select-department">
-                      <SelectValue placeholder={it.selectDepartment} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">{it.selectDepartment}</SelectItem>
-                      {(departments || []).map((d: any) => (
-                        <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label>{it.department}</Label>
+                <Select value={departmentId} onValueChange={setDepartmentId}>
+                  <SelectTrigger data-testid="select-department">
+                    <SelectValue placeholder={it.selectDepartment} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{it.selectDepartment}</SelectItem>
+                    {(departments || []).map((d: any) => (
+                      <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-            <div>
-              <Label>{it.vehicle}</Label>
-              <Select value={vehicleId} onValueChange={setVehicleId}>
-                <SelectTrigger data-testid="select-vehicle">
-                  <SelectValue placeholder={it.selectVehicle} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{it.selectVehicle}</SelectItem>
-                  {(vehicles || []).map((v: any) => (
-                    <SelectItem key={v.id} value={String(v.id)}>
-                      {v.make} {v.model} ({v.licensePlate})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>{it.notes}</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={it.notesPlaceholder}
-                data-testid="input-notes"
-              />
+              <div>
+                <Label>{it.vehicle}</Label>
+                <Select value={vehicleId} onValueChange={setVehicleId}>
+                  <SelectTrigger data-testid="select-vehicle">
+                    <SelectValue placeholder={it.selectVehicle} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{it.selectVehicle}</SelectItem>
+                    {(vehicles || []).map((v: any) => (
+                      <SelectItem key={v.id} value={String(v.id)}>
+                        {v.make} {v.model} ({v.licensePlate})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div>
@@ -568,16 +540,6 @@ export default function Indents() {
                   <span className="text-muted-foreground">{it.department}:</span>
                   <span className="ml-2">{viewIndent.department?.name || "—"}</span>
                 </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">{it.purpose}:</span>
-                  <p className="mt-1">{viewIndent.purpose}</p>
-                </div>
-                {viewIndent.notes && (
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">{it.notes}:</span>
-                    <p className="mt-1">{viewIndent.notes}</p>
-                  </div>
-                )}
                 {viewIndent.approvalNotes && (
                   <div className="col-span-2">
                     <span className="text-muted-foreground">{it.approvalNotes}:</span>

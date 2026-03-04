@@ -1581,6 +1581,9 @@ export async function registerRoutes(
     try {
       const parsed = api.indents.create.input.parse(req.body);
       const { items, ...indentData } = parsed;
+      if (!indentData.purpose) {
+        indentData.purpose = items.map((i: any) => i.itemName).join(', ');
+      }
       const created = await storage.createIndent(
         { ...indentData, requestedById: user.id, status: 'pending' } as any,
         items
