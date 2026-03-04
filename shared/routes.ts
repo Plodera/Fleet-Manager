@@ -674,6 +674,19 @@ export const api = {
     },
     delete: { method: 'DELETE' as const, path: '/api/indents/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
   },
+  indentApprovers: {
+    list: { method: 'GET' as const, path: '/api/indent-approvers', responses: { 200: z.array(z.any()) } },
+    mine: { method: 'GET' as const, path: '/api/indent-approvers/mine', responses: { 200: z.array(z.number()) } },
+    set: {
+      method: 'POST' as const,
+      path: '/api/indent-approvers',
+      input: z.object({
+        userId: z.coerce.number(),
+        departmentIds: z.array(z.coerce.number()),
+      }),
+      responses: { 200: z.any(), 400: errorSchemas.validation },
+    },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {

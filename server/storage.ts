@@ -1,7 +1,7 @@
 import { 
   users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
-  indents, indentItems,
+  indents, indentItems, indentApproverDepartments,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -18,9 +18,10 @@ import {
   type WorkOrderItem, type InsertWorkOrderItem,
   type Indent, type InsertIndent,
   type IndentItem, type InsertIndentItem,
+  type IndentApproverDepartment,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -145,6 +146,11 @@ export interface IStorage {
   getNextIndentNo(): Promise<string>;
   getIndentItems(indentId: number): Promise<IndentItem[]>;
   replaceIndentItems(indentId: number, items: Omit<InsertIndentItem, 'indentId'>[]): Promise<IndentItem[]>;
+
+  // Indent Approver Departments
+  getIndentApproverDepartments(): Promise<any[]>;
+  getMyIndentApproverDepartments(userId: number): Promise<number[]>;
+  setIndentApproverDepartments(userId: number, departmentIds: number[]): Promise<void>;
 
   sessionStore: session.Store;
 }
@@ -733,6 +739,30 @@ export class DatabaseStorage implements IStorage {
     }
     return [];
   }
+
+  // Indent Approver Departments
+  async getIndentApproverDepartments(): Promise<any[]> {
+    const rows = await getDb().select().from(indentApproverDepartments);
+    const results = [];
+    for (const row of rows) {
+      const [user] = await getDb().select().from(users).where(eq(users.id, row.userId));
+      const [dept] = await getDb().select().from(departments).where(eq(departments.id, row.departmentId));
+      if (user && dept) results.push({ ...row, user, department: dept });
+    }
+    return results;
+  }
+
+  async getMyIndentApproverDepartments(userId: number): Promise<number[]> {
+    const rows = await getDb().select().from(indentApproverDepartments).where(eq(indentApproverDepartments.userId, userId));
+    return rows.map(r => r.departmentId);
+  }
+
+  async setIndentApproverDepartments(userId: number, departmentIds: number[]): Promise<void> {
+    await getDb().delete(indentApproverDepartments).where(eq(indentApproverDepartments.userId, userId));
+    if (departmentIds.length > 0) {
+      await getDb().insert(indentApproverDepartments).values(departmentIds.map(departmentId => ({ userId, departmentId })));
+    }
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -835,5 +865,8 @@ export const storage = {
   getNextIndentNo: () => getStorage().getNextIndentNo(),
   getIndentItems: (...args: Parameters<DatabaseStorage['getIndentItems']>) => getStorage().getIndentItems(...args),
   replaceIndentItems: (...args: Parameters<DatabaseStorage['replaceIndentItems']>) => getStorage().replaceIndentItems(...args),
+  getIndentApproverDepartments: () => getStorage().getIndentApproverDepartments(),
+  getMyIndentApproverDepartments: (...args: Parameters<DatabaseStorage['getMyIndentApproverDepartments']>) => getStorage().getMyIndentApproverDepartments(...args),
+  setIndentApproverDepartments: (...args: Parameters<DatabaseStorage['setIndentApproverDepartments']>) => getStorage().setIndentApproverDepartments(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

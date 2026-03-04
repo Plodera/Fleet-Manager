@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { apiRequest } from "@/lib/queryClient";
@@ -24,12 +24,24 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Plus, Eye, Trash2, PackageSearch, X, Check, XCircle, CheckCircle } from "lucide-react";
+import { Plus, Eye, Trash2, PackageSearch, X, Check, XCircle, CheckCircle, Settings } from "lucide-react";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
 
 const UNITS = ["pcs", "litres", "kg", "metres", "sets", "boxes", "rolls"];
+
+function getCurrentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getUserPermissions(user: any): string[] {
+  if (!user?.permissions) return [];
+  if (Array.isArray(user.permissions)) return user.permissions;
+  try { return JSON.parse(user.permissions as string); } catch { return []; }
+}
 
 interface IndentItem {
   itemName: string;
@@ -52,10 +64,12 @@ export default function Indents() {
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [approveIndent, setApproveIndent] = useState<any>(null);
+  const [isApproverConfigOpen, setIsApproverConfigOpen] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [monthFilter, setMonthFilter] = useState(getCurrentMonth());
 
   const [vehicleId, setVehicleId] = useState("");
   const [priority, setPriority] = useState("medium");
@@ -65,12 +79,29 @@ export default function Indents() {
   const [erpIndentNo, setErpIndentNo] = useState("");
   const [approvalNotes, setApprovalNotes] = useState("");
 
+  const [selectedApproverUserId, setSelectedApproverUserId] = useState("");
+  const [selectedApproverDepts, setSelectedApproverDepts] = useState<number[]>([]);
+
   const { data: indents, isLoading } = useQuery<any[]>({
     queryKey: [api.indents.list.path],
   });
 
   const { data: departments } = useQuery<any[]>({
     queryKey: [api.departments.list.path],
+  });
+
+  const { data: allUsers } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+    enabled: user?.role === "admin",
+  });
+
+  const { data: approverAssignments, refetch: refetchAssignments } = useQuery<any[]>({
+    queryKey: ["/api/indent-approvers"],
+    enabled: user?.role === "admin",
+  });
+
+  const { data: myApproverDepts } = useQuery<number[]>({
+    queryKey: ["/api/indent-approvers/mine"],
   });
 
   const createMutation = useMutation({
@@ -115,6 +146,22 @@ export default function Indents() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.indents.list.path] });
       toast({ title: "Indent deleted" });
+    },
+  });
+
+  const saveApproverMutation = useMutation({
+    mutationFn: async (data: { userId: number; departmentIds: number[] }) => {
+      const res = await apiRequest("POST", "/api/indent-approvers", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchAssignments();
+      setSelectedApproverUserId("");
+      setSelectedApproverDepts([]);
+      toast({ title: "Approver assignment saved" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -177,6 +224,39 @@ export default function Indents() {
     updateMutation.mutate({ id, data: { status: "fulfilled" } });
   }
 
+  function canApproveIndent(indent: any): boolean {
+    if (!user) return false;
+    if (user.role === "admin") return true;
+    const perms = getUserPermissions(user);
+    if (!perms.includes("approve_indents")) return false;
+    if (!indent.departmentId) return true;
+    return (myApproverDepts || []).includes(indent.departmentId);
+  }
+
+  function handleSelectApproverUser(userId: string) {
+    setSelectedApproverUserId(userId);
+    if (userId && userId !== "none") {
+      const existing = (approverAssignments || []).filter((a: any) => a.userId === Number(userId));
+      setSelectedApproverDepts(existing.map((a: any) => a.departmentId));
+    } else {
+      setSelectedApproverDepts([]);
+    }
+  }
+
+  function toggleApproverDept(deptId: number) {
+    setSelectedApproverDepts(prev =>
+      prev.includes(deptId) ? prev.filter(d => d !== deptId) : [...prev, deptId]
+    );
+  }
+
+  function handleSaveApprover() {
+    if (!selectedApproverUserId || selectedApproverUserId === "none") return;
+    saveApproverMutation.mutate({
+      userId: Number(selectedApproverUserId),
+      departmentIds: selectedApproverDepts,
+    });
+  }
+
   const statusColor = (s: string) => {
     switch (s) {
       case "pending": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
@@ -201,19 +281,39 @@ export default function Indents() {
   const statusLabel = (s: string) => (it as any)[s] || s;
   const priorityLabel = (p: string) => (it as any)[p] || p;
 
-  const filtered = (indents || []).filter((indent: any) => {
-    if (statusFilter && statusFilter !== "all" && indent.status !== statusFilter) return false;
-    if (priorityFilter && priorityFilter !== "all" && indent.priority !== priorityFilter) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const match = indent.indentNo?.toLowerCase().includes(q)
-        || indent.erpIndentNo?.toLowerCase().includes(q)
-        || indent.requestedBy?.fullName?.toLowerCase().includes(q)
-        || indent.items?.some((i: any) => i.itemName?.toLowerCase().includes(q));
-      if (!match) return false;
-    }
-    return true;
-  });
+  const filtered = useMemo(() => {
+    return (indents || []).filter((indent: any) => {
+      if (statusFilter && statusFilter !== "all" && indent.status !== statusFilter) return false;
+      if (priorityFilter && priorityFilter !== "all" && indent.priority !== priorityFilter) return false;
+      if (monthFilter && monthFilter !== "all") {
+        if (indent.createdAt) {
+          const d = new Date(indent.createdAt);
+          const indentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          if (indentMonth !== monthFilter) return false;
+        }
+      }
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const match = indent.indentNo?.toLowerCase().includes(q)
+          || indent.erpIndentNo?.toLowerCase().includes(q)
+          || indent.requestedBy?.fullName?.toLowerCase().includes(q)
+          || indent.items?.some((i: any) => i.itemName?.toLowerCase().includes(q));
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [indents, statusFilter, priorityFilter, monthFilter, searchQuery]);
+
+  const approversByUser = useMemo(() => {
+    const map = new Map<number, { user: any; departments: any[] }>();
+    (approverAssignments || []).forEach((a: any) => {
+      if (!map.has(a.userId)) {
+        map.set(a.userId, { user: a.user, departments: [] });
+      }
+      map.get(a.userId)!.departments.push(a.department);
+    });
+    return Array.from(map.values());
+  }, [approverAssignments]);
 
   return (
     <div className="p-6" data-testid="indents-page">
@@ -222,17 +322,24 @@ export default function Indents() {
         description={it.subtitle}
         icon={<PackageSearch className="w-5 h-5 text-primary" />}
         actions={
-          <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-new-indent">
-                <Plus className="w-4 h-4 mr-2" /> {it.newIndent}
+          <div className="flex gap-2">
+            {user?.role === "admin" && (
+              <Button variant="outline" onClick={() => setIsApproverConfigOpen(true)} data-testid="button-approver-config">
+                <Settings className="w-4 h-4 mr-2" /> {it.approverConfig}
               </Button>
-            </DialogTrigger>
-          </Dialog>
+            )}
+            <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetForm(); }}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-new-indent">
+                  <Plus className="w-4 h-4 mr-2" /> {it.newIndent}
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+          </div>
         }
       />
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4 flex-wrap">
         <Input
           placeholder={it.search}
           value={searchQuery}
@@ -240,6 +347,27 @@ export default function Indents() {
           className="max-w-xs"
           data-testid="input-search-indents"
         />
+        <div className="flex items-center gap-1">
+          <Input
+            type="month"
+            value={monthFilter === "all" ? "" : monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value || "all")}
+            className="w-[180px]"
+            data-testid="input-month-filter"
+          />
+          {monthFilter !== "all" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => setMonthFilter("all")}
+              data-testid="button-clear-month-filter"
+              title={it.allMonths}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
             <SelectValue placeholder={it.allStatuses} />
@@ -324,7 +452,7 @@ export default function Indents() {
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
-                      {indent.status === "pending" && (user?.role === "admin" || user?.isApprover) && (
+                      {indent.status === "pending" && canApproveIndent(indent) && (
                         <>
                           <Button
                             variant="ghost" size="icon"
@@ -344,7 +472,7 @@ export default function Indents() {
                           </Button>
                         </>
                       )}
-                      {indent.status === "approved" && (user?.role === "admin") && (
+                      {indent.status === "approved" && canApproveIndent(indent) && (
                         <Button
                           variant="ghost" size="icon"
                           className="text-blue-600 hover:text-blue-700"
@@ -636,6 +764,86 @@ export default function Indents() {
               {t.buttons.reject}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approver Config Dialog */}
+      <Dialog open={isApproverConfigOpen} onOpenChange={setIsApproverConfigOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-approver-config">
+          <DialogHeader>
+            <DialogTitle>{it.approverConfig}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{it.approverConfigDesc}</p>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>{it.selectUser}</Label>
+                <Select value={selectedApproverUserId} onValueChange={handleSelectApproverUser}>
+                  <SelectTrigger data-testid="select-approver-user">
+                    <SelectValue placeholder={it.selectUser} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{it.selectUser}</SelectItem>
+                    {(allUsers || []).filter((u: any) => u.role !== "customer").map((u: any) => (
+                      <SelectItem key={u.id} value={String(u.id)}>{u.fullName || u.username}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {selectedApproverUserId && selectedApproverUserId !== "none" && (
+              <div>
+                <Label className="mb-2 block">{it.assignedDepartments}</Label>
+                <div className="space-y-2 border rounded-lg p-3">
+                  {(departments || []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{it.noDepartments}</p>
+                  ) : (
+                    (departments || []).map((dept: any) => (
+                      <div key={dept.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`dept-${dept.id}`}
+                          checked={selectedApproverDepts.includes(dept.id)}
+                          onCheckedChange={() => toggleApproverDept(dept.id)}
+                          data-testid={`checkbox-dept-${dept.id}`}
+                        />
+                        <label htmlFor={`dept-${dept.id}`} className="text-sm cursor-pointer">{dept.name}</label>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <Button
+                  className="mt-3"
+                  onClick={handleSaveApprover}
+                  disabled={saveApproverMutation.isPending}
+                  data-testid="button-save-approver"
+                >
+                  {it.saveAssignment}
+                </Button>
+              </div>
+            )}
+
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold mb-2 block">{it.currentAssignments}</Label>
+              {approversByUser.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{it.noAssignments}</p>
+              ) : (
+                <div className="space-y-2">
+                  {approversByUser.map(({ user: u, departments: depts }) => (
+                    <div key={u.id} className="flex items-start gap-3 p-2 border rounded-lg" data-testid={`approver-assignment-${u.id}`}>
+                      <span className="font-medium text-sm min-w-[120px]">{u.fullName || u.username}</span>
+                      <div className="flex flex-wrap gap-1">
+                        {depts.map((d: any) => (
+                          <Badge key={d.id} variant="secondary" className="text-xs">{d.name}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

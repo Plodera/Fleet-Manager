@@ -1604,9 +1604,17 @@ export async function registerRoutes(
       const parsed = api.indents.update.input.parse(req.body);
       const { items, ...updates } = parsed;
 
-      if (updates.status === 'approved' || updates.status === 'rejected') {
-        if (user.role !== 'admin' && !user.isApprover) {
-          return res.status(403).json({ message: "Only admins or approvers can approve/reject indents" });
+      if (updates.status === 'approved' || updates.status === 'rejected' || updates.status === 'fulfilled') {
+        if (user.role !== 'admin') {
+          if (!hasPermission(user, 'approve_indents')) {
+            return res.status(403).json({ message: "You don't have permission to approve/reject indents" });
+          }
+          if (existing.departmentId) {
+            const myDepts = await storage.getMyIndentApproverDepartments(user.id);
+            if (!myDepts.includes(existing.departmentId)) {
+              return res.status(403).json({ message: "You are not assigned as approver for this department" });
+            }
+          }
         }
         if (updates.status === 'approved') {
           if (!updates.erpIndentNo && !existing.erpIndentNo) {
@@ -1614,10 +1622,6 @@ export async function registerRoutes(
           }
           (updates as any).approvedById = user.id;
         }
-      }
-
-      if (updates.status === 'fulfilled' && user.role !== 'admin') {
-        return res.status(403).json({ message: "Only admins can mark indents as fulfilled" });
       }
 
       await storage.updateIndent(id, updates as any);
@@ -1640,6 +1644,33 @@ export async function registerRoutes(
     }
     await storage.deleteIndent(Number(req.params.id));
     res.status(204).send();
+  });
+
+  // Indent Approver Departments
+  app.get(api.indentApprovers.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const assignments = await storage.getIndentApproverDepartments();
+    res.json(assignments);
+  });
+
+  app.get(api.indentApprovers.mine.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    const deptIds = await storage.getMyIndentApproverDepartments(user.id);
+    res.json(deptIds);
+  });
+
+  app.post(api.indentApprovers.set.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { userId, departmentIds } = api.indentApprovers.set.input.parse(req.body);
+      await storage.setIndentApproverDepartments(userId, departmentIds);
+      res.json({ success: true });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
   // Seed Data

@@ -31,6 +31,7 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'view_work_order_reports', label: 'Work Order Reports', labelPt: 'Relatórios de Ordens' },
   { id: 'view_reports', label: 'Reports', labelPt: 'Relatórios' },
   { id: 'view_indents', label: 'Indents', labelPt: 'Requisições' },
+  { id: 'approve_indents', label: 'Approve Indents', labelPt: 'Aprovar Requisições' },
   { id: 'manage_users', label: 'User Management', labelPt: 'Gestão de Utilizadores' },
 ] as const;
 
@@ -548,3 +549,18 @@ export type Indent = typeof indents.$inferSelect;
 export type InsertIndent = z.infer<typeof insertIndentSchema>;
 export type IndentItem = typeof indentItems.$inferSelect;
 export type InsertIndentItem = z.infer<typeof insertIndentItemSchema>;
+
+export const indentApproverDepartments = pgTable("indent_approver_departments", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  departmentId: integer("department_id").references(() => departments.id, { onDelete: "cascade" }).notNull(),
+});
+
+export const indentApproverDepartmentsRelations = relations(indentApproverDepartments, ({ one }) => ({
+  user: one(users, { fields: [indentApproverDepartments.userId], references: [users.id] }),
+  department: one(departments, { fields: [indentApproverDepartments.departmentId], references: [departments.id] }),
+}));
+
+export const insertIndentApproverDepartmentSchema = createInsertSchema(indentApproverDepartments).omit({ id: true });
+export type IndentApproverDepartment = typeof indentApproverDepartments.$inferSelect;
+export type InsertIndentApproverDepartment = z.infer<typeof insertIndentApproverDepartmentSchema>;
