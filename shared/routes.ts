@@ -17,6 +17,7 @@ import {
   insertVehicleTypeSchema,
   insertWorkOrderSchema,
   insertWorkOrderItemSchema,
+  insertIndentSchema,
   users,
   vehicles,
   bookings,
@@ -34,6 +35,8 @@ import {
   vehicleTypes,
   workOrders,
   workOrderItems,
+  indents,
+  indentItems,
 } from './schema';
 
 export const errorSchemas = {
@@ -627,6 +630,50 @@ export const api = {
       responses: { 200: z.any(), 404: errorSchemas.notFound },
     },
     delete: { method: 'DELETE' as const, path: '/api/work-orders/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
+  },
+  indents: {
+    list: { method: 'GET' as const, path: '/api/indents', responses: { 200: z.array(z.any()) } },
+    get: { method: 'GET' as const, path: '/api/indents/:id', responses: { 200: z.any(), 404: errorSchemas.notFound } },
+    create: {
+      method: 'POST' as const,
+      path: '/api/indents',
+      input: z.object({
+        vehicleId: z.coerce.number().optional().nullable(),
+        purpose: z.string().min(1),
+        priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+        departmentId: z.coerce.number().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        items: z.array(z.object({
+          itemName: z.string().min(1),
+          quantity: z.coerce.number().min(1),
+          unit: z.string().min(1),
+          notes: z.string().optional().nullable(),
+        })).min(1),
+      }),
+      responses: { 201: z.any(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/indents/:id',
+      input: z.object({
+        status: z.enum(['pending', 'approved', 'rejected', 'fulfilled', 'cancelled']).optional(),
+        erpIndentNo: z.string().optional().nullable(),
+        approvalNotes: z.string().optional().nullable(),
+        vehicleId: z.coerce.number().optional().nullable(),
+        purpose: z.string().optional(),
+        priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+        departmentId: z.coerce.number().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        items: z.array(z.object({
+          itemName: z.string().min(1),
+          quantity: z.coerce.number().min(1),
+          unit: z.string().min(1),
+          notes: z.string().optional().nullable(),
+        })).optional(),
+      }),
+      responses: { 200: z.any(), 400: errorSchemas.validation, 404: errorSchemas.notFound },
+    },
+    delete: { method: 'DELETE' as const, path: '/api/indents/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
   },
 };
 

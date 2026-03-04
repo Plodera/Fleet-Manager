@@ -1557,6 +1557,88 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Indents
+  app.get(api.indents.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_indents')) return res.status(403).send("Access denied");
+    res.json(await storage.getIndents());
+  });
+
+  app.get(api.indents.get.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_indents')) return res.status(403).send("Access denied");
+    const indent = await storage.getIndent(Number(req.params.id));
+    if (!indent) return res.status(404).json({ message: "Indent not found" });
+    res.json(indent);
+  });
+
+  app.post(api.indents.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_indents')) return res.status(403).send("Access denied");
+    try {
+      const parsed = api.indents.create.input.parse(req.body);
+      const { items, ...indentData } = parsed;
+      const created = await storage.createIndent(
+        { ...indentData, requestedById: user.id, status: 'pending' } as any,
+        items
+      );
+      const enriched = await storage.getIndent(created.id);
+      res.status(201).json(enriched);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.patch(api.indents.update.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_indents')) return res.status(403).send("Access denied");
+    try {
+      const id = Number(req.params.id);
+      const existing = await storage.getIndent(id);
+      if (!existing) return res.status(404).json({ message: "Indent not found" });
+      const parsed = api.indents.update.input.parse(req.body);
+      const { items, ...updates } = parsed;
+
+      if (updates.status === 'approved' || updates.status === 'rejected') {
+        if (user.role !== 'admin' && !user.isApprover) {
+          return res.status(403).json({ message: "Only admins or approvers can approve/reject indents" });
+        }
+        if (updates.status === 'approved') {
+          if (!updates.erpIndentNo && !existing.erpIndentNo) {
+            return res.status(400).json({ message: "ERP Indent Number is required for approval" });
+          }
+          (updates as any).approvedById = user.id;
+        }
+      }
+
+      if (updates.status === 'fulfilled' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only admins can mark indents as fulfilled" });
+      }
+
+      await storage.updateIndent(id, updates as any);
+      if (items) {
+        await storage.replaceIndentItems(id, items);
+      }
+      const enriched = await storage.getIndent(id);
+      res.json(enriched);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete(api.indents.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_indents')) return res.status(403).send("Access denied");
+    const indent = await storage.getIndent(Number(req.params.id));
+    if (!indent) return res.status(404).json({ message: "Indent not found" });
+    if (user.role !== 'admin' && indent.requestedById !== user.id) {
+      return res.status(403).json({ message: "You can only delete your own indents" });
+    }
+    await storage.deleteIndent(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

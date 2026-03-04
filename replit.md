@@ -15,13 +15,14 @@ A vehicle management and booking system for organizational vehicles with user au
 - Vehicle Inspections: Equipment-specific inspections for Factory Vehicles (18 items) and Transfer Trolleys (11 items in 2 sections)
 - Equipment Types Management: Admin interface for creating custom equipment types with configurable checklist items
 - User Authentication with role-based access (admin, staff, customer)
-- User Permissions System: Granular access control (12 permissions including manage_vehicles)
+- User Permissions System: Granular access control (13 permissions including manage_vehicles, view_indents)
 - Analytics Dashboard
 - Booking Approval Workflow: Designate approvers, bookings require approval before use
 - Driver Dashboard: Dedicated view for drivers showing only their assigned trips with Start/End Trip actions
 - Work Order Reports: Custom report generation with selectable fields, date/status/type filters, print and CSV export
 - Vehicle Types Configuration: Admin-configurable vehicle type groups (e.g., "Passenger Vehicles" → car/van/bus, "Equipment/Industrial" → truck) that filter the vehicle dropdown in Work Orders. Each type has an "Available for Booking" toggle — only vehicles in bookable categories appear in Bookings and Shared Rides vehicle dropdowns.
 - Configurable Maintenance Types: Admin-managed maintenance types with bilingual labels (no code changes needed)
+- Indents (Parts/Materials Requisition): Requisition workflow with auto-generated indent numbers (IND-0001), ERP Indent Number mandatory at approval, priority levels (low/medium/high/urgent), department and vehicle association, dynamic line items with unit dropdown (pcs/litres/kg/metres/sets/boxes/rolls), status flow (pending→approved→fulfilled or rejected/cancelled)
 - Bilingual Support: English/Portuguese for navigation, buttons, and status labels
 
 ## Vehicle Inspections

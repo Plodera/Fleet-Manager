@@ -30,6 +30,7 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'view_work_orders', label: 'Work Orders', labelPt: 'Ordens de Trabalho' },
   { id: 'view_work_order_reports', label: 'Work Order Reports', labelPt: 'Relatórios de Ordens' },
   { id: 'view_reports', label: 'Reports', labelPt: 'Relatórios' },
+  { id: 'view_indents', label: 'Indents', labelPt: 'Requisições' },
   { id: 'manage_users', label: 'User Management', labelPt: 'Gestão de Utilizadores' },
 ] as const;
 
@@ -488,3 +489,62 @@ export type WorkOrder = typeof workOrders.$inferSelect;
 export type InsertWorkOrder = z.infer<typeof insertWorkOrderSchema>;
 export type WorkOrderItem = typeof workOrderItems.$inferSelect;
 export type InsertWorkOrderItem = z.infer<typeof insertWorkOrderItemSchema>;
+
+// Indents (Parts/Materials Requisitions)
+export const indents = pgTable("indents", {
+  id: serial("id").primaryKey(),
+  indentNo: text("indent_no").notNull().unique(),
+  erpIndentNo: text("erp_indent_no"),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id),
+  requestedById: integer("requested_by_id").references(() => users.id).notNull(),
+  approvedById: integer("approved_by_id").references(() => users.id),
+  status: text("status").notNull().default("pending"),
+  priority: text("priority").notNull().default("medium"),
+  purpose: text("purpose").notNull(),
+  departmentId: integer("department_id").references(() => departments.id),
+  notes: text("notes"),
+  approvalNotes: text("approval_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const indentItems = pgTable("indent_items", {
+  id: serial("id").primaryKey(),
+  indentId: integer("indent_id").references(() => indents.id, { onDelete: "cascade" }).notNull(),
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  unit: text("unit").notNull().default("pcs"),
+  notes: text("notes"),
+});
+
+export const indentsRelations = relations(indents, ({ one, many }) => ({
+  vehicle: one(vehicles, { fields: [indents.vehicleId], references: [vehicles.id] }),
+  requestedBy: one(users, { fields: [indents.requestedById], references: [users.id], relationName: "indentRequester" }),
+  approvedBy: one(users, { fields: [indents.approvedById], references: [users.id], relationName: "indentApprover" }),
+  department: one(departments, { fields: [indents.departmentId], references: [departments.id] }),
+  items: many(indentItems),
+}));
+
+export const indentItemsRelations = relations(indentItems, ({ one }) => ({
+  indent: one(indents, { fields: [indentItems.indentId], references: [indents.id] }),
+}));
+
+export const insertIndentSchema = createInsertSchema(indents)
+  .omit({ id: true, createdAt: true, updatedAt: true, indentNo: true })
+  .extend({
+    requestedById: z.coerce.number(),
+    vehicleId: z.coerce.number().optional().nullable(),
+    departmentId: z.coerce.number().optional().nullable(),
+    approvedById: z.coerce.number().optional().nullable(),
+  });
+export const insertIndentItemSchema = createInsertSchema(indentItems)
+  .omit({ id: true })
+  .extend({
+    indentId: z.coerce.number(),
+    quantity: z.coerce.number().min(1),
+  });
+
+export type Indent = typeof indents.$inferSelect;
+export type InsertIndent = z.infer<typeof insertIndentSchema>;
+export type IndentItem = typeof indentItems.$inferSelect;
+export type InsertIndentItem = z.infer<typeof insertIndentItemSchema>;

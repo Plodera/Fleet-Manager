@@ -1,6 +1,7 @@
 import { 
   users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
+  indents, indentItems,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -15,6 +16,8 @@ import {
   type VehicleType, type InsertVehicleType,
   type WorkOrder, type InsertWorkOrder,
   type WorkOrderItem, type InsertWorkOrderItem,
+  type Indent, type InsertIndent,
+  type IndentItem, type InsertIndentItem,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
@@ -132,6 +135,16 @@ export interface IStorage {
   updateWorkOrderItem(id: number, updates: Partial<InsertWorkOrderItem>): Promise<WorkOrderItem>;
   deleteWorkOrderItem(id: number): Promise<void>;
   deleteWorkOrderItems(workOrderId: number): Promise<void>;
+
+  // Indents
+  getIndents(): Promise<any[]>;
+  getIndent(id: number): Promise<any | undefined>;
+  createIndent(data: InsertIndent, items: Omit<InsertIndentItem, 'indentId'>[]): Promise<Indent>;
+  updateIndent(id: number, updates: Partial<InsertIndent>): Promise<Indent>;
+  deleteIndent(id: number): Promise<void>;
+  getNextIndentNo(): Promise<string>;
+  getIndentItems(indentId: number): Promise<IndentItem[]>;
+  replaceIndentItems(indentId: number, items: Omit<InsertIndentItem, 'indentId'>[]): Promise<IndentItem[]>;
 
   sessionStore: session.Store;
 }
@@ -654,6 +667,72 @@ export class DatabaseStorage implements IStorage {
   async deleteWorkOrderItems(workOrderId: number): Promise<void> {
     await getDb().delete(workOrderItems).where(eq(workOrderItems.workOrderId, workOrderId));
   }
+
+  // Indents
+  async getIndents(): Promise<any[]> {
+    const allIndents = await getDb().select().from(indents).orderBy(desc(indents.createdAt));
+    const results = [];
+    for (const indent of allIndents) {
+      const enriched = await this._enrichIndent(indent);
+      if (enriched) results.push(enriched);
+    }
+    return results;
+  }
+
+  async getIndent(id: number): Promise<any | undefined> {
+    const [indent] = await getDb().select().from(indents).where(eq(indents.id, id));
+    if (!indent) return undefined;
+    return this._enrichIndent(indent);
+  }
+
+  private async _enrichIndent(indent: Indent) {
+    const [requestedBy] = await getDb().select().from(users).where(eq(users.id, indent.requestedById));
+    if (!requestedBy) return undefined;
+    const approvedBy = indent.approvedById ? (await getDb().select().from(users).where(eq(users.id, indent.approvedById)))[0] : null;
+    const vehicle = indent.vehicleId ? (await getDb().select().from(vehicles).where(eq(vehicles.id, indent.vehicleId)))[0] : null;
+    const department = indent.departmentId ? (await getDb().select().from(departments).where(eq(departments.id, indent.departmentId)))[0] : null;
+    const items = await getDb().select().from(indentItems).where(eq(indentItems.indentId, indent.id));
+    return { ...indent, requestedBy, approvedBy, vehicle, department, items };
+  }
+
+  async createIndent(data: InsertIndent, items: Omit<InsertIndentItem, 'indentId'>[]): Promise<Indent> {
+    const indentNo = await this.getNextIndentNo();
+    const [created] = await getDb().insert(indents).values({ ...data, indentNo }).returning();
+    if (items.length > 0) {
+      await getDb().insert(indentItems).values(items.map(item => ({ ...item, indentId: created.id })));
+    }
+    return created;
+  }
+
+  async updateIndent(id: number, updates: Partial<InsertIndent>): Promise<Indent> {
+    const [updated] = await getDb().update(indents).set({ ...updates, updatedAt: new Date() }).where(eq(indents.id, id)).returning();
+    return updated;
+  }
+
+  async deleteIndent(id: number): Promise<void> {
+    await getDb().delete(indentItems).where(eq(indentItems.indentId, id));
+    await getDb().delete(indents).where(eq(indents.id, id));
+  }
+
+  async getNextIndentNo(): Promise<string> {
+    const result = await getDb().select({ maxNo: sql<string>`MAX(indent_no)` }).from(indents);
+    const maxNo = result[0]?.maxNo;
+    if (!maxNo) return 'IND-0001';
+    const num = parseInt(maxNo.replace('IND-', ''), 10);
+    return `IND-${String(num + 1).padStart(4, '0')}`;
+  }
+
+  async getIndentItems(indentId: number): Promise<IndentItem[]> {
+    return await getDb().select().from(indentItems).where(eq(indentItems.indentId, indentId));
+  }
+
+  async replaceIndentItems(indentId: number, items: Omit<InsertIndentItem, 'indentId'>[]): Promise<IndentItem[]> {
+    await getDb().delete(indentItems).where(eq(indentItems.indentId, indentId));
+    if (items.length > 0) {
+      return await getDb().insert(indentItems).values(items.map(item => ({ ...item, indentId }))).returning();
+    }
+    return [];
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -748,5 +827,13 @@ export const storage = {
   updateWorkOrderItem: (...args: Parameters<DatabaseStorage['updateWorkOrderItem']>) => getStorage().updateWorkOrderItem(...args),
   deleteWorkOrderItem: (...args: Parameters<DatabaseStorage['deleteWorkOrderItem']>) => getStorage().deleteWorkOrderItem(...args),
   deleteWorkOrderItems: (...args: Parameters<DatabaseStorage['deleteWorkOrderItems']>) => getStorage().deleteWorkOrderItems(...args),
+  getIndents: () => getStorage().getIndents(),
+  getIndent: (...args: Parameters<DatabaseStorage['getIndent']>) => getStorage().getIndent(...args),
+  createIndent: (...args: Parameters<DatabaseStorage['createIndent']>) => getStorage().createIndent(...args),
+  updateIndent: (...args: Parameters<DatabaseStorage['updateIndent']>) => getStorage().updateIndent(...args),
+  deleteIndent: (...args: Parameters<DatabaseStorage['deleteIndent']>) => getStorage().deleteIndent(...args),
+  getNextIndentNo: () => getStorage().getNextIndentNo(),
+  getIndentItems: (...args: Parameters<DatabaseStorage['getIndentItems']>) => getStorage().getIndentItems(...args),
+  replaceIndentItems: (...args: Parameters<DatabaseStorage['replaceIndentItems']>) => getStorage().replaceIndentItems(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };
