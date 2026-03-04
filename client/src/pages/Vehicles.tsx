@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useVehicles } from "@/hooks/use-vehicles";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Car, Gauge, Calendar, Pencil, Image, Users, AlertTriangle } from "lucide-react";
+import { Plus, Search, Car, Gauge, Calendar, Pencil, Image, Users, AlertTriangle, Filter } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/lib/i18n";
 import { PageHeader } from "@/components/PageHeader";
@@ -28,6 +28,8 @@ export default function Vehicles() {
   const canManageVehicles = isAdmin || userPermissions.includes('manage_vehicles');
   const canManageAvailability = canManageVehicles || user?.isApprover;
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -37,11 +39,42 @@ export default function Vehicles() {
     refetchInterval: 60000,
   });
 
-  const filteredVehicles = vehicles?.filter(v => 
-    v.make.toLowerCase().includes(search.toLowerCase()) || 
-    v.model.toLowerCase().includes(search.toLowerCase()) ||
-    (v.licensePlate || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const { data: vehicleTypes } = useQuery<any[]>({
+    queryKey: ["/api/vehicle-types"],
+  });
+
+  const categoryMap = useMemo(() => {
+    if (!vehicleTypes || vehicleTypes.length === 0) return null;
+    const map: Record<string, string> = {};
+    vehicleTypes.forEach((vt: any) => {
+      (vt.categories || []).forEach((cat: string) => {
+        map[cat] = vt.name;
+      });
+    });
+    return map;
+  }, [vehicleTypes]);
+
+  const filteredVehicles = useMemo(() => {
+    let filtered = vehicles || [];
+    if (search) {
+      const s = search.toLowerCase();
+      filtered = filtered.filter(v =>
+        v.make.toLowerCase().includes(s) ||
+        v.model.toLowerCase().includes(s) ||
+        (v.licensePlate || '').toLowerCase().includes(s)
+      );
+    }
+    if (categoryFilter !== "all" && vehicleTypes) {
+      const vt = vehicleTypes.find((v: any) => String(v.id) === categoryFilter);
+      if (vt) {
+        filtered = filtered.filter(v => (vt.categories || []).includes((v as any).category));
+      }
+    }
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(v => v.status === statusFilter);
+    }
+    return filtered;
+  }, [vehicles, search, categoryFilter, statusFilter, vehicleTypes]);
 
   const form = useForm({
     resolver: zodResolver(insertVehicleSchema),
@@ -407,14 +440,48 @@ export default function Vehicles() {
         </DialogContent>
       </Dialog>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input 
-          className="pl-10 max-w-sm bg-white" 
-          placeholder={t.vehicles.searchPlaceholder}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input 
+            className="pl-10 bg-white" 
+            placeholder={t.vehicles.searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="input-vehicle-search"
+          />
+        </div>
+        {vehicleTypes && vehicleTypes.length > 0 && (
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[200px] bg-white" data-testid="select-vehicle-category-filter">
+              <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder={t.vehicles.allCategories} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" data-testid="select-category-all">{t.vehicles.allCategories}</SelectItem>
+              {vehicleTypes.map((vt: any) => (
+                <SelectItem key={vt.id} value={String(vt.id)} data-testid={`select-category-${vt.id}`}>
+                  {vt.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px] bg-white" data-testid="select-vehicle-status-filter">
+            <SelectValue placeholder={t.vehicles.allStatuses} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" data-testid="select-status-all">{t.vehicles.allStatuses}</SelectItem>
+            <SelectItem value="available" data-testid="select-status-available">{t.status.available}</SelectItem>
+            <SelectItem value="in_use" data-testid="select-status-inUse">{t.status.inUse}</SelectItem>
+            <SelectItem value="maintenance" data-testid="select-status-maintenance">{t.status.maintenance}</SelectItem>
+            <SelectItem value="unavailable" data-testid="select-status-unavailable">{t.status.unavailable}</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-sm text-muted-foreground whitespace-nowrap" data-testid="text-vehicle-count">
+          {t.vehicles.showing} {filteredVehicles?.length || 0} {t.vehicles.of} {vehicles?.length || 0} {t.vehicles.vehiclesLabel}
+        </span>
       </div>
 
       {isLoading ? (

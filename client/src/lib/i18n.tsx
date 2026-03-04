@@ -147,6 +147,11 @@ const translations = {
       adjustSearch: "Try adjusting your search terms.",
       deleteConfirm: "Delete this vehicle?",
       vinPlaceholder: "Unique VIN...",
+      allCategories: "All Categories",
+      allStatuses: "All Statuses",
+      showing: "Showing",
+      of: "of",
+      vehiclesLabel: "vehicles",
     },
     // Bookings page
     bookings: {
@@ -588,6 +593,11 @@ const translations = {
       adjustSearch: "Tente ajustar os termos de pesquisa.",
       deleteConfirm: "Eliminar este veículo?",
       vinPlaceholder: "VIN único...",
+      allCategories: "Todas as Categorias",
+      allStatuses: "Todos os Estados",
+      showing: "A mostrar",
+      of: "de",
+      vehiclesLabel: "veículos",
     },
     // Bookings page
     bookings: {

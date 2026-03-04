@@ -9,7 +9,7 @@ A vehicle management and booking system for organizational vehicles with user au
 - **Dialog Pattern**: Dialog triggers placed in PageHeader actions prop; Dialog bodies rendered as siblings outside the header component.
 
 ## Features
-- Vehicle Management: CRUD operations for vehicles
+- Vehicle Management: CRUD operations for vehicles with category and status filters, search, and vehicle count display
 - Booking System: Reservation and scheduling with approval workflow
 - Maintenance Tracking & Fuel Monitoring
 - Vehicle Inspections: Equipment-specific inspections for Factory Vehicles (18 items) and Transfer Trolleys (11 items in 2 sections)
