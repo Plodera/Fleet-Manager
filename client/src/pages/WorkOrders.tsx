@@ -237,7 +237,7 @@ export default function WorkOrders() {
                       <SelectItem value="all" data-testid="select-vehicle-type-all">{t.workOrders.allVehicleTypes}</SelectItem>
                       {vehicleTypesData.map((vt: any) => (
                         <SelectItem key={vt.id} value={String(vt.id)} data-testid={`select-vehicle-type-${vt.id}`}>
-                          {language === "pt" ? vt.labelPt : vt.labelEn}
+                          {vt.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
