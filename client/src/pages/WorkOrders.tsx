@@ -272,7 +272,7 @@ export default function WorkOrders() {
                     <SelectContent>
                       {maintenanceTypeConfigs?.map(mt => (
                         <SelectItem key={mt.name} value={mt.name} data-testid={`select-maintenance-type-${mt.name}`}>
-                          {language === "pt" ? mt.labelPt : mt.labelEn}
+                          {mt.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
