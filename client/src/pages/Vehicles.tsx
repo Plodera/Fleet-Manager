@@ -474,7 +474,7 @@ export default function Vehicles() {
           <SelectContent>
             <SelectItem value="all" data-testid="select-status-all">{t.vehicles.allStatuses}</SelectItem>
             <SelectItem value="available" data-testid="select-status-available">{t.status.available}</SelectItem>
-            <SelectItem value="in_use" data-testid="select-status-inUse">{t.status.inUse}</SelectItem>
+            <SelectItem value="in_use" data-testid="select-status-inUse">{t.status.in_use}</SelectItem>
             <SelectItem value="maintenance" data-testid="select-status-maintenance">{t.status.maintenance}</SelectItem>
             <SelectItem value="unavailable" data-testid="select-status-unavailable">{t.status.unavailable}</SelectItem>
           </SelectContent>
