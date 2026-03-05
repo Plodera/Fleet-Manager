@@ -723,9 +723,9 @@ export class DatabaseStorage implements IStorage {
   async getNextIndentNo(): Promise<string> {
     const result = await getDb().select({ maxNo: sql<string>`MAX(indent_no)` }).from(indents);
     const maxNo = result[0]?.maxNo;
-    if (!maxNo) return 'IND-0001';
-    const num = parseInt(maxNo.replace('IND-', ''), 10);
-    return `IND-${String(num + 1).padStart(4, '0')}`;
+    if (!maxNo) return 'PR-0001';
+    const num = parseInt(maxNo.replace(/^(IND|PR)-/, ''), 10);
+    return `PR-${String(num + 1).padStart(4, '0')}`;
   }
 
   async getIndentItems(indentId: number): Promise<IndentItem[]> {

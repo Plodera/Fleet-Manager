@@ -97,7 +97,7 @@ export default function Indents() {
       queryClient.invalidateQueries({ queryKey: [api.indents.list.path] });
       setIsCreateOpen(false);
       resetForm();
-      toast({ title: "Indent created successfully" });
+      toast({ title: it.title, description: it.newIndent });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -116,7 +116,7 @@ export default function Indents() {
       setApproveIndent(null);
       setErpIndentNo("");
       setApprovalNotes("");
-      toast({ title: "Indent updated successfully" });
+      toast({ title: it.title, description: it.editIndent });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -129,7 +129,7 @@ export default function Indents() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.indents.list.path] });
-      toast({ title: "Indent deleted" });
+      toast({ title: it.title, description: it.deleteConfirm });
     },
   });
 
