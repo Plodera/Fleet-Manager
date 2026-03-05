@@ -16,9 +16,13 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
-import { FileText, Printer, Download, Filter, CheckSquare, BarChart3, FileSpreadsheet } from "lucide-react";
+import { FileText, Printer, Download, Filter, CheckSquare, BarChart3, FileSpreadsheet, Search } from "lucide-react";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
+
+type GroupByOption = "maintenanceType" | "status" | "vehicle" | "month";
+type ValuesOption = "count" | "totalHours";
+type CrossTabOption = "none" | "maintenanceType";
 
 interface FieldOption {
   key: string;
@@ -26,9 +30,28 @@ interface FieldOption {
   getValue: (wo: any) => string;
 }
 
-interface SummaryEntry {
-  label: string;
-  count: number;
+function parseTimeToMinutes(time: string): number {
+  if (!time) return 0;
+  const parts = time.split(":");
+  if (parts.length < 2) return 0;
+  return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+}
+
+function formatMinutesToHHMM(totalMinutes: number): string {
+  if (totalMinutes <= 0) return "";
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+function getWorkOrderTotalMinutes(wo: any): number {
+  if (!wo.items || wo.items.length === 0) return 0;
+  return wo.items.reduce((sum: number, item: any) => {
+    const start = parseTimeToMinutes(item.startTime || "");
+    const end = parseTimeToMinutes(item.endTime || "");
+    const diff = end >= start ? end - start : 0;
+    return sum + diff;
+  }, 0);
 }
 
 export default function WorkOrderReports() {
@@ -45,6 +68,11 @@ export default function WorkOrderReports() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [showReport, setShowReport] = useState(false);
+
+  const [groupBy, setGroupBy] = useState<GroupByOption>("vehicle");
+  const [valuesOption, setValuesOption] = useState<ValuesOption>("totalHours");
+  const [crossTab, setCrossTab] = useState<CrossTabOption>("maintenanceType");
+  const [summarySearch, setSummarySearch] = useState("");
 
   const { data: workOrders, isLoading, isError } = useQuery<any[]>({
     queryKey: [api.workOrders.list.path],
@@ -68,6 +96,18 @@ export default function WorkOrderReports() {
     return labels[status] || status;
   };
 
+  const groupByLabels: Record<GroupByOption, string> = {
+    maintenanceType: t.workOrders.byMaintenanceType,
+    status: t.workOrders.byStatus,
+    vehicle: t.workOrders.byVehicle,
+    month: t.workOrders.byMonth,
+  };
+
+  const valuesLabels: Record<ValuesOption, string> = {
+    count: t.workOrders.count,
+    totalHours: t.workOrders.totalHours,
+  };
+
   const fieldOptions: FieldOption[] = useMemo(() => [
     { key: "jobNo", label: t.workOrders.jobNo, getValue: (wo) => wo.jobNo || "-" },
     { key: "date", label: t.workOrders.date, getValue: (wo) => wo.date ? format(new Date(wo.date), "dd/MM/yyyy") : "-" },
@@ -88,7 +128,7 @@ export default function WorkOrderReports() {
     }},
     { key: "description", label: t.workOrders.description, getValue: (wo) => {
       if (!wo.items || wo.items.length === 0) return "-";
-      return wo.items.flatMap((item: any) => 
+      return wo.items.flatMap((item: any) =>
         Array.isArray(item.descriptions) ? item.descriptions : [item.description || ""]
       ).filter(Boolean).join("; ") || "-";
     }},
@@ -121,45 +161,125 @@ export default function WorkOrderReports() {
     });
   }, [workOrders, dateFrom, dateTo, statusFilter, typeFilter]);
 
-  const summaryByType = useMemo((): SummaryEntry[] => {
-    const counts: Record<string, number> = {};
-    filteredWorkOrders.forEach(wo => {
-      const label = getMtLabel(wo.maintenanceType);
-      counts[label] = (counts[label] || 0) + 1;
-    });
-    return Object.entries(counts).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
-  }, [filteredWorkOrders, maintenanceTypeConfigs, language]);
+  const getGroupKey = (wo: any): string => {
+    switch (groupBy) {
+      case "maintenanceType": return getMtLabel(wo.maintenanceType);
+      case "status": return getStatusLabel(wo.status);
+      case "vehicle": return wo.vehicle ? `${wo.vehicle.licensePlate} — ${wo.vehicle.make} ${wo.vehicle.model}` : "-";
+      case "month": return wo.date ? format(new Date(wo.date), "yyyy-MM") : "-";
+      default: return "-";
+    }
+  };
 
-  const summaryByStatus = useMemo((): SummaryEntry[] => {
-    const counts: Record<string, number> = {};
-    filteredWorkOrders.forEach(wo => {
-      const label = getStatusLabel(wo.status);
-      counts[label] = (counts[label] || 0) + 1;
-    });
-    return Object.entries(counts).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
-  }, [filteredWorkOrders, t]);
+  const getGroupSortKey = (wo: any): string => {
+    if (groupBy === "month" && wo.date) return format(new Date(wo.date), "yyyy-MM");
+    return getGroupKey(wo);
+  };
 
-  const summaryByVehicle = useMemo((): SummaryEntry[] => {
-    const counts: Record<string, number> = {};
-    filteredWorkOrders.forEach(wo => {
-      const label = wo.vehicle ? `${wo.vehicle.make} ${wo.vehicle.model} - ${wo.vehicle.licensePlate}` : "-";
-      counts[label] = (counts[label] || 0) + 1;
-    });
-    return Object.entries(counts).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
-  }, [filteredWorkOrders]);
+  const getGroupDisplayLabel = (key: string): string => {
+    if (groupBy === "month" && key !== "-") {
+      try {
+        const [y, m] = key.split("-");
+        return format(new Date(parseInt(y), parseInt(m) - 1, 1), "MMM yyyy");
+      } catch { return key; }
+    }
+    return key;
+  };
 
-  const summaryByMonth = useMemo((): SummaryEntry[] => {
-    const counts: Record<string, { label: string; count: number; sortKey: number }> = {};
+  const allMtTypes = useMemo(() => {
+    if (!maintenanceTypeConfigs) return [];
+    return maintenanceTypeConfigs.filter(mt => mt.isActive).map(mt => ({
+      name: mt.name,
+      label: language === "pt" ? mt.labelPt : mt.labelEn,
+    }));
+  }, [maintenanceTypeConfigs, language]);
+
+  const uniqueMaintenanceTypes = useMemo(() => {
+    if (!workOrders) return [];
+    const types = new Set(workOrders.map(wo => wo.maintenanceType));
+    return Array.from(types);
+  }, [workOrders]);
+
+  const summaryData = useMemo(() => {
+    if (crossTab === "none") {
+      const groups: Record<string, { label: string; value: number; sortKey: string }> = {};
+      filteredWorkOrders.forEach(wo => {
+        const key = getGroupKey(wo);
+        const sortKey = getGroupSortKey(wo);
+        if (!groups[key]) groups[key] = { label: getGroupDisplayLabel(key), value: 0, sortKey };
+        if (valuesOption === "count") {
+          groups[key].value += 1;
+        } else {
+          groups[key].value += getWorkOrderTotalMinutes(wo);
+        }
+      });
+      const entries = Object.entries(groups).map(([key, g]) => ({
+        key,
+        label: groupBy === "month" ? getGroupDisplayLabel(key) : key,
+        value: valuesOption === "count" ? g.value : g.value,
+        displayValue: valuesOption === "count" ? String(g.value) : formatMinutesToHHMM(g.value),
+        sortKey: g.sortKey,
+      }));
+      entries.sort((a, b) => groupBy === "month" ? a.sortKey.localeCompare(b.sortKey) : b.value - a.value);
+      return entries;
+    }
+    return [];
+  }, [filteredWorkOrders, groupBy, valuesOption, crossTab, maintenanceTypeConfigs, language, t]);
+
+  const pivotData = useMemo(() => {
+    if (crossTab !== "maintenanceType") return [];
+    const groups: Record<string, { label: string; sortKey: string; byType: Record<string, number> }> = {};
     filteredWorkOrders.forEach(wo => {
-      if (!wo.date) return;
-      const d = new Date(wo.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const label = format(d, "MMM yyyy");
-      if (!counts[key]) counts[key] = { label, count: 0, sortKey: d.getTime() };
-      counts[key].count += 1;
+      const key = getGroupKey(wo);
+      const sortKey = getGroupSortKey(wo);
+      if (!groups[key]) {
+        groups[key] = {
+          label: groupBy === "month" ? getGroupDisplayLabel(key) : key,
+          sortKey,
+          byType: {},
+        };
+      }
+      const mtLabel = getMtLabel(wo.maintenanceType);
+      if (!groups[key].byType[mtLabel]) groups[key].byType[mtLabel] = 0;
+      if (valuesOption === "count") {
+        groups[key].byType[mtLabel] += 1;
+      } else {
+        groups[key].byType[mtLabel] += getWorkOrderTotalMinutes(wo);
+      }
     });
-    return Object.values(counts).sort((a, b) => a.sortKey - b.sortKey).map(({ label, count }) => ({ label, count }));
-  }, [filteredWorkOrders]);
+    const entries = Object.entries(groups).map(([key, g]) => ({
+      key,
+      label: g.label,
+      sortKey: g.sortKey,
+      byType: g.byType,
+    }));
+    entries.sort((a, b) => groupBy === "month" ? a.sortKey.localeCompare(b.sortKey) : a.label.localeCompare(b.label));
+    return entries;
+  }, [filteredWorkOrders, groupBy, valuesOption, crossTab, maintenanceTypeConfigs, language, t]);
+
+  const filteredSummaryData = useMemo(() => {
+    if (!summarySearch.trim()) return summaryData;
+    const q = summarySearch.toLowerCase();
+    return summaryData.filter(e => e.label.toLowerCase().includes(q));
+  }, [summaryData, summarySearch]);
+
+  const filteredPivotData = useMemo(() => {
+    if (!summarySearch.trim()) return pivotData;
+    const q = summarySearch.toLowerCase();
+    return pivotData.filter(e => e.label.toLowerCase().includes(q));
+  }, [pivotData, summarySearch]);
+
+  const pivotMtColumns = useMemo(() => {
+    const used = new Set<string>();
+    pivotData.forEach(row => {
+      Object.keys(row.byType).forEach(k => used.add(k));
+    });
+    const ordered = allMtTypes.filter(mt => used.has(mt.label)).map(mt => mt.label);
+    used.forEach(label => {
+      if (!ordered.includes(label)) ordered.push(label);
+    });
+    return ordered;
+  }, [pivotData, allMtTypes]);
 
   const activeFieldOptions = fieldOptions.filter(f => selectedFields.includes(f.key));
 
@@ -169,13 +289,8 @@ export default function WorkOrderReports() {
     );
   };
 
-  const selectAllFields = () => {
-    setSelectedFields(fieldOptions.map(f => f.key));
-  };
-
-  const deselectAllFields = () => {
-    setSelectedFields([]);
-  };
+  const selectAllFields = () => setSelectedFields(fieldOptions.map(f => f.key));
+  const deselectAllFields = () => setSelectedFields([]);
 
   const handleGenerateReport = () => {
     if (reportMode === "detailed" && selectedFields.length === 0) {
@@ -194,31 +309,58 @@ export default function WorkOrderReports() {
     return parts;
   };
 
-  const buildSummaryHtml = () => {
-    const renderTable = (title: string, data: SummaryEntry[]) => {
-      const rows = data.map(e => `<tr><td>${e.label}</td><td style="text-align:right">${e.count}</td></tr>`).join("");
+  const getSummaryTableHtml = () => {
+    if (crossTab === "maintenanceType") {
+      const colTotals: Record<string, number> = {};
+      pivotMtColumns.forEach(c => { colTotals[c] = 0; });
+      const rows = filteredPivotData.map(row => {
+        const cells = pivotMtColumns.map(col => {
+          const val = row.byType[col] || 0;
+          colTotals[col] = (colTotals[col] || 0) + val;
+          return `<td style="text-align:right">${valuesOption === "count" ? (val || "") : formatMinutesToHHMM(val)}</td>`;
+        }).join("");
+        return `<tr><td>${row.label}</td>${cells}</tr>`;
+      }).join("");
+      const totalRow = pivotMtColumns.map(col => {
+        const val = colTotals[col] || 0;
+        return `<td style="text-align:right;font-weight:600">${valuesOption === "count" ? val : formatMinutesToHHMM(val)}</td>`;
+      }).join("");
       return `
-        <h3 style="margin-top:16px;margin-bottom:4px;font-size:14px;">${title}</h3>
-        <table><thead><tr><th>${t.workOrders.category}</th><th style="text-align:right">${t.workOrders.count}</th></tr></thead>
-        <tbody>${rows}</tbody></table>
+        <table>
+          <thead><tr><th>${groupByLabels[groupBy]}</th>${pivotMtColumns.map(c => `<th style="text-align:right">${c}</th>`).join("")}</tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td style="font-weight:600">${t.workOrders.total}</td>${totalRow}</tr></tfoot>
+        </table>
       `;
-    };
-    return `
-      ${renderTable(t.workOrders.byMaintenanceType, summaryByType)}
-      ${renderTable(t.workOrders.byStatus, summaryByStatus)}
-      ${renderTable(t.workOrders.byVehicle, summaryByVehicle)}
-      ${renderTable(t.workOrders.byMonth, summaryByMonth)}
-    `;
+    } else {
+      const totalVal = filteredSummaryData.reduce((s, e) => s + e.value, 0);
+      const rows = filteredSummaryData.map(e =>
+        `<tr><td>${e.label}</td><td style="text-align:right">${e.displayValue}</td></tr>`
+      ).join("");
+      const totalDisplay = valuesOption === "count" ? String(totalVal) : formatMinutesToHHMM(totalVal);
+      return `
+        <table>
+          <thead><tr><th>${groupByLabels[groupBy]}</th><th style="text-align:right">${valuesLabels[valuesOption]}</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td style="font-weight:600">${t.workOrders.total}</td><td style="text-align:right;font-weight:600">${totalDisplay}</td></tr></tfoot>
+        </table>
+      `;
+    }
   };
 
   const handlePrint = () => {
     const meta = getFilterMeta();
     let bodyContent = "";
-
     if (reportMode === "summary") {
+      const displayCount = crossTab === "maintenanceType" ? filteredPivotData.length : filteredSummaryData.length;
       bodyContent = `
-        <div class="total">${t.workOrders.totalWorkOrders}: ${filteredWorkOrders.length}</div>
-        ${buildSummaryHtml()}
+        <div class="total">${t.workOrders.totalWorkOrders}: ${filteredWorkOrders.length}${summarySearch.trim() ? ` (${displayCount} ${language === "pt" ? "mostrados" : "shown"})` : ""}</div>
+        <div class="meta-summary">
+          ${t.workOrders.groupBy}: ${groupByLabels[groupBy]} &nbsp;|&nbsp;
+          ${t.workOrders.showValues}: ${valuesLabels[valuesOption]}
+          ${crossTab !== "none" ? ` &nbsp;|&nbsp; ${t.workOrders.crossTabBy}: ${t.workOrders.byMaintenanceType}` : ""}
+        </div>
+        ${getSummaryTableHtml()}
       `;
     } else {
       const printContent = reportRef.current;
@@ -228,37 +370,31 @@ export default function WorkOrderReports() {
         ${printContent.querySelector("table")?.outerHTML || ""}
       `;
     }
-
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
     printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
+      <!DOCTYPE html><html><head>
         <title>${t.workOrders.workOrderReport}</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
           h1 { font-size: 18px; margin-bottom: 4px; }
-          h3 { font-size: 14px; margin-top: 20px; margin-bottom: 6px; }
           .subtitle { color: #666; margin-bottom: 16px; font-size: 13px; }
-          .meta { display: flex; gap: 20px; margin-bottom: 12px; color: #444; font-size: 11px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 16px; }
+          .meta { display: flex; gap: 20px; margin-bottom: 8px; color: #444; font-size: 11px; }
+          .meta-summary { margin-bottom: 12px; color: #444; font-size: 11px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
           th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; font-size: 11px; }
           th { background-color: #f5f5f5; font-weight: 600; }
           tr:nth-child(even) { background-color: #fafafa; }
-          .total { margin-top: 8px; font-weight: 600; font-size: 12px; }
+          tfoot td { border-top: 2px solid #999; background: #f5f5f5; }
+          .total { margin-top: 8px; font-weight: 600; font-size: 12px; margin-bottom: 8px; }
         </style>
-      </head>
-      <body>
+      </head><body>
         <h1>${t.workOrders.workOrderReport}${reportMode === "summary" ? ` - ${t.workOrders.summaryReport}` : ""}</h1>
         <div class="subtitle">${t.workOrders.reportSubtitle}</div>
         <div class="meta">${meta.map(m => `<span>${m}</span>`).join("")}</div>
         ${bodyContent}
-        <div style="margin-top: 20px; color: #999; font-size: 10px;">
-          ${format(new Date(), "dd/MM/yyyy HH:mm")}
-        </div>
-      </body>
-      </html>
+        <div style="margin-top: 20px; color: #999; font-size: 10px;">${format(new Date(), "dd/MM/yyyy HH:mm")}</div>
+      </body></html>
     `);
     printWindow.document.close();
     printWindow.print();
@@ -267,107 +403,134 @@ export default function WorkOrderReports() {
   const handleExportExcel = async () => {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
-
     if (reportMode === "summary") {
-      const addSheet = (name: string, data: SummaryEntry[]) => {
-        const rows = data.map(e => ({ [t.workOrders.category]: e.label, [t.workOrders.count]: e.count }));
+      if (crossTab === "maintenanceType") {
+        const rows = filteredPivotData.map(row => {
+          const obj: Record<string, any> = { [groupByLabels[groupBy]]: row.label };
+          pivotMtColumns.forEach(col => {
+            const val = row.byType[col] || 0;
+            obj[col] = valuesOption === "count" ? (val || "") : formatMinutesToHHMM(val);
+          });
+          return obj;
+        });
+        const totalRow: Record<string, any> = { [groupByLabels[groupBy]]: t.workOrders.total };
+        pivotMtColumns.forEach(col => {
+          const total = filteredPivotData.reduce((s, r) => s + (r.byType[col] || 0), 0);
+          totalRow[col] = valuesOption === "count" ? total : formatMinutesToHHMM(total);
+        });
+        rows.push(totalRow);
         const ws = XLSX.utils.json_to_sheet(rows);
-        XLSX.utils.book_append_sheet(wb, ws, name.substring(0, 31));
-      };
-      addSheet(t.workOrders.byMaintenanceType, summaryByType);
-      addSheet(t.workOrders.byStatus, summaryByStatus);
-      addSheet(t.workOrders.byVehicle, summaryByVehicle);
-      addSheet(t.workOrders.byMonth, summaryByMonth);
+        XLSX.utils.book_append_sheet(wb, ws, t.workOrders.summaryReport.substring(0, 31));
+      } else {
+        const rows = filteredSummaryData.map(e => ({
+          [groupByLabels[groupBy]]: e.label,
+          [valuesLabels[valuesOption]]: e.displayValue,
+        }));
+        const totalVal = filteredSummaryData.reduce((s, e) => s + e.value, 0);
+        rows.push({
+          [groupByLabels[groupBy]]: t.workOrders.total,
+          [valuesLabels[valuesOption]]: valuesOption === "count" ? String(totalVal) : formatMinutesToHHMM(totalVal),
+        });
+        const ws = XLSX.utils.json_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, t.workOrders.summaryReport.substring(0, 31));
+      }
     } else {
-      const headers = activeFieldOptions.map(f => f.label);
       const rows = filteredWorkOrders.map(wo =>
         activeFieldOptions.reduce((obj: Record<string, string>, f) => {
           obj[f.label] = f.getValue(wo);
           return obj;
         }, {})
       );
-      const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+      const ws = XLSX.utils.json_to_sheet(rows, { header: activeFieldOptions.map(f => f.label) });
       XLSX.utils.book_append_sheet(wb, ws, t.workOrders.workOrderReport.substring(0, 31));
     }
-
     XLSX.writeFile(wb, `work_order_report_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`);
   };
 
   const handleExportPdf = async () => {
     const { default: jsPDF } = await import("jspdf");
     const autoTable = (await import("jspdf-autotable")).default;
-
-    const doc = new jsPDF({ orientation: reportMode === "detailed" ? "landscape" : "portrait" });
+    const isLandscape = reportMode === "detailed" || (crossTab === "maintenanceType" && pivotMtColumns.length > 3);
+    const doc = new jsPDF({ orientation: isLandscape ? "landscape" : "portrait" });
     const pageWidth = doc.internal.pageSize.getWidth();
 
     doc.setFontSize(16);
     doc.text(`${t.workOrders.workOrderReport}${reportMode === "summary" ? ` - ${t.workOrders.summaryReport}` : ""}`, 14, 18);
-
     doc.setFontSize(9);
     doc.setTextColor(100);
     const meta = getFilterMeta();
-    if (meta.length > 0) {
-      doc.text(meta.join("  |  "), 14, 26);
-    }
-    doc.text(`${t.workOrders.totalWorkOrders}: ${filteredWorkOrders.length}`, 14, meta.length > 0 ? 32 : 26);
-    doc.text(format(new Date(), "dd/MM/yyyy HH:mm"), pageWidth - 14, 18, { align: "right" });
+    if (meta.length > 0) doc.text(meta.join("  |  "), 14, 26);
 
-    let startY = meta.length > 0 ? 38 : 32;
+    let startY = meta.length > 0 ? 32 : 26;
+    if (reportMode === "summary") {
+      doc.text(`${t.workOrders.groupBy}: ${groupByLabels[groupBy]}  |  ${t.workOrders.showValues}: ${valuesLabels[valuesOption]}${crossTab !== "none" ? `  |  ${t.workOrders.crossTabBy}: ${t.workOrders.byMaintenanceType}` : ""}`, 14, startY);
+      startY += 6;
+    }
+    doc.text(`${t.workOrders.totalWorkOrders}: ${filteredWorkOrders.length}`, 14, startY);
+    doc.text(format(new Date(), "dd/MM/yyyy HH:mm"), pageWidth - 14, 18, { align: "right" });
+    startY += 6;
 
     if (reportMode === "summary") {
-      const sections = [
-        { title: t.workOrders.byMaintenanceType, data: summaryByType },
-        { title: t.workOrders.byStatus, data: summaryByStatus },
-        { title: t.workOrders.byVehicle, data: summaryByVehicle },
-        { title: t.workOrders.byMonth, data: summaryByMonth },
-      ];
-
-      for (const section of sections) {
-        doc.setFontSize(11);
-        doc.setTextColor(0);
-        doc.text(section.title, 14, startY);
-        startY += 4;
-
+      if (crossTab === "maintenanceType") {
+        const head = [groupByLabels[groupBy], ...pivotMtColumns];
+        const body = filteredPivotData.map(row => [
+          row.label,
+          ...pivotMtColumns.map(col => {
+            const val = row.byType[col] || 0;
+            return valuesOption === "count" ? String(val || "") : formatMinutesToHHMM(val);
+          }),
+        ]);
+        const totalRow = [t.workOrders.total, ...pivotMtColumns.map(col => {
+          const total = filteredPivotData.reduce((s, r) => s + (r.byType[col] || 0), 0);
+          return valuesOption === "count" ? String(total) : formatMinutesToHHMM(total);
+        })];
+        body.push(totalRow);
+        autoTable(doc, {
+          startY, head: [head], body, theme: "grid",
+          headStyles: { fillColor: [60, 60, 60], fontSize: 8 },
+          bodyStyles: { fontSize: 8 },
+          margin: { left: 14, right: 14 },
+          didParseCell: (data: any) => {
+            if (data.row.index === body.length - 1) {
+              data.cell.styles.fontStyle = "bold";
+              data.cell.styles.fillColor = [240, 240, 240];
+            }
+          },
+        });
+      } else {
+        const body = filteredSummaryData.map(e => [e.label, e.displayValue]);
+        const totalVal = filteredSummaryData.reduce((s, e) => s + e.value, 0);
+        body.push([t.workOrders.total, valuesOption === "count" ? String(totalVal) : formatMinutesToHHMM(totalVal)]);
         autoTable(doc, {
           startY,
-          head: [[t.workOrders.category, t.workOrders.count]],
-          body: section.data.map(e => [e.label, String(e.count)]),
+          head: [[groupByLabels[groupBy], valuesLabels[valuesOption]]],
+          body,
           theme: "grid",
           headStyles: { fillColor: [60, 60, 60], fontSize: 9 },
           bodyStyles: { fontSize: 9 },
           columnStyles: { 1: { halign: "right" } },
           margin: { left: 14, right: 14 },
+          didParseCell: (data: any) => {
+            if (data.row.index === body.length - 1) {
+              data.cell.styles.fontStyle = "bold";
+              data.cell.styles.fillColor = [240, 240, 240];
+            }
+          },
         });
-
-        startY = (doc as any).lastAutoTable.finalY + 12;
-        if (startY > doc.internal.pageSize.getHeight() - 30) {
-          doc.addPage();
-          startY = 20;
-        }
       }
     } else {
-      const headers = activeFieldOptions.map(f => f.label);
-      const body = filteredWorkOrders.map(wo => activeFieldOptions.map(f => f.getValue(wo)));
-
       autoTable(doc, {
         startY,
-        head: [headers],
-        body,
+        head: [activeFieldOptions.map(f => f.label)],
+        body: filteredWorkOrders.map(wo => activeFieldOptions.map(f => f.getValue(wo))),
         theme: "grid",
         headStyles: { fillColor: [60, 60, 60], fontSize: 8 },
         bodyStyles: { fontSize: 7 },
         margin: { left: 10, right: 10 },
       });
     }
-
     doc.save(`work_order_report_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`);
   };
-
-  const uniqueMaintenanceTypes = useMemo(() => {
-    if (!workOrders) return [];
-    const types = new Set(workOrders.map(wo => wo.maintenanceType));
-    return Array.from(types);
-  }, [workOrders]);
 
   if (isLoading && !isError) {
     return (
@@ -383,34 +546,6 @@ export default function WorkOrderReports() {
       </div>
     );
   }
-
-  const renderSummaryTable = (title: string, data: SummaryEntry[], testId: string) => (
-    <Card className="p-4" data-testid={`card-summary-${testId}`}>
-      <h3 className="font-semibold text-sm mb-3">{title}</h3>
-      <Table>
-        <TableHeader className="bg-muted/50">
-          <TableRow>
-            <TableHead>{t.workOrders.category}</TableHead>
-            <TableHead className="text-right w-24">{t.workOrders.count}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={2} className="text-center text-muted-foreground text-sm py-4">—</TableCell>
-            </TableRow>
-          ) : (
-            data.map((entry, idx) => (
-              <TableRow key={idx} data-testid={`row-summary-${testId}-${idx}`}>
-                <TableCell className="text-sm">{entry.label}</TableCell>
-                <TableCell className="text-right font-medium text-sm">{entry.count}</TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </Card>
-  );
 
   return (
     <div className="space-y-6">
@@ -437,6 +572,55 @@ export default function WorkOrderReports() {
               </SelectContent>
             </Select>
           </Card>
+
+          {reportMode === "summary" && (
+            <Card className="p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                <h2 className="font-semibold text-lg">{t.workOrders.summaryOverview}</h2>
+              </div>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-sm">{t.workOrders.groupBy}</Label>
+                  <Select value={groupBy} onValueChange={(v) => { setGroupBy(v as GroupByOption); setShowReport(false); }}>
+                    <SelectTrigger data-testid="select-group-by">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="vehicle" data-testid="select-group-by-vehicle">{t.workOrders.byVehicle}</SelectItem>
+                      <SelectItem value="maintenanceType" data-testid="select-group-by-type">{t.workOrders.byMaintenanceType}</SelectItem>
+                      <SelectItem value="status" data-testid="select-group-by-status">{t.workOrders.byStatus}</SelectItem>
+                      <SelectItem value="month" data-testid="select-group-by-month">{t.workOrders.byMonth}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">{t.workOrders.showValues}</Label>
+                  <Select value={valuesOption} onValueChange={(v) => { setValuesOption(v as ValuesOption); setShowReport(false); }}>
+                    <SelectTrigger data-testid="select-values">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="count" data-testid="select-values-count">{t.workOrders.count}</SelectItem>
+                      <SelectItem value="totalHours" data-testid="select-values-hours">{t.workOrders.totalHours}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">{t.workOrders.crossTabBy}</Label>
+                  <Select value={crossTab} onValueChange={(v) => { setCrossTab(v as CrossTabOption); setShowReport(false); }}>
+                    <SelectTrigger data-testid="select-cross-tab">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none" data-testid="select-cross-tab-none">{t.workOrders.none}</SelectItem>
+                      <SelectItem value="maintenanceType" data-testid="select-cross-tab-type">{t.workOrders.byMaintenanceType}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </Card>
+          )}
 
           {reportMode === "detailed" && (
             <Card className="p-4 space-y-4">
@@ -478,28 +662,16 @@ export default function WorkOrderReports() {
             <div className="space-y-3">
               <div className="space-y-1">
                 <Label className="text-sm">{t.workOrders.dateFrom}</Label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  data-testid="input-date-from"
-                />
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="input-date-from" />
               </div>
               <div className="space-y-1">
                 <Label className="text-sm">{t.workOrders.dateTo}</Label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  data-testid="input-date-to"
-                />
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="input-date-to" />
               </div>
               <div className="space-y-1">
                 <Label className="text-sm">{t.workOrders.filterByStatus}</Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger data-testid="select-status-filter">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger data-testid="select-status-filter"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t.workOrders.allStatuses}</SelectItem>
                     <SelectItem value="open">{t.workOrders.open}</SelectItem>
@@ -511,9 +683,7 @@ export default function WorkOrderReports() {
               <div className="space-y-1">
                 <Label className="text-sm">{t.workOrders.filterByType}</Label>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger data-testid="select-type-filter">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger data-testid="select-type-filter"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t.workOrders.allTypes}</SelectItem>
                     {uniqueMaintenanceTypes.map(type => (
@@ -557,21 +727,113 @@ export default function WorkOrderReports() {
                 </div>
               </div>
 
-              {reportMode === "summary" ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="summary-report-container">
-                  <div className="md:col-span-2">
-                    <Card className="p-4 bg-primary/5 border-primary/20">
-                      <div className="text-center">
-                        <div className="text-3xl font-bold" data-testid="text-total-work-orders">{filteredWorkOrders.length}</div>
-                        <div className="text-sm text-muted-foreground">{t.workOrders.totalWorkOrders}</div>
-                      </div>
-                    </Card>
-                  </div>
-                  {renderSummaryTable(t.workOrders.byMaintenanceType, summaryByType, "type")}
-                  {renderSummaryTable(t.workOrders.byStatus, summaryByStatus, "status")}
-                  {renderSummaryTable(t.workOrders.byVehicle, summaryByVehicle, "vehicle")}
-                  {renderSummaryTable(t.workOrders.byMonth, summaryByMonth, "month")}
+              {reportMode === "summary" && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    placeholder={t.workOrders.searchResults}
+                    value={summarySearch}
+                    onChange={(e) => setSummarySearch(e.target.value)}
+                    data-testid="input-summary-search"
+                  />
                 </div>
+              )}
+
+              {reportMode === "summary" ? (
+                <Card className="overflow-visible" data-testid="summary-report-container">
+                  <div className="overflow-x-auto">
+                    {crossTab === "maintenanceType" ? (
+                      <Table>
+                        <TableHeader className="bg-muted/50">
+                          <TableRow>
+                            <TableHead>{groupByLabels[groupBy]}</TableHead>
+                            {pivotMtColumns.map(col => (
+                              <TableHead key={col} className="text-right">{col}</TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredPivotData.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={pivotMtColumns.length + 1} className="h-24 text-center text-muted-foreground">
+                                {t.workOrders.noWorkOrders}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredPivotData.map((row, idx) => (
+                              <TableRow key={idx} data-testid={`row-pivot-${idx}`}>
+                                <TableCell className="font-medium">{row.label}</TableCell>
+                                {pivotMtColumns.map(col => {
+                                  const val = row.byType[col] || 0;
+                                  return (
+                                    <TableCell key={col} className="text-right">
+                                      {valuesOption === "count"
+                                        ? (val || "")
+                                        : formatMinutesToHHMM(val)}
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                        {filteredPivotData.length > 0 && (
+                          <tfoot>
+                            <TableRow className="bg-muted/30 font-semibold">
+                              <TableCell className="font-semibold">{t.workOrders.total}</TableCell>
+                              {pivotMtColumns.map(col => {
+                                const total = filteredPivotData.reduce((s, r) => s + (r.byType[col] || 0), 0);
+                                return (
+                                  <TableCell key={col} className="text-right font-semibold">
+                                    {valuesOption === "count" ? total : formatMinutesToHHMM(total)}
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          </tfoot>
+                        )}
+                      </Table>
+                    ) : (
+                      <Table>
+                        <TableHeader className="bg-muted/50">
+                          <TableRow>
+                            <TableHead>{groupByLabels[groupBy]}</TableHead>
+                            <TableHead className="text-right w-32">{valuesLabels[valuesOption]}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredSummaryData.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={2} className="h-24 text-center text-muted-foreground">
+                                {t.workOrders.noWorkOrders}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredSummaryData.map((entry, idx) => (
+                              <TableRow key={idx} data-testid={`row-summary-${idx}`}>
+                                <TableCell>{entry.label}</TableCell>
+                                <TableCell className="text-right font-medium">{entry.displayValue}</TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                        {filteredSummaryData.length > 0 && (
+                          <tfoot>
+                            <TableRow className="bg-muted/30 font-semibold">
+                              <TableCell className="font-semibold">{t.workOrders.total}</TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {valuesOption === "count"
+                                  ? filteredSummaryData.reduce((s, e) => s + e.value, 0)
+                                  : formatMinutesToHHMM(filteredSummaryData.reduce((s, e) => s + e.value, 0))}
+                              </TableCell>
+                            </TableRow>
+                          </tfoot>
+                        )}
+                      </Table>
+                    )}
+                  </div>
+                </Card>
               ) : (
                 <Card className="overflow-visible">
                   <div ref={reportRef} className="overflow-x-auto">
@@ -598,17 +860,11 @@ export default function WorkOrderReports() {
                               {activeFieldOptions.map(field => (
                                 <TableCell key={field.key} data-testid={`cell-${wo.id}-${field.key}`}>
                                   {field.key === "status" ? (
-                                    <Badge
-                                      variant={wo.status === "completed" ? "secondary" : wo.status === "in_progress" ? "default" : "outline"}
-                                      data-testid={`badge-status-${wo.id}`}
-                                    >
+                                    <Badge variant={wo.status === "completed" ? "secondary" : wo.status === "in_progress" ? "default" : "outline"} data-testid={`badge-status-${wo.id}`}>
                                       {field.getValue(wo)}
                                     </Badge>
                                   ) : field.key === "maintenanceType" ? (
-                                    <Badge
-                                      variant="outline"
-                                      data-testid={`badge-mt-${wo.id}`}
-                                    >
+                                    <Badge variant="outline" data-testid={`badge-mt-${wo.id}`}>
                                       {field.getValue(wo)}
                                     </Badge>
                                   ) : (
