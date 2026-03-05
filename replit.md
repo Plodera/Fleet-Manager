@@ -21,7 +21,7 @@ A vehicle management and booking system for organizational vehicles with user au
 - Driver Dashboard: Dedicated view for drivers showing only their assigned trips with Start/End Trip actions
 - Work Order Reports: Custom report generation with selectable fields, date/status/type filters, print and CSV export
 - Vehicle Types Configuration: Admin-configurable vehicle type groups (e.g., "Passenger Vehicles" → car/van/bus, "Equipment/Industrial" → truck) that filter the vehicle dropdown in Work Orders. Each type has an "Available for Booking" toggle — only vehicles in bookable categories appear in Bookings and Shared Rides vehicle dropdowns.
-- Configurable Maintenance Types: Admin-managed maintenance types with bilingual labels (no code changes needed)
+- Configurable Maintenance Types: Admin-managed maintenance types with bilingual labels (no code changes needed), optional "Disable Activity Type" toggle per maintenance type that hides/disables the activity type dropdown in work orders
 - Indents (Parts/Materials Requisition): Requisition workflow with auto-generated indent numbers (IND-0001), ERP Indent Number mandatory at approval, priority levels (low/medium/high/urgent), department and vehicle association, dynamic line items with unit dropdown (pcs/litres/kg/metres/sets/boxes/rolls), status flow (pending→approved→fulfilled or rejected/cancelled), department-based approval (admin assigns approvers per department via `indent_approver_departments` junction table), monthly filter (defaults to current month), `approve_indents` permission for granular access control
 - Bilingual Support: English/Portuguese for navigation, buttons, and status labels
 

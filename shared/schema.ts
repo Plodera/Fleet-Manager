@@ -268,6 +268,7 @@ export const maintenanceTypeConfig = pgTable("maintenance_type_config", {
   labelEn: text("label_en").notNull(),
   labelPt: text("label_pt").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  disableActivityType: boolean("disable_activity_type").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -69,7 +69,7 @@ export default function WorkOrderConfig() {
   const [subEquipForm, setSubEquipForm] = useState({ name: "", labelEn: "", labelPt: "", maintenanceTypes: [] as string[] });
 
   const [mtDialog, setMtDialog] = useState<{ open: boolean; editing: MaintenanceTypeConfig | null }>({ open: false, editing: null });
-  const [mtForm, setMtForm] = useState({ name: "", labelEn: "", labelPt: "" });
+  const [mtForm, setMtForm] = useState({ name: "", labelEn: "", labelPt: "", disableActivityType: false });
 
   const [vtDialog, setVtDialog] = useState<{ open: boolean; editing: VehicleType | null }>({ open: false, editing: null });
   const [vtForm, setVtForm] = useState({ name: "", labelEn: "", labelPt: "", categories: [] as string[], availableForBooking: true });
@@ -375,12 +375,12 @@ export default function WorkOrderConfig() {
   };
 
   const openAddMtConfig = () => {
-    setMtForm({ name: "", labelEn: "", labelPt: "" });
+    setMtForm({ name: "", labelEn: "", labelPt: "", disableActivityType: false });
     setMtDialog({ open: true, editing: null });
   };
 
   const openEditMtConfig = (mt: MaintenanceTypeConfig) => {
-    setMtForm({ name: mt.name, labelEn: mt.labelEn, labelPt: mt.labelPt });
+    setMtForm({ name: mt.name, labelEn: mt.labelEn, labelPt: mt.labelPt, disableActivityType: mt.disableActivityType || false });
     setMtDialog({ open: true, editing: mt });
   };
 
@@ -470,23 +470,31 @@ export default function WorkOrderConfig() {
                   <TableHead>{t.adminConfig.maintenanceTypeName}</TableHead>
                   <TableHead>Label (EN)</TableHead>
                   <TableHead>Label (PT)</TableHead>
+                  <TableHead>{language === "pt" ? "Desativar Atividade" : "Disable Activity"}</TableHead>
                   <TableHead className="text-right">{t.buttons.edit}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {mtConfigLoading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center" data-testid="text-mt-config-loading">{t.labels.loading}</TableCell>
+                    <TableCell colSpan={5} className="h-24 text-center" data-testid="text-mt-config-loading">{t.labels.loading}</TableCell>
                   </TableRow>
                 ) : maintenanceTypeConfigs?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground" data-testid="text-mt-config-empty">{t.labels.noRecords}</TableCell>
+                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground" data-testid="text-mt-config-empty">{t.labels.noRecords}</TableCell>
                   </TableRow>
                 ) : maintenanceTypeConfigs?.map((mt) => (
                   <TableRow key={mt.id} data-testid={`row-mt-config-${mt.id}`}>
                     <TableCell className="font-medium">{mt.name}</TableCell>
                     <TableCell>{mt.labelEn}</TableCell>
                     <TableCell>{mt.labelPt}</TableCell>
+                    <TableCell>
+                      {mt.disableActivityType ? (
+                        <Badge variant="secondary" className="text-xs">{language === "pt" ? "Sim" : "Yes"}</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button size="icon" variant="ghost" onClick={() => openEditMtConfig(mt)} data-testid={`button-edit-mt-config-${mt.id}`}>
@@ -951,6 +959,17 @@ export default function WorkOrderConfig() {
                   data-testid="input-mt-config-label-pt"
                 />
               </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="mt-disable-activity"
+                checked={mtForm.disableActivityType}
+                onCheckedChange={(checked) => setMtForm({ ...mtForm, disableActivityType: !!checked })}
+                data-testid="checkbox-mt-disable-activity"
+              />
+              <label htmlFor="mt-disable-activity" className="text-sm font-medium cursor-pointer">
+                {language === "pt" ? "Desativar Tipo de Atividade" : "Disable Activity Type"}
+              </label>
             </div>
           </div>
           <DialogFooter className="gap-2">

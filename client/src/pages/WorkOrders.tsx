@@ -179,6 +179,10 @@ export default function WorkOrders() {
     setItems(updated);
   };
 
+  const isActivityTypeDisabled = maintenanceType
+    ? !!(maintenanceTypeConfigs?.find(m => m.name === maintenanceType))?.disableActivityType
+    : false;
+
   const getMaintenanceTypeBadge = (type: string) => {
     const mtConfig = maintenanceTypeConfigs?.find(m => m.name === type);
     const label = mtConfig ? (language === "pt" ? mtConfig.labelPt : mtConfig.labelEn) : type;
@@ -264,7 +268,13 @@ export default function WorkOrders() {
                   <Label>{t.workOrders.maintenanceType}</Label>
                   <Select value={maintenanceType} onValueChange={(v) => {
                       setMaintenanceType(v);
-                      setItems(prev => prev.map(item => ({ ...item, subEquipmentId: null })));
+                      const mtConfig = maintenanceTypeConfigs?.find(m => m.name === v);
+                      const shouldDisableActivity = !!mtConfig?.disableActivityType;
+                      setItems(prev => prev.map(item => ({
+                        ...item,
+                        subEquipmentId: null,
+                        activityTypeId: shouldDisableActivity ? null : item.activityTypeId,
+                      })));
                     }}>
                     <SelectTrigger data-testid="select-maintenance-type">
                       <SelectValue placeholder={t.workOrders.maintenanceType} />
@@ -361,11 +371,12 @@ export default function WorkOrders() {
                       <div className="space-y-1">
                         <Label className="text-xs">{t.workOrders.activityType}</Label>
                         <Select
-                          value={item.activityTypeId ? String(item.activityTypeId) : ""}
+                          value={isActivityTypeDisabled ? "" : (item.activityTypeId ? String(item.activityTypeId) : "")}
                           onValueChange={(v) => updateItem(index, "activityTypeId", v ? Number(v) : null)}
+                          disabled={isActivityTypeDisabled}
                         >
                           <SelectTrigger data-testid={`select-activity-type-${index}`}>
-                            <SelectValue placeholder={t.workOrders.selectActivityType} />
+                            <SelectValue placeholder={isActivityTypeDisabled ? "N/A" : t.workOrders.selectActivityType} />
                           </SelectTrigger>
                           <SelectContent>
                             {activityTypesData?.map((at: any) => (
@@ -613,7 +624,7 @@ export default function WorkOrders() {
                       <TableRow>
                         <TableHead>#</TableHead>
                         <TableHead>{t.workOrders.subEquipment}</TableHead>
-                        {viewWorkOrder.maintenanceType === "breakdown" && (
+                        {!(maintenanceTypeConfigs?.find(m => m.name === viewWorkOrder.maintenanceType)?.disableActivityType) && (
                           <TableHead>{t.workOrders.activityType}</TableHead>
                         )}
                         <TableHead>{t.workOrders.startTime}</TableHead>
@@ -626,7 +637,7 @@ export default function WorkOrders() {
                         <TableRow key={item.id || idx} data-testid={`view-item-row-${idx}`}>
                           <TableCell>{idx + 1}</TableCell>
                           <TableCell>{item.subEquipment?.name || item.subEquipmentName || "-"}</TableCell>
-                          {viewWorkOrder.maintenanceType === "breakdown" && (
+                          {!(maintenanceTypeConfigs?.find(m => m.name === viewWorkOrder.maintenanceType)?.disableActivityType) && (
                             <TableCell>{item.activityType?.name || item.activityTypeName || "-"}</TableCell>
                           )}
                           <TableCell>{item.startTime}</TableCell>
