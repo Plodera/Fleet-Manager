@@ -11,7 +11,7 @@ A vehicle management and booking system for organizational vehicles with user au
 ## Features
 - Vehicle Management: CRUD operations for vehicles with category and status filters, search, and vehicle count display
 - Booking System: Reservation and scheduling with approval workflow
-- Maintenance Tracking & Fuel Monitoring
+- Maintenance Tracking & Fuel Monitoring (Work Orders support full CRUD — create, view, edit, delete)
 - Vehicle Inspections: Equipment-specific inspections for Factory Vehicles (18 items) and Transfer Trolleys (11 items in 2 sections)
 - Equipment Types Management: Admin interface for creating custom equipment types with configurable checklist items
 - User Authentication with role-based access (admin, staff, customer)

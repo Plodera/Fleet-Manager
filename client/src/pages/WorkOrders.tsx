@@ -25,7 +25,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Eye, Trash2, Printer, X, ClipboardList } from "lucide-react";
+import { Plus, Eye, Trash2, Printer, X, ClipboardList, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -45,6 +45,8 @@ export default function WorkOrders() {
   const queryClient = useQueryClient();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingWorkOrderId, setEditingWorkOrderId] = useState<number | null>(null);
   const [viewWorkOrder, setViewWorkOrder] = useState<any>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
 
@@ -92,6 +94,24 @@ export default function WorkOrders() {
       toast({ title: t.workOrders.title, description: t.workOrders.creating });
       resetForm();
       setIsCreateOpen(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: t.labels.error, description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const url = buildUrl(api.workOrders.update.path, { id });
+      const res = await apiRequest("PUT", url, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.workOrders.list.path] });
+      toast({ title: t.workOrders.title, description: t.workOrders.editWorkOrder });
+      resetForm();
+      setIsEditOpen(false);
+      setEditingWorkOrderId(null);
     },
     onError: (err: Error) => {
       toast({ title: t.labels.error, description: err.message, variant: "destructive" });
@@ -149,6 +169,62 @@ export default function WorkOrders() {
         endTime: i.endTime,
         descriptions: i.descriptions.filter(d => d.trim()),
       })),
+    });
+  };
+
+  const handleEditWorkOrder = async (id: number) => {
+    try {
+      const url = buildUrl(api.workOrders.get.path, { id });
+      const res = await apiRequest("GET", url);
+      const data = await res.json();
+      setEditingWorkOrderId(data.id);
+      setVehicleId(String(data.vehicleId));
+      setMaintenanceType(data.maintenanceType || "");
+      setShiftId(data.shiftId ? String(data.shiftId) : "");
+      setDate(data.date ? data.date.split("T")[0] : new Date().toISOString().split("T")[0]);
+      setStatus(data.status || "open");
+      if (data.items && data.items.length > 0) {
+        setItems(data.items.map((item: any) => ({
+          subEquipmentId: item.subEquipmentId || null,
+          activityTypeId: item.activityTypeId || null,
+          startTime: item.startTime || "",
+          endTime: item.endTime || "",
+          descriptions: Array.isArray(item.descriptions) && item.descriptions.length > 0
+            ? item.descriptions
+            : [""],
+        })));
+      } else {
+        setItems([{ subEquipmentId: null, activityTypeId: null, startTime: "", endTime: "", descriptions: [""] }]);
+      }
+      setIsEditOpen(true);
+    } catch {
+      toast({ title: t.labels.error, variant: "destructive" });
+    }
+  };
+
+  const handleUpdate = () => {
+    if (!editingWorkOrderId || !vehicleId || !maintenanceType || !date) return;
+    const validItems = items.filter(i => i.startTime && i.endTime && i.descriptions.some(d => d.trim()));
+    if (validItems.length === 0) {
+      toast({ title: t.labels.error, description: t.workOrders.addAtLeastOneItem, variant: "destructive" });
+      return;
+    }
+    updateMutation.mutate({
+      id: editingWorkOrderId,
+      data: {
+        vehicleId: Number(vehicleId),
+        maintenanceType,
+        shiftId: shiftId ? Number(shiftId) : null,
+        date,
+        status,
+        items: validItems.map(i => ({
+          subEquipmentId: i.subEquipmentId || null,
+          activityTypeId: i.activityTypeId || null,
+          startTime: i.startTime,
+          endTime: i.endTime,
+          descriptions: i.descriptions.filter(d => d.trim()),
+        })),
+      },
     });
   };
 
@@ -475,6 +551,244 @@ export default function WorkOrders() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { resetForm(); setEditingWorkOrderId(null); } }}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{t.workOrders.editWorkOrder}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {vehicleTypesData && vehicleTypesData.length > 0 && (
+                <div className="space-y-2">
+                  <Label>{t.workOrders.vehicleTypeFilter}</Label>
+                  <Select value={vehicleTypeFilter} onValueChange={(v) => { setVehicleTypeFilter(v); setVehicleId(""); }}>
+                    <SelectTrigger data-testid="edit-select-vehicle-type-filter">
+                      <SelectValue placeholder={t.workOrders.selectVehicleType} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.workOrders.allVehicleTypes}</SelectItem>
+                      {vehicleTypesData.map((vt: any) => (
+                        <SelectItem key={vt.id} value={String(vt.id)}>{vt.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t.workOrders.equipment}</Label>
+                  <Select value={vehicleId} onValueChange={setVehicleId}>
+                    <SelectTrigger data-testid="edit-select-vehicle">
+                      <SelectValue placeholder={t.workOrders.selectVehicle} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredVehicles?.map((v: any) => (
+                        <SelectItem key={v.id} value={String(v.id)}>
+                          {v.make} {v.model} ({v.licensePlate || v.vin})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t.workOrders.maintenanceType}</Label>
+                  <Select value={maintenanceType} onValueChange={(v) => {
+                      setMaintenanceType(v);
+                      const mtConfig = maintenanceTypeConfigs?.find(m => m.name === v);
+                      const shouldDisableActivity = !!mtConfig?.disableActivityType;
+                      setItems(prev => prev.map(item => ({
+                        ...item,
+                        activityTypeId: shouldDisableActivity ? null : item.activityTypeId,
+                      })));
+                    }}>
+                    <SelectTrigger data-testid="edit-select-maintenance-type">
+                      <SelectValue placeholder={t.workOrders.maintenanceType} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {maintenanceTypeConfigs?.map(mt => (
+                        <SelectItem key={mt.name} value={mt.name}>{mt.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>{t.workOrders.shift}</Label>
+                  <Select value={shiftId} onValueChange={setShiftId}>
+                    <SelectTrigger data-testid="edit-select-shift">
+                      <SelectValue placeholder={t.workOrders.selectShift} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {shiftsData?.map((s: any) => (
+                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t.workOrders.date}</Label>
+                  <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} data-testid="edit-input-date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t.workOrders.status}</Label>
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger data-testid="edit-select-status">
+                      <SelectValue placeholder={t.workOrders.selectStatus} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="open">{t.workOrders.open}</SelectItem>
+                      <SelectItem value="in_progress">{t.workOrders.inProgress}</SelectItem>
+                      <SelectItem value="completed">{t.workOrders.completed}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <Label className="text-base font-semibold">{t.workOrders.items}</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addItem} data-testid="edit-button-add-item">
+                    <Plus className="w-4 h-4 mr-1" /> {t.workOrders.addItem}
+                  </Button>
+                </div>
+
+                {items.map((item, index) => (
+                  <Card key={index} className="p-4 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span className="text-sm font-medium text-muted-foreground">{language === "pt" ? `Item Nº ${index + 1}` : `Item No. ${index + 1}`}</span>
+                      {items.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} data-testid={`edit-button-remove-item-${index}`}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t.workOrders.subEquipment}</Label>
+                        <Select
+                          value={item.subEquipmentId ? String(item.subEquipmentId) : ""}
+                          onValueChange={(v) => updateItem(index, "subEquipmentId", v ? Number(v) : null)}
+                        >
+                          <SelectTrigger data-testid={`edit-select-sub-equipment-${index}`}>
+                            <SelectValue placeholder={t.workOrders.selectSubEquipment} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {subEquipmentData
+                              ?.filter((se: any) => !maintenanceType || !se.maintenanceTypes?.length || se.maintenanceTypes.includes(maintenanceType))
+                              ?.map((se: any) => (
+                              <SelectItem key={se.id} value={String(se.id)}>{se.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t.workOrders.activityType}</Label>
+                        <Select
+                          value={isActivityTypeDisabled ? "" : (item.activityTypeId ? String(item.activityTypeId) : "")}
+                          onValueChange={(v) => updateItem(index, "activityTypeId", v ? Number(v) : null)}
+                          disabled={isActivityTypeDisabled}
+                        >
+                          <SelectTrigger data-testid={`edit-select-activity-type-${index}`}>
+                            <SelectValue placeholder={isActivityTypeDisabled ? "N/A" : t.workOrders.selectActivityType} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activityTypesData?.map((at: any) => (
+                              <SelectItem key={at.id} value={String(at.id)}>{at.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t.workOrders.startTime}</Label>
+                        <Input
+                          type="time"
+                          value={item.startTime}
+                          onChange={(e) => updateItem(index, "startTime", e.target.value)}
+                          data-testid={`edit-input-start-time-${index}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t.workOrders.endTime}</Label>
+                        <Input
+                          type="time"
+                          value={item.endTime}
+                          onChange={(e) => updateItem(index, "endTime", e.target.value)}
+                          data-testid={`edit-input-end-time-${index}`}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <Label className="text-xs">{t.workOrders.description}</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const updated = [...items];
+                            updated[index] = { ...updated[index], descriptions: [...updated[index].descriptions, ""] };
+                            setItems(updated);
+                          }}
+                          data-testid={`edit-button-add-description-${index}`}
+                        >
+                          <Plus className="w-3 h-3 mr-1" /> {t.workOrders.addDescription}
+                        </Button>
+                      </div>
+                      {item.descriptions.map((desc, dIdx) => (
+                        <div key={dIdx} className="flex items-center gap-2">
+                          <Input
+                            value={desc}
+                            onChange={(e) => {
+                              const updated = [...items];
+                              const newDescs = [...updated[index].descriptions];
+                              newDescs[dIdx] = e.target.value;
+                              updated[index] = { ...updated[index], descriptions: newDescs };
+                              setItems(updated);
+                            }}
+                            placeholder={t.workOrders.descriptionPlaceholder}
+                            data-testid={`edit-input-description-${index}-${dIdx}`}
+                          />
+                          {item.descriptions.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const updated = [...items];
+                                const newDescs = updated[index].descriptions.filter((_, i) => i !== dIdx);
+                                updated[index] = { ...updated[index], descriptions: newDescs };
+                                setItems(updated);
+                              }}
+                              data-testid={`edit-button-remove-description-${index}-${dIdx}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => { setIsEditOpen(false); resetForm(); setEditingWorkOrderId(null); }} data-testid="button-cancel-edit">
+                {t.buttons.cancel}
+              </Button>
+              <Button
+                onClick={handleUpdate}
+                disabled={updateMutation.isPending || !vehicleId || !maintenanceType || !date}
+                data-testid="button-submit-edit-work-order"
+              >
+                {updateMutation.isPending ? t.workOrders.creating : t.buttons.save}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       <Card className="border-none shadow-md overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50">
@@ -525,6 +839,14 @@ export default function WorkOrders() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditWorkOrder(wo.id)}
+                        data-testid={`button-edit-${wo.id}`}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
