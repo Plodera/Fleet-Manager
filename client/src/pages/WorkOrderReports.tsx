@@ -451,40 +451,31 @@ export default function WorkOrderReports() {
                   data-testid="input-summary-search"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Label className="text-xs whitespace-nowrap">{t.workOrders.dateFrom}</Label>
-                <Input
-                  type="date"
-                  className="h-8 text-sm w-36"
-                  value={summaryDateFrom}
-                  onChange={(e) => setSummaryDateFrom(e.target.value)}
-                  data-testid="input-summary-date-from"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Label className="text-xs whitespace-nowrap">{t.workOrders.dateTo}</Label>
-                <Input
-                  type="date"
-                  className="h-8 text-sm w-36"
-                  value={summaryDateTo}
-                  onChange={(e) => setSummaryDateTo(e.target.value)}
-                  data-testid="input-summary-date-to"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Label className="text-xs whitespace-nowrap">{language === "pt" ? "Filtrar" : "Find"}</Label>
-                <Select value={summaryFind} onValueChange={setSummaryFind}>
-                  <SelectTrigger className="h-8 text-sm w-40" data-testid="select-summary-find">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t.workOrders.allTypes}</SelectItem>
-                    {uniqueMaintenanceTypes.map(type => (
-                      <SelectItem key={type} value={type}>{getMtLabel(type)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Input
+                type="date"
+                className="h-8 text-sm w-36"
+                value={summaryDateFrom}
+                onChange={(e) => setSummaryDateFrom(e.target.value)}
+                data-testid="input-summary-date-from"
+              />
+              <Input
+                type="date"
+                className="h-8 text-sm w-36"
+                value={summaryDateTo}
+                onChange={(e) => setSummaryDateTo(e.target.value)}
+                data-testid="input-summary-date-to"
+              />
+              <Select value={summaryFind} onValueChange={setSummaryFind}>
+                <SelectTrigger className="h-8 text-sm w-40" data-testid="select-summary-find">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t.workOrders.allTypes}</SelectItem>
+                  {uniqueMaintenanceTypes.map(type => (
+                    <SelectItem key={type} value={type}>{getMtLabel(type)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </Card>
 
