@@ -20,10 +20,6 @@ import { FileText, Printer, Download, Filter, CheckSquare, BarChart3, FileSpread
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
 
-type GroupByOption = "maintenanceType" | "status" | "vehicle" | "month";
-type ValuesOption = "count" | "totalHours";
-type CrossTabOption = "none" | "maintenanceType";
-
 interface FieldOption {
   key: string;
   label: string;
@@ -69,10 +65,10 @@ export default function WorkOrderReports() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [showReport, setShowReport] = useState(false);
 
-  const [groupBy, setGroupBy] = useState<GroupByOption>("vehicle");
-  const [valuesOption, setValuesOption] = useState<ValuesOption>("totalHours");
-  const [crossTab, setCrossTab] = useState<CrossTabOption>("maintenanceType");
   const [summarySearch, setSummarySearch] = useState("");
+  const [summaryDateFrom, setSummaryDateFrom] = useState("");
+  const [summaryDateTo, setSummaryDateTo] = useState("");
+  const [summaryFind, setSummaryFind] = useState("all");
 
   const { data: workOrders, isLoading, isError } = useQuery<any[]>({
     queryKey: [api.workOrders.list.path],
@@ -94,18 +90,6 @@ export default function WorkOrderReports() {
       completed: t.workOrders.completed,
     };
     return labels[status] || status;
-  };
-
-  const groupByLabels: Record<GroupByOption, string> = {
-    maintenanceType: t.workOrders.byMaintenanceType,
-    status: t.workOrders.byStatus,
-    vehicle: t.workOrders.byVehicle,
-    month: t.workOrders.byMonth,
-  };
-
-  const valuesLabels: Record<ValuesOption, string> = {
-    count: t.workOrders.count,
-    totalHours: t.workOrders.totalHours,
   };
 
   const fieldOptions: FieldOption[] = useMemo(() => [
@@ -147,13 +131,11 @@ export default function WorkOrderReports() {
     return workOrders.filter(wo => {
       if (dateFrom) {
         const woDate = new Date(wo.date).getTime();
-        const fromDate = new Date(dateFrom).getTime();
-        if (woDate < fromDate) return false;
+        if (woDate < new Date(dateFrom).getTime()) return false;
       }
       if (dateTo) {
         const woDate = new Date(wo.date).getTime();
-        const toDate = new Date(dateTo).getTime();
-        if (woDate > toDate) return false;
+        if (woDate > new Date(dateTo).getTime()) return false;
       }
       if (statusFilter !== "all" && wo.status !== statusFilter) return false;
       if (typeFilter !== "all" && wo.maintenanceType !== typeFilter) return false;
@@ -161,125 +143,65 @@ export default function WorkOrderReports() {
     });
   }, [workOrders, dateFrom, dateTo, statusFilter, typeFilter]);
 
-  const getGroupKey = (wo: any): string => {
-    switch (groupBy) {
-      case "maintenanceType": return getMtLabel(wo.maintenanceType);
-      case "status": return getStatusLabel(wo.status);
-      case "vehicle": return wo.vehicle ? `${wo.vehicle.licensePlate} — ${wo.vehicle.make} ${wo.vehicle.model}` : "-";
-      case "month": return wo.date ? format(new Date(wo.date), "yyyy-MM") : "-";
-      default: return "-";
-    }
-  };
+  const summaryFilteredWOs = useMemo(() => {
+    if (!workOrders) return [];
+    return workOrders.filter(wo => {
+      if (summaryDateFrom) {
+        const woDate = new Date(wo.date).getTime();
+        if (woDate < new Date(summaryDateFrom).getTime()) return false;
+      }
+      if (summaryDateTo) {
+        const woDate = new Date(wo.date).getTime();
+        if (woDate > new Date(summaryDateTo).getTime()) return false;
+      }
+      if (summaryFind !== "all" && wo.maintenanceType !== summaryFind) return false;
+      return true;
+    });
+  }, [workOrders, summaryDateFrom, summaryDateTo, summaryFind]);
 
-  const getGroupSortKey = (wo: any): string => {
-    if (groupBy === "month" && wo.date) return format(new Date(wo.date), "yyyy-MM");
-    return getGroupKey(wo);
-  };
-
-  const getGroupDisplayLabel = (key: string): string => {
-    if (groupBy === "month" && key !== "-") {
-      try {
-        const [y, m] = key.split("-");
-        return format(new Date(parseInt(y), parseInt(m) - 1, 1), "MMM yyyy");
-      } catch { return key; }
-    }
-    return key;
-  };
-
-  const allMtTypes = useMemo(() => {
+  const mtColumns = useMemo(() => {
     if (!maintenanceTypeConfigs) return [];
-    return maintenanceTypeConfigs.filter(mt => mt.isActive).map(mt => ({
-      name: mt.name,
-      label: language === "pt" ? mt.labelPt : mt.labelEn,
-    }));
+    return maintenanceTypeConfigs
+      .filter(mt => mt.isActive)
+      .map(mt => ({
+        name: mt.name,
+        label: language === "pt" ? mt.labelPt : mt.labelEn,
+      }));
   }, [maintenanceTypeConfigs, language]);
 
-  const uniqueMaintenanceTypes = useMemo(() => {
-    if (!workOrders) return [];
-    const types = new Set(workOrders.map(wo => wo.maintenanceType));
-    return Array.from(types);
-  }, [workOrders]);
-
-  const summaryData = useMemo(() => {
-    if (crossTab === "none") {
-      const groups: Record<string, { label: string; value: number; sortKey: string }> = {};
-      filteredWorkOrders.forEach(wo => {
-        const key = getGroupKey(wo);
-        const sortKey = getGroupSortKey(wo);
-        if (!groups[key]) groups[key] = { label: getGroupDisplayLabel(key), value: 0, sortKey };
-        if (valuesOption === "count") {
-          groups[key].value += 1;
-        } else {
-          groups[key].value += getWorkOrderTotalMinutes(wo);
-        }
-      });
-      const entries = Object.entries(groups).map(([key, g]) => ({
-        key,
-        label: groupBy === "month" ? getGroupDisplayLabel(key) : key,
-        value: valuesOption === "count" ? g.value : g.value,
-        displayValue: valuesOption === "count" ? String(g.value) : formatMinutesToHHMM(g.value),
-        sortKey: g.sortKey,
-      }));
-      entries.sort((a, b) => groupBy === "month" ? a.sortKey.localeCompare(b.sortKey) : b.value - a.value);
-      return entries;
-    }
-    return [];
-  }, [filteredWorkOrders, groupBy, valuesOption, crossTab, maintenanceTypeConfigs, language, t]);
-
   const pivotData = useMemo(() => {
-    if (crossTab !== "maintenanceType") return [];
-    const groups: Record<string, { label: string; sortKey: string; byType: Record<string, number> }> = {};
-    filteredWorkOrders.forEach(wo => {
-      const key = getGroupKey(wo);
-      const sortKey = getGroupSortKey(wo);
-      if (!groups[key]) {
-        groups[key] = {
-          label: groupBy === "month" ? getGroupDisplayLabel(key) : key,
-          sortKey,
+    const vehicles: Record<number, { licensePlate: string; name: string; byType: Record<string, number> }> = {};
+    summaryFilteredWOs.forEach(wo => {
+      if (!wo.vehicle) return;
+      const vid = wo.vehicleId || wo.vehicle.id;
+      if (!vehicles[vid]) {
+        vehicles[vid] = {
+          licensePlate: wo.vehicle.licensePlate || "-",
+          name: `${wo.vehicle.make} ${wo.vehicle.model}`,
           byType: {},
         };
       }
-      const mtLabel = getMtLabel(wo.maintenanceType);
-      if (!groups[key].byType[mtLabel]) groups[key].byType[mtLabel] = 0;
-      if (valuesOption === "count") {
-        groups[key].byType[mtLabel] += 1;
-      } else {
-        groups[key].byType[mtLabel] += getWorkOrderTotalMinutes(wo);
-      }
+      const mtName = wo.maintenanceType;
+      if (!vehicles[vid].byType[mtName]) vehicles[vid].byType[mtName] = 0;
+      vehicles[vid].byType[mtName] += getWorkOrderTotalMinutes(wo);
     });
-    const entries = Object.entries(groups).map(([key, g]) => ({
-      key,
-      label: g.label,
-      sortKey: g.sortKey,
-      byType: g.byType,
-    }));
-    entries.sort((a, b) => groupBy === "month" ? a.sortKey.localeCompare(b.sortKey) : a.label.localeCompare(b.label));
-    return entries;
-  }, [filteredWorkOrders, groupBy, valuesOption, crossTab, maintenanceTypeConfigs, language, t]);
-
-  const filteredSummaryData = useMemo(() => {
-    if (!summarySearch.trim()) return summaryData;
-    const q = summarySearch.toLowerCase();
-    return summaryData.filter(e => e.label.toLowerCase().includes(q));
-  }, [summaryData, summarySearch]);
+    return Object.entries(vehicles)
+      .map(([id, v]) => ({ id: Number(id), ...v }))
+      .sort((a, b) => a.licensePlate.localeCompare(b.licensePlate));
+  }, [summaryFilteredWOs]);
 
   const filteredPivotData = useMemo(() => {
     if (!summarySearch.trim()) return pivotData;
     const q = summarySearch.toLowerCase();
-    return pivotData.filter(e => e.label.toLowerCase().includes(q));
+    return pivotData.filter(v =>
+      v.licensePlate.toLowerCase().includes(q) || v.name.toLowerCase().includes(q)
+    );
   }, [pivotData, summarySearch]);
 
-  const pivotMtColumns = useMemo(() => {
-    const used = new Set<string>();
-    pivotData.forEach(row => {
-      Object.keys(row.byType).forEach(k => used.add(k));
-    });
-    const ordered = allMtTypes.filter(mt => used.has(mt.label)).map(mt => mt.label);
-    used.forEach(label => {
-      if (!ordered.includes(label)) ordered.push(label);
-    });
-    return ordered;
-  }, [pivotData, allMtTypes]);
+  const uniqueMaintenanceTypes = useMemo(() => {
+    if (!workOrders) return [];
+    return Array.from(new Set(workOrders.map(wo => wo.maintenanceType)));
+  }, [workOrders]);
 
   const activeFieldOptions = fieldOptions.filter(f => selectedFields.includes(f.key));
 
@@ -288,9 +210,6 @@ export default function WorkOrderReports() {
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     );
   };
-
-  const selectAllFields = () => setSelectedFields(fieldOptions.map(f => f.key));
-  const deselectAllFields = () => setSelectedFields([]);
 
   const handleGenerateReport = () => {
     if (reportMode === "detailed" && selectedFields.length === 0) {
@@ -302,65 +221,52 @@ export default function WorkOrderReports() {
 
   const getFilterMeta = () => {
     const parts: string[] = [];
-    if (dateFrom) parts.push(`${t.workOrders.dateFrom}: ${format(new Date(dateFrom), "dd/MM/yyyy")}`);
-    if (dateTo) parts.push(`${t.workOrders.dateTo}: ${format(new Date(dateTo), "dd/MM/yyyy")}`);
-    if (statusFilter !== "all") parts.push(`${t.workOrders.filterByStatus}: ${getStatusLabel(statusFilter)}`);
-    if (typeFilter !== "all") parts.push(`${t.workOrders.filterByType}: ${getMtLabel(typeFilter)}`);
-    return parts;
-  };
-
-  const getSummaryTableHtml = () => {
-    if (crossTab === "maintenanceType") {
-      const colTotals: Record<string, number> = {};
-      pivotMtColumns.forEach(c => { colTotals[c] = 0; });
-      const rows = filteredPivotData.map(row => {
-        const cells = pivotMtColumns.map(col => {
-          const val = row.byType[col] || 0;
-          colTotals[col] = (colTotals[col] || 0) + val;
-          return `<td style="text-align:right">${valuesOption === "count" ? (val || "") : formatMinutesToHHMM(val)}</td>`;
-        }).join("");
-        return `<tr><td>${row.label}</td>${cells}</tr>`;
-      }).join("");
-      const totalRow = pivotMtColumns.map(col => {
-        const val = colTotals[col] || 0;
-        return `<td style="text-align:right;font-weight:600">${valuesOption === "count" ? val : formatMinutesToHHMM(val)}</td>`;
-      }).join("");
-      return `
-        <table>
-          <thead><tr><th>${groupByLabels[groupBy]}</th>${pivotMtColumns.map(c => `<th style="text-align:right">${c}</th>`).join("")}</tr></thead>
-          <tbody>${rows}</tbody>
-          <tfoot><tr><td style="font-weight:600">${t.workOrders.total}</td>${totalRow}</tr></tfoot>
-        </table>
-      `;
+    if (reportMode === "summary") {
+      if (summaryDateFrom) parts.push(`${t.workOrders.dateFrom}: ${format(new Date(summaryDateFrom), "dd/MM/yyyy")}`);
+      if (summaryDateTo) parts.push(`${t.workOrders.dateTo}: ${format(new Date(summaryDateTo), "dd/MM/yyyy")}`);
+      if (summaryFind !== "all") parts.push(`${t.workOrders.filterByType}: ${getMtLabel(summaryFind)}`);
     } else {
-      const totalVal = filteredSummaryData.reduce((s, e) => s + e.value, 0);
-      const rows = filteredSummaryData.map(e =>
-        `<tr><td>${e.label}</td><td style="text-align:right">${e.displayValue}</td></tr>`
-      ).join("");
-      const totalDisplay = valuesOption === "count" ? String(totalVal) : formatMinutesToHHMM(totalVal);
-      return `
-        <table>
-          <thead><tr><th>${groupByLabels[groupBy]}</th><th style="text-align:right">${valuesLabels[valuesOption]}</th></tr></thead>
-          <tbody>${rows}</tbody>
-          <tfoot><tr><td style="font-weight:600">${t.workOrders.total}</td><td style="text-align:right;font-weight:600">${totalDisplay}</td></tr></tfoot>
-        </table>
-      `;
+      if (dateFrom) parts.push(`${t.workOrders.dateFrom}: ${format(new Date(dateFrom), "dd/MM/yyyy")}`);
+      if (dateTo) parts.push(`${t.workOrders.dateTo}: ${format(new Date(dateTo), "dd/MM/yyyy")}`);
+      if (statusFilter !== "all") parts.push(`${t.workOrders.filterByStatus}: ${getStatusLabel(statusFilter)}`);
+      if (typeFilter !== "all") parts.push(`${t.workOrders.filterByType}: ${getMtLabel(typeFilter)}`);
     }
+    return parts;
   };
 
   const handlePrint = () => {
     const meta = getFilterMeta();
     let bodyContent = "";
     if (reportMode === "summary") {
-      const displayCount = crossTab === "maintenanceType" ? filteredPivotData.length : filteredSummaryData.length;
+      const headerCols = mtColumns.map(c => `<th style="text-align:right;font-size:10px;padding:4px 6px">${c.label}</th>`).join("");
+      const dataRows = filteredPivotData.map(row => {
+        const cells = mtColumns.map(col => {
+          const val = row.byType[col.name] || 0;
+          return `<td style="text-align:right;padding:4px 6px">${formatMinutesToHHMM(val)}</td>`;
+        }).join("");
+        return `<tr><td style="padding:4px 6px">${row.licensePlate}</td><td style="padding:4px 6px">${row.name}</td>${cells}</tr>`;
+      }).join("");
+      const totalCells = mtColumns.map(col => {
+        const total = filteredPivotData.reduce((s, r) => s + (r.byType[col.name] || 0), 0);
+        return `<td style="text-align:right;font-weight:600;padding:4px 6px">${formatMinutesToHHMM(total)}</td>`;
+      }).join("");
       bodyContent = `
-        <div class="total">${t.workOrders.totalWorkOrders}: ${filteredWorkOrders.length}${summarySearch.trim() ? ` (${displayCount} ${language === "pt" ? "mostrados" : "shown"})` : ""}</div>
-        <div class="meta-summary">
-          ${t.workOrders.groupBy}: ${groupByLabels[groupBy]} &nbsp;|&nbsp;
-          ${t.workOrders.showValues}: ${valuesLabels[valuesOption]}
-          ${crossTab !== "none" ? ` &nbsp;|&nbsp; ${t.workOrders.crossTabBy}: ${t.workOrders.byMaintenanceType}` : ""}
-        </div>
-        ${getSummaryTableHtml()}
+        <table>
+          <thead>
+            <tr style="background:#4a7c59;color:white">
+              <th style="padding:4px 6px">${t.workOrders.equipmentNo}</th>
+              <th style="padding:4px 6px">${t.workOrders.equipmentName}</th>
+              ${headerCols}
+            </tr>
+          </thead>
+          <tbody>${dataRows}</tbody>
+          <tfoot>
+            <tr style="background:#f0f0f0">
+              <td colspan="2" style="font-weight:600;padding:4px 6px">${t.workOrders.total}</td>
+              ${totalCells}
+            </tr>
+          </tfoot>
+        </table>
       `;
     } else {
       const printContent = reportRef.current;
@@ -379,14 +285,13 @@ export default function WorkOrderReports() {
           body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
           h1 { font-size: 18px; margin-bottom: 4px; }
           .subtitle { color: #666; margin-bottom: 16px; font-size: 13px; }
-          .meta { display: flex; gap: 20px; margin-bottom: 8px; color: #444; font-size: 11px; }
-          .meta-summary { margin-bottom: 12px; color: #444; font-size: 11px; }
+          .meta { display: flex; gap: 20px; margin-bottom: 12px; color: #444; font-size: 11px; }
           table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; font-size: 11px; }
+          th, td { border: 1px solid #ddd; text-align: left; font-size: 11px; }
           th { background-color: #f5f5f5; font-weight: 600; }
           tr:nth-child(even) { background-color: #fafafa; }
-          tfoot td { border-top: 2px solid #999; background: #f5f5f5; }
-          .total { margin-top: 8px; font-weight: 600; font-size: 12px; margin-bottom: 8px; }
+          tfoot td { border-top: 2px solid #999; }
+          .total { margin-top: 8px; font-weight: 600; font-size: 12px; }
         </style>
       </head><body>
         <h1>${t.workOrders.workOrderReport}${reportMode === "summary" ? ` - ${t.workOrders.summaryReport}` : ""}</h1>
@@ -404,36 +309,27 @@ export default function WorkOrderReports() {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
     if (reportMode === "summary") {
-      if (crossTab === "maintenanceType") {
-        const rows = filteredPivotData.map(row => {
-          const obj: Record<string, any> = { [groupByLabels[groupBy]]: row.label };
-          pivotMtColumns.forEach(col => {
-            const val = row.byType[col] || 0;
-            obj[col] = valuesOption === "count" ? (val || "") : formatMinutesToHHMM(val);
-          });
-          return obj;
+      const rows = filteredPivotData.map(row => {
+        const obj: Record<string, any> = {
+          [t.workOrders.equipmentNo]: row.licensePlate,
+          [t.workOrders.equipmentName]: row.name,
+        };
+        mtColumns.forEach(col => {
+          obj[col.label] = formatMinutesToHHMM(row.byType[col.name] || 0);
         });
-        const totalRow: Record<string, any> = { [groupByLabels[groupBy]]: t.workOrders.total };
-        pivotMtColumns.forEach(col => {
-          const total = filteredPivotData.reduce((s, r) => s + (r.byType[col] || 0), 0);
-          totalRow[col] = valuesOption === "count" ? total : formatMinutesToHHMM(total);
-        });
-        rows.push(totalRow);
-        const ws = XLSX.utils.json_to_sheet(rows);
-        XLSX.utils.book_append_sheet(wb, ws, t.workOrders.summaryReport.substring(0, 31));
-      } else {
-        const rows = filteredSummaryData.map(e => ({
-          [groupByLabels[groupBy]]: e.label,
-          [valuesLabels[valuesOption]]: e.displayValue,
-        }));
-        const totalVal = filteredSummaryData.reduce((s, e) => s + e.value, 0);
-        rows.push({
-          [groupByLabels[groupBy]]: t.workOrders.total,
-          [valuesLabels[valuesOption]]: valuesOption === "count" ? String(totalVal) : formatMinutesToHHMM(totalVal),
-        });
-        const ws = XLSX.utils.json_to_sheet(rows);
-        XLSX.utils.book_append_sheet(wb, ws, t.workOrders.summaryReport.substring(0, 31));
-      }
+        return obj;
+      });
+      const totalRow: Record<string, any> = {
+        [t.workOrders.equipmentNo]: t.workOrders.total,
+        [t.workOrders.equipmentName]: "",
+      };
+      mtColumns.forEach(col => {
+        const total = filteredPivotData.reduce((s, r) => s + (r.byType[col.name] || 0), 0);
+        totalRow[col.label] = formatMinutesToHHMM(total);
+      });
+      rows.push(totalRow);
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, t.workOrders.summaryReport.substring(0, 31));
     } else {
       const rows = filteredWorkOrders.map(wo =>
         activeFieldOptions.reduce((obj: Record<string, string>, f) => {
@@ -450,8 +346,7 @@ export default function WorkOrderReports() {
   const handleExportPdf = async () => {
     const { default: jsPDF } = await import("jspdf");
     const autoTable = (await import("jspdf-autotable")).default;
-    const isLandscape = reportMode === "detailed" || (crossTab === "maintenanceType" && pivotMtColumns.length > 3);
-    const doc = new jsPDF({ orientation: isLandscape ? "landscape" : "portrait" });
+    const doc = new jsPDF({ orientation: "landscape" });
     const pageWidth = doc.internal.pageSize.getWidth();
 
     doc.setFontSize(16);
@@ -460,64 +355,36 @@ export default function WorkOrderReports() {
     doc.setTextColor(100);
     const meta = getFilterMeta();
     if (meta.length > 0) doc.text(meta.join("  |  "), 14, 26);
-
-    let startY = meta.length > 0 ? 32 : 26;
-    if (reportMode === "summary") {
-      doc.text(`${t.workOrders.groupBy}: ${groupByLabels[groupBy]}  |  ${t.workOrders.showValues}: ${valuesLabels[valuesOption]}${crossTab !== "none" ? `  |  ${t.workOrders.crossTabBy}: ${t.workOrders.byMaintenanceType}` : ""}`, 14, startY);
-      startY += 6;
-    }
-    doc.text(`${t.workOrders.totalWorkOrders}: ${filteredWorkOrders.length}`, 14, startY);
     doc.text(format(new Date(), "dd/MM/yyyy HH:mm"), pageWidth - 14, 18, { align: "right" });
-    startY += 6;
+    let startY = meta.length > 0 ? 32 : 26;
 
     if (reportMode === "summary") {
-      if (crossTab === "maintenanceType") {
-        const head = [groupByLabels[groupBy], ...pivotMtColumns];
-        const body = filteredPivotData.map(row => [
-          row.label,
-          ...pivotMtColumns.map(col => {
-            const val = row.byType[col] || 0;
-            return valuesOption === "count" ? String(val || "") : formatMinutesToHHMM(val);
-          }),
-        ]);
-        const totalRow = [t.workOrders.total, ...pivotMtColumns.map(col => {
-          const total = filteredPivotData.reduce((s, r) => s + (r.byType[col] || 0), 0);
-          return valuesOption === "count" ? String(total) : formatMinutesToHHMM(total);
-        })];
-        body.push(totalRow);
-        autoTable(doc, {
-          startY, head: [head], body, theme: "grid",
-          headStyles: { fillColor: [60, 60, 60], fontSize: 8 },
-          bodyStyles: { fontSize: 8 },
-          margin: { left: 14, right: 14 },
-          didParseCell: (data: any) => {
-            if (data.row.index === body.length - 1) {
-              data.cell.styles.fontStyle = "bold";
-              data.cell.styles.fillColor = [240, 240, 240];
-            }
-          },
-        });
-      } else {
-        const body = filteredSummaryData.map(e => [e.label, e.displayValue]);
-        const totalVal = filteredSummaryData.reduce((s, e) => s + e.value, 0);
-        body.push([t.workOrders.total, valuesOption === "count" ? String(totalVal) : formatMinutesToHHMM(totalVal)]);
-        autoTable(doc, {
-          startY,
-          head: [[groupByLabels[groupBy], valuesLabels[valuesOption]]],
-          body,
-          theme: "grid",
-          headStyles: { fillColor: [60, 60, 60], fontSize: 9 },
-          bodyStyles: { fontSize: 9 },
-          columnStyles: { 1: { halign: "right" } },
-          margin: { left: 14, right: 14 },
-          didParseCell: (data: any) => {
-            if (data.row.index === body.length - 1) {
-              data.cell.styles.fontStyle = "bold";
-              data.cell.styles.fillColor = [240, 240, 240];
-            }
-          },
-        });
-      }
+      const head = [t.workOrders.equipmentNo, t.workOrders.equipmentName, ...mtColumns.map(c => c.label)];
+      const body = filteredPivotData.map(row => [
+        row.licensePlate,
+        row.name,
+        ...mtColumns.map(col => formatMinutesToHHMM(row.byType[col.name] || 0)),
+      ]);
+      const totalRow = [
+        t.workOrders.total, "",
+        ...mtColumns.map(col => {
+          const total = filteredPivotData.reduce((s, r) => s + (r.byType[col.name] || 0), 0);
+          return formatMinutesToHHMM(total);
+        }),
+      ];
+      body.push(totalRow);
+      autoTable(doc, {
+        startY, head: [head], body, theme: "grid",
+        headStyles: { fillColor: [74, 124, 89], fontSize: 7 },
+        bodyStyles: { fontSize: 7 },
+        margin: { left: 10, right: 10 },
+        didParseCell: (data: any) => {
+          if (data.row.index === body.length - 1) {
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fillColor = [240, 240, 240];
+          }
+        },
+      });
     } else {
       autoTable(doc, {
         startY,
@@ -555,84 +422,152 @@ export default function WorkOrderReports() {
         icon={<BarChart3 className="w-5 h-5 text-primary" />}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-4">
-          <Card className="p-4 space-y-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5" />
-              <h2 className="font-semibold text-lg">{t.workOrders.reportMode}</h2>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={reportMode} onValueChange={(v) => { setReportMode(v as "detailed" | "summary"); setShowReport(false); }}>
+          <SelectTrigger className="w-40" data-testid="select-report-mode">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="detailed" data-testid="select-report-mode-detailed">{t.workOrders.detailedReport}</SelectItem>
+            <SelectItem value="summary" data-testid="select-report-mode-summary">{t.workOrders.summaryReport}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {reportMode === "summary" ? (
+        <div className="space-y-4">
+          <Card className="p-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge variant="default" className="text-xs font-semibold px-3 py-1 bg-green-700 hover:bg-green-700" data-testid="badge-summary-label">
+                {t.workOrders.summaryReport.toUpperCase()}
+              </Badge>
+              <div className="flex items-center gap-1 flex-1 min-w-[180px]">
+                <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                <Input
+                  className="h-8 text-sm"
+                  placeholder={t.workOrders.searchResults}
+                  value={summarySearch}
+                  onChange={(e) => setSummarySearch(e.target.value)}
+                  data-testid="input-summary-search"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs whitespace-nowrap">{t.workOrders.dateFrom}</Label>
+                <Input
+                  type="date"
+                  className="h-8 text-sm w-36"
+                  value={summaryDateFrom}
+                  onChange={(e) => setSummaryDateFrom(e.target.value)}
+                  data-testid="input-summary-date-from"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs whitespace-nowrap">{t.workOrders.dateTo}</Label>
+                <Input
+                  type="date"
+                  className="h-8 text-sm w-36"
+                  value={summaryDateTo}
+                  onChange={(e) => setSummaryDateTo(e.target.value)}
+                  data-testid="input-summary-date-to"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs whitespace-nowrap">{language === "pt" ? "Filtrar" : "Find"}</Label>
+                <Select value={summaryFind} onValueChange={setSummaryFind}>
+                  <SelectTrigger className="h-8 text-sm w-40" data-testid="select-summary-find">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t.workOrders.allTypes}</SelectItem>
+                    {uniqueMaintenanceTypes.map(type => (
+                      <SelectItem key={type} value={type}>{getMtLabel(type)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <Select value={reportMode} onValueChange={(v) => { setReportMode(v as "detailed" | "summary"); setShowReport(false); }}>
-              <SelectTrigger data-testid="select-report-mode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="detailed" data-testid="select-report-mode-detailed">{t.workOrders.detailedReport}</SelectItem>
-                <SelectItem value="summary" data-testid="select-report-mode-summary">{t.workOrders.summaryReport}</SelectItem>
-              </SelectContent>
-            </Select>
           </Card>
 
-          {reportMode === "summary" && (
-            <Card className="p-4 space-y-4">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                <h2 className="font-semibold text-lg">{t.workOrders.summaryOverview}</h2>
-              </div>
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-sm">{t.workOrders.groupBy}</Label>
-                  <Select value={groupBy} onValueChange={(v) => { setGroupBy(v as GroupByOption); setShowReport(false); }}>
-                    <SelectTrigger data-testid="select-group-by">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="vehicle" data-testid="select-group-by-vehicle">{t.workOrders.byVehicle}</SelectItem>
-                      <SelectItem value="maintenanceType" data-testid="select-group-by-type">{t.workOrders.byMaintenanceType}</SelectItem>
-                      <SelectItem value="status" data-testid="select-group-by-status">{t.workOrders.byStatus}</SelectItem>
-                      <SelectItem value="month" data-testid="select-group-by-month">{t.workOrders.byMonth}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm">{t.workOrders.showValues}</Label>
-                  <Select value={valuesOption} onValueChange={(v) => { setValuesOption(v as ValuesOption); setShowReport(false); }}>
-                    <SelectTrigger data-testid="select-values">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="count" data-testid="select-values-count">{t.workOrders.count}</SelectItem>
-                      <SelectItem value="totalHours" data-testid="select-values-hours">{t.workOrders.totalHours}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm">{t.workOrders.crossTabBy}</Label>
-                  <Select value={crossTab} onValueChange={(v) => { setCrossTab(v as CrossTabOption); setShowReport(false); }}>
-                    <SelectTrigger data-testid="select-cross-tab">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none" data-testid="select-cross-tab-none">{t.workOrders.none}</SelectItem>
-                      <SelectItem value="maintenanceType" data-testid="select-cross-tab-type">{t.workOrders.byMaintenanceType}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </Card>
-          )}
+          <div className="flex items-center justify-end gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print-report">
+              <Printer className="w-4 h-4 mr-2" />
+              {t.workOrders.printReport}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportExcel} data-testid="button-export-excel">
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              {t.workOrders.exportExcel}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPdf} data-testid="button-export-pdf">
+              <Download className="w-4 h-4 mr-2" />
+              {t.workOrders.exportPdf}
+            </Button>
+          </div>
 
-          {reportMode === "detailed" && (
+          <Card className="overflow-visible" data-testid="summary-report-container">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-green-700">
+                    <TableHead className="text-white font-semibold text-xs">{t.workOrders.equipmentNo}</TableHead>
+                    <TableHead className="text-white font-semibold text-xs">{t.workOrders.equipmentName}</TableHead>
+                    {mtColumns.map(col => (
+                      <TableHead key={col.name} className="text-white font-semibold text-xs text-right">{col.label}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPivotData.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={mtColumns.length + 2} className="h-24 text-center text-muted-foreground">
+                        {t.workOrders.noWorkOrders}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredPivotData.map((row, idx) => (
+                      <TableRow key={row.id} className={idx % 2 === 0 ? "bg-yellow-50/50" : ""} data-testid={`row-pivot-${idx}`}>
+                        <TableCell className="text-sm font-medium">{row.licensePlate}</TableCell>
+                        <TableCell className="text-sm">{row.name}</TableCell>
+                        {mtColumns.map(col => (
+                          <TableCell key={col.name} className="text-sm text-right">
+                            {formatMinutesToHHMM(row.byType[col.name] || 0)}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+                {filteredPivotData.length > 0 && (
+                  <tfoot>
+                    <TableRow className="bg-muted/50 font-semibold">
+                      <TableCell colSpan={2} className="font-semibold text-sm">{t.workOrders.total}</TableCell>
+                      {mtColumns.map(col => {
+                        const total = filteredPivotData.reduce((s, r) => s + (r.byType[col.name] || 0), 0);
+                        return (
+                          <TableCell key={col.name} className="text-right font-semibold text-sm">
+                            {formatMinutesToHHMM(total)}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  </tfoot>
+                )}
+              </Table>
+            </div>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 space-y-4">
             <Card className="p-4 space-y-4">
               <div className="flex items-center gap-2">
                 <CheckSquare className="w-5 h-5" />
                 <h2 className="font-semibold text-lg">{t.workOrders.selectFields}</h2>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={selectAllFields} data-testid="button-select-all">
+                <Button variant="outline" size="sm" onClick={() => setSelectedFields(fieldOptions.map(f => f.key))} data-testid="button-select-all">
                   {t.workOrders.selectAll}
                 </Button>
-                <Button variant="outline" size="sm" onClick={deselectAllFields} data-testid="button-deselect-all">
+                <Button variant="outline" size="sm" onClick={() => setSelectedFields([])} data-testid="button-deselect-all">
                   {t.workOrders.deselectAll}
                 </Button>
               </div>
@@ -652,189 +587,79 @@ export default function WorkOrderReports() {
                 ))}
               </div>
             </Card>
-          )}
 
-          <Card className="p-4 space-y-4">
-            <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5" />
-              <h2 className="font-semibold text-lg">{t.workOrders.filterByStatus}</h2>
-            </div>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label className="text-sm">{t.workOrders.dateFrom}</Label>
-                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="input-date-from" />
+            <Card className="p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5" />
+                <h2 className="font-semibold text-lg">{t.workOrders.filterByStatus}</h2>
               </div>
-              <div className="space-y-1">
-                <Label className="text-sm">{t.workOrders.dateTo}</Label>
-                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="input-date-to" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">{t.workOrders.filterByStatus}</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger data-testid="select-status-filter"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t.workOrders.allStatuses}</SelectItem>
-                    <SelectItem value="open">{t.workOrders.open}</SelectItem>
-                    <SelectItem value="in_progress">{t.workOrders.inProgress}</SelectItem>
-                    <SelectItem value="completed">{t.workOrders.completed}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">{t.workOrders.filterByType}</Label>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger data-testid="select-type-filter"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t.workOrders.allTypes}</SelectItem>
-                    {uniqueMaintenanceTypes.map(type => (
-                      <SelectItem key={type} value={type}>{getMtLabel(type)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </Card>
-
-          <Button className="w-full" onClick={handleGenerateReport} disabled={isLoading} data-testid="button-generate-report">
-            <FileText className="w-4 h-4 mr-2" />
-            {t.workOrders.generateReport}
-          </Button>
-        </div>
-
-        <div className="lg:col-span-2">
-          {showReport ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-semibold text-lg">{t.workOrders.workOrderReport}</h2>
-                  <Badge variant="secondary" data-testid="badge-total-records">
-                    {t.workOrders.totalRecords}: {filteredWorkOrders.length}
-                  </Badge>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-sm">{t.workOrders.dateFrom}</Label>
+                  <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="input-date-from" />
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print-report">
-                    <Printer className="w-4 h-4 mr-2" />
-                    {t.workOrders.printReport}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleExportExcel} data-testid="button-export-excel">
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    {t.workOrders.exportExcel}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleExportPdf} data-testid="button-export-pdf">
-                    <Download className="w-4 h-4 mr-2" />
-                    {t.workOrders.exportPdf}
-                  </Button>
+                <div className="space-y-1">
+                  <Label className="text-sm">{t.workOrders.dateTo}</Label>
+                  <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="input-date-to" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">{t.workOrders.filterByStatus}</Label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger data-testid="select-status-filter"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.workOrders.allStatuses}</SelectItem>
+                      <SelectItem value="open">{t.workOrders.open}</SelectItem>
+                      <SelectItem value="in_progress">{t.workOrders.inProgress}</SelectItem>
+                      <SelectItem value="completed">{t.workOrders.completed}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">{t.workOrders.filterByType}</Label>
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger data-testid="select-type-filter"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.workOrders.allTypes}</SelectItem>
+                      {uniqueMaintenanceTypes.map(type => (
+                        <SelectItem key={type} value={type}>{getMtLabel(type)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
+            </Card>
 
-              {reportMode === "summary" && (
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    className="pl-9"
-                    placeholder={t.workOrders.searchResults}
-                    value={summarySearch}
-                    onChange={(e) => setSummarySearch(e.target.value)}
-                    data-testid="input-summary-search"
-                  />
-                </div>
-              )}
+            <Button className="w-full" onClick={handleGenerateReport} disabled={isLoading} data-testid="button-generate-report">
+              <FileText className="w-4 h-4 mr-2" />
+              {t.workOrders.generateReport}
+            </Button>
+          </div>
 
-              {reportMode === "summary" ? (
-                <Card className="overflow-visible" data-testid="summary-report-container">
-                  <div className="overflow-x-auto">
-                    {crossTab === "maintenanceType" ? (
-                      <Table>
-                        <TableHeader className="bg-muted/50">
-                          <TableRow>
-                            <TableHead>{groupByLabels[groupBy]}</TableHead>
-                            {pivotMtColumns.map(col => (
-                              <TableHead key={col} className="text-right">{col}</TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredPivotData.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={pivotMtColumns.length + 1} className="h-24 text-center text-muted-foreground">
-                                {t.workOrders.noWorkOrders}
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredPivotData.map((row, idx) => (
-                              <TableRow key={idx} data-testid={`row-pivot-${idx}`}>
-                                <TableCell className="font-medium">{row.label}</TableCell>
-                                {pivotMtColumns.map(col => {
-                                  const val = row.byType[col] || 0;
-                                  return (
-                                    <TableCell key={col} className="text-right">
-                                      {valuesOption === "count"
-                                        ? (val || "")
-                                        : formatMinutesToHHMM(val)}
-                                    </TableCell>
-                                  );
-                                })}
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                        {filteredPivotData.length > 0 && (
-                          <tfoot>
-                            <TableRow className="bg-muted/30 font-semibold">
-                              <TableCell className="font-semibold">{t.workOrders.total}</TableCell>
-                              {pivotMtColumns.map(col => {
-                                const total = filteredPivotData.reduce((s, r) => s + (r.byType[col] || 0), 0);
-                                return (
-                                  <TableCell key={col} className="text-right font-semibold">
-                                    {valuesOption === "count" ? total : formatMinutesToHHMM(total)}
-                                  </TableCell>
-                                );
-                              })}
-                            </TableRow>
-                          </tfoot>
-                        )}
-                      </Table>
-                    ) : (
-                      <Table>
-                        <TableHeader className="bg-muted/50">
-                          <TableRow>
-                            <TableHead>{groupByLabels[groupBy]}</TableHead>
-                            <TableHead className="text-right w-32">{valuesLabels[valuesOption]}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredSummaryData.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={2} className="h-24 text-center text-muted-foreground">
-                                {t.workOrders.noWorkOrders}
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredSummaryData.map((entry, idx) => (
-                              <TableRow key={idx} data-testid={`row-summary-${idx}`}>
-                                <TableCell>{entry.label}</TableCell>
-                                <TableCell className="text-right font-medium">{entry.displayValue}</TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                        {filteredSummaryData.length > 0 && (
-                          <tfoot>
-                            <TableRow className="bg-muted/30 font-semibold">
-                              <TableCell className="font-semibold">{t.workOrders.total}</TableCell>
-                              <TableCell className="text-right font-semibold">
-                                {valuesOption === "count"
-                                  ? filteredSummaryData.reduce((s, e) => s + e.value, 0)
-                                  : formatMinutesToHHMM(filteredSummaryData.reduce((s, e) => s + e.value, 0))}
-                              </TableCell>
-                            </TableRow>
-                          </tfoot>
-                        )}
-                      </Table>
-                    )}
+          <div className="lg:col-span-2">
+            {showReport && selectedFields.length > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-3">
+                    <h2 className="font-semibold text-lg">{t.workOrders.workOrderReport}</h2>
+                    <Badge variant="secondary" data-testid="badge-total-records">
+                      {t.workOrders.totalRecords}: {filteredWorkOrders.length}
+                    </Badge>
                   </div>
-                </Card>
-              ) : (
+                  <div className="flex gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print-report">
+                      <Printer className="w-4 h-4 mr-2" />
+                      {t.workOrders.printReport}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportExcel} data-testid="button-export-excel">
+                      <FileSpreadsheet className="w-4 h-4 mr-2" />
+                      {t.workOrders.exportExcel}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportPdf} data-testid="button-export-pdf">
+                      <Download className="w-4 h-4 mr-2" />
+                      {t.workOrders.exportPdf}
+                    </Button>
+                  </div>
+                </div>
                 <Card className="overflow-visible">
                   <div ref={reportRef} className="overflow-x-auto">
                     <Table>
@@ -879,19 +704,19 @@ export default function WorkOrderReports() {
                     </Table>
                   </div>
                 </Card>
-              )}
-            </div>
-          ) : (
-            <Card className="flex flex-col items-center justify-center p-12 text-center">
-              <FileText className="w-16 h-16 text-muted-foreground/30 mb-4" />
-              <h3 className="font-semibold text-lg mb-1" data-testid="text-empty-state">{t.workOrders.workOrderReport}</h3>
-              <p className="text-muted-foreground text-sm max-w-md">
-                {t.workOrders.reportSubtitle}
-              </p>
-            </Card>
-          )}
+              </div>
+            ) : (
+              <Card className="flex flex-col items-center justify-center p-12 text-center">
+                <FileText className="w-16 h-16 text-muted-foreground/30 mb-4" />
+                <h3 className="font-semibold text-lg mb-1" data-testid="text-empty-state">{t.workOrders.workOrderReport}</h3>
+                <p className="text-muted-foreground text-sm max-w-md">
+                  {t.workOrders.reportSubtitle}
+                </p>
+              </Card>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
