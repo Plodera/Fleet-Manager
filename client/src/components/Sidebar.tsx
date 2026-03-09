@@ -20,7 +20,8 @@ import {
   Cog,
   BarChart3,
   KeyRound,
-  PackageSearch
+  PackageSearch,
+  Monitor
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -153,6 +154,7 @@ export function Sidebar() {
         { href: "/settings", label: t.nav.settings, icon: Settings, permission: "admin_only", hideFromDriver: true },
         { href: "/equipment-types", label: t.nav.equipmentTypes, icon: Settings2, permission: "admin_only", hideFromDriver: true },
         { href: "/work-order-config", label: t.nav.workOrderConfig, icon: Cog, permission: "admin_only", hideFromDriver: true },
+        { href: "/tv-dashboard-config", label: t.nav.tvDashboards, icon: Monitor, permission: "admin_only", hideFromDriver: true },
       ],
     },
   ];

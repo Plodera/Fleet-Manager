@@ -30,6 +30,9 @@ import WorkOrders from "@/pages/WorkOrders";
 import WorkOrderConfig from "@/pages/WorkOrderConfig";
 import WorkOrderReports from "@/pages/WorkOrderReports";
 import Indents from "@/pages/Indents";
+import TVDashboardConfig from "@/pages/TVDashboardConfig";
+import TVDashboard from "@/pages/TVDashboard";
+import TVDashboardIndex from "@/pages/TVDashboardIndex";
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -157,6 +160,12 @@ function Router() {
       <Route path="/shared-rides/:id/print">
         <PrintRoute component={SharedRidePrintView} requiredPermission="view_shared_rides" />
       </Route>
+      
+      <Route path="/tv-dashboard-config">
+        <PrivateRoute component={TVDashboardConfig} adminOnly />
+      </Route>
+      <Route path="/tv-dashboard/:id" component={TVDashboard} />
+      <Route path="/tv-dashboard" component={TVDashboardIndex} />
       
       <Route component={NotFound} />
     </Switch>

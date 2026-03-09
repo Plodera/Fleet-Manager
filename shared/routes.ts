@@ -687,6 +687,110 @@ export const api = {
       responses: { 200: z.any(), 400: errorSchemas.validation },
     },
   },
+  tvDashboards: {
+    list: { method: 'GET' as const, path: '/api/tv-dashboards', responses: { 200: z.array(z.any()) } },
+    get: { method: 'GET' as const, path: '/api/tv-dashboards/:id', responses: { 200: z.any(), 404: errorSchemas.notFound } },
+    create: {
+      method: 'POST' as const,
+      path: '/api/tv-dashboards',
+      input: z.object({
+        name: z.string().min(1),
+        departmentId: z.coerce.number().optional().nullable(),
+        labelEn: z.string().optional().default(""),
+        labelPt: z.string().optional().default(""),
+        isActive: z.boolean().optional().default(true),
+      }),
+      responses: { 201: z.any(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/tv-dashboards/:id',
+      input: z.object({
+        name: z.string().min(1).optional(),
+        departmentId: z.coerce.number().optional().nullable(),
+        labelEn: z.string().optional(),
+        labelPt: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
+    },
+    delete: { method: 'DELETE' as const, path: '/api/tv-dashboards/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
+    display: { method: 'GET' as const, path: '/api/tv-dashboards/:id/display', responses: { 200: z.any(), 404: errorSchemas.notFound } },
+  },
+  tvDashboardKpis: {
+    list: { method: 'GET' as const, path: '/api/tv-dashboards/:dashboardId/kpis', responses: { 200: z.array(z.any()) } },
+    create: {
+      method: 'POST' as const,
+      path: '/api/tv-dashboards/:dashboardId/kpis',
+      input: z.object({
+        name: z.string().min(1),
+        labelEn: z.string().optional().default(""),
+        labelPt: z.string().optional().default(""),
+        unit: z.string().optional().nullable(),
+        sortOrder: z.coerce.number().optional().default(0),
+        isActive: z.boolean().optional().default(true),
+      }),
+      responses: { 201: z.any(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/tv-kpis/:id',
+      input: z.object({
+        name: z.string().min(1).optional(),
+        labelEn: z.string().optional(),
+        labelPt: z.string().optional(),
+        unit: z.string().optional().nullable(),
+        sortOrder: z.coerce.number().optional(),
+        isActive: z.boolean().optional(),
+      }),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
+    },
+    delete: { method: 'DELETE' as const, path: '/api/tv-kpis/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
+  },
+  tvKpiValues: {
+    list: { method: 'GET' as const, path: '/api/tv-kpi-values', responses: { 200: z.array(z.any()) } },
+    upsert: {
+      method: 'POST' as const,
+      path: '/api/tv-kpi-values',
+      input: z.object({
+        values: z.array(z.object({
+          kpiId: z.coerce.number(),
+          periodType: z.enum(["daily", "monthly"]),
+          periodDate: z.string(),
+          value: z.string(),
+        })),
+      }),
+      responses: { 200: z.any(), 400: errorSchemas.validation },
+    },
+  },
+  tvDashboardVideos: {
+    list: { method: 'GET' as const, path: '/api/tv-dashboards/:dashboardId/videos', responses: { 200: z.array(z.any()) } },
+    create: {
+      method: 'POST' as const,
+      path: '/api/tv-dashboards/:dashboardId/videos',
+      input: z.object({
+        title: z.string().min(1),
+        videoType: z.enum(["youtube", "upload"]).optional().default("youtube"),
+        url: z.string().min(1),
+        isActive: z.boolean().optional().default(true),
+        sortOrder: z.coerce.number().optional().default(0),
+      }),
+      responses: { 201: z.any(), 400: errorSchemas.validation },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/tv-videos/:id',
+      input: z.object({
+        title: z.string().min(1).optional(),
+        videoType: z.enum(["youtube", "upload"]).optional(),
+        url: z.string().min(1).optional(),
+        isActive: z.boolean().optional(),
+        sortOrder: z.coerce.number().optional(),
+      }),
+      responses: { 200: z.any(), 404: errorSchemas.notFound },
+    },
+    delete: { method: 'DELETE' as const, path: '/api/tv-videos/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {

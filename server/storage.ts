@@ -2,6 +2,7 @@ import {
   users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
   indents, indentItems, indentApproverDepartments,
+  tvDashboards, tvDashboardKpis, tvDashboardKpiValues, tvDashboardVideos,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -19,6 +20,10 @@ import {
   type Indent, type InsertIndent,
   type IndentItem, type InsertIndentItem,
   type IndentApproverDepartment,
+  type TvDashboard, type InsertTvDashboard,
+  type TvDashboardKpi, type InsertTvDashboardKpi,
+  type TvDashboardKpiValue, type InsertTvDashboardKpiValue,
+  type TvDashboardVideo, type InsertTvDashboardVideo,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq, desc, sql, and } from "drizzle-orm";
@@ -151,6 +156,24 @@ export interface IStorage {
   getIndentApproverDepartments(): Promise<any[]>;
   getMyIndentApproverDepartments(userId: number): Promise<number[]>;
   setIndentApproverDepartments(userId: number, departmentIds: number[]): Promise<void>;
+
+  // TV Dashboards
+  getTvDashboards(): Promise<TvDashboard[]>;
+  getTvDashboard(id: number): Promise<TvDashboard | undefined>;
+  createTvDashboard(data: InsertTvDashboard): Promise<TvDashboard>;
+  updateTvDashboard(id: number, updates: Partial<InsertTvDashboard>): Promise<TvDashboard>;
+  deleteTvDashboard(id: number): Promise<void>;
+  getTvDashboardKpis(dashboardId: number): Promise<TvDashboardKpi[]>;
+  createTvDashboardKpi(data: InsertTvDashboardKpi): Promise<TvDashboardKpi>;
+  updateTvDashboardKpi(id: number, updates: Partial<InsertTvDashboardKpi>): Promise<TvDashboardKpi>;
+  deleteTvDashboardKpi(id: number): Promise<void>;
+  getTvKpiValues(kpiIds: number[], periodType?: string, periodDate?: string): Promise<TvDashboardKpiValue[]>;
+  upsertTvKpiValues(values: InsertTvDashboardKpiValue[]): Promise<void>;
+  getTvDashboardVideos(dashboardId: number): Promise<TvDashboardVideo[]>;
+  createTvDashboardVideo(data: InsertTvDashboardVideo): Promise<TvDashboardVideo>;
+  updateTvDashboardVideo(id: number, updates: Partial<InsertTvDashboardVideo>): Promise<TvDashboardVideo>;
+  deleteTvDashboardVideo(id: number): Promise<void>;
+  getTvDashboardDisplay(id: number): Promise<any>;
 
   sessionStore: session.Store;
 }
@@ -763,6 +786,119 @@ export class DatabaseStorage implements IStorage {
       await getDb().insert(indentApproverDepartments).values(departmentIds.map(departmentId => ({ userId, departmentId })));
     }
   }
+
+  async getTvDashboards(): Promise<TvDashboard[]> {
+    return await getDb().select().from(tvDashboards).orderBy(tvDashboards.name);
+  }
+
+  async getTvDashboard(id: number): Promise<TvDashboard | undefined> {
+    const [dashboard] = await getDb().select().from(tvDashboards).where(eq(tvDashboards.id, id));
+    return dashboard;
+  }
+
+  async createTvDashboard(data: InsertTvDashboard): Promise<TvDashboard> {
+    const [dashboard] = await getDb().insert(tvDashboards).values(data).returning();
+    return dashboard;
+  }
+
+  async updateTvDashboard(id: number, updates: Partial<InsertTvDashboard>): Promise<TvDashboard> {
+    const [dashboard] = await getDb().update(tvDashboards).set(updates).where(eq(tvDashboards.id, id)).returning();
+    return dashboard;
+  }
+
+  async deleteTvDashboard(id: number): Promise<void> {
+    await getDb().delete(tvDashboards).where(eq(tvDashboards.id, id));
+  }
+
+  async getTvDashboardKpis(dashboardId: number): Promise<TvDashboardKpi[]> {
+    return await getDb().select().from(tvDashboardKpis).where(eq(tvDashboardKpis.dashboardId, dashboardId)).orderBy(tvDashboardKpis.sortOrder);
+  }
+
+  async createTvDashboardKpi(data: InsertTvDashboardKpi): Promise<TvDashboardKpi> {
+    const [kpi] = await getDb().insert(tvDashboardKpis).values(data).returning();
+    return kpi;
+  }
+
+  async updateTvDashboardKpi(id: number, updates: Partial<InsertTvDashboardKpi>): Promise<TvDashboardKpi> {
+    const [kpi] = await getDb().update(tvDashboardKpis).set(updates).where(eq(tvDashboardKpis.id, id)).returning();
+    return kpi;
+  }
+
+  async deleteTvDashboardKpi(id: number): Promise<void> {
+    await getDb().delete(tvDashboardKpis).where(eq(tvDashboardKpis.id, id));
+  }
+
+  async getTvKpiValues(kpiIds: number[], periodType?: string, periodDate?: string): Promise<TvDashboardKpiValue[]> {
+    if (kpiIds.length === 0) return [];
+    const conditions = [sql`${tvDashboardKpiValues.kpiId} IN (${sql.join(kpiIds.map(id => sql`${id}`), sql`, `)})`];
+    if (periodType) conditions.push(eq(tvDashboardKpiValues.periodType, periodType));
+    if (periodDate) conditions.push(eq(tvDashboardKpiValues.periodDate, periodDate));
+    return await getDb().select().from(tvDashboardKpiValues).where(and(...conditions));
+  }
+
+  async upsertTvKpiValues(values: InsertTvDashboardKpiValue[]): Promise<void> {
+    for (const val of values) {
+      const existing = await getDb().select().from(tvDashboardKpiValues)
+        .where(and(
+          eq(tvDashboardKpiValues.kpiId, val.kpiId),
+          eq(tvDashboardKpiValues.periodType, val.periodType),
+          eq(tvDashboardKpiValues.periodDate, val.periodDate),
+        ));
+      if (existing.length > 0) {
+        await getDb().update(tvDashboardKpiValues)
+          .set({ value: val.value, createdById: val.createdById })
+          .where(eq(tvDashboardKpiValues.id, existing[0].id));
+      } else {
+        await getDb().insert(tvDashboardKpiValues).values(val);
+      }
+    }
+  }
+
+  async getTvDashboardVideos(dashboardId: number): Promise<TvDashboardVideo[]> {
+    return await getDb().select().from(tvDashboardVideos).where(eq(tvDashboardVideos.dashboardId, dashboardId)).orderBy(tvDashboardVideos.sortOrder);
+  }
+
+  async createTvDashboardVideo(data: InsertTvDashboardVideo): Promise<TvDashboardVideo> {
+    const [video] = await getDb().insert(tvDashboardVideos).values(data).returning();
+    return video;
+  }
+
+  async updateTvDashboardVideo(id: number, updates: Partial<InsertTvDashboardVideo>): Promise<TvDashboardVideo> {
+    const [video] = await getDb().update(tvDashboardVideos).set(updates).where(eq(tvDashboardVideos.id, id)).returning();
+    return video;
+  }
+
+  async deleteTvDashboardVideo(id: number): Promise<void> {
+    await getDb().delete(tvDashboardVideos).where(eq(tvDashboardVideos.id, id));
+  }
+
+  async getTvDashboardDisplay(id: number): Promise<any> {
+    const dashboard = await this.getTvDashboard(id);
+    if (!dashboard) return null;
+
+    const kpis = await getDb().select().from(tvDashboardKpis)
+      .where(and(eq(tvDashboardKpis.dashboardId, id), eq(tvDashboardKpis.isActive, true)))
+      .orderBy(tvDashboardKpis.sortOrder);
+
+    const kpiIds = kpis.map(k => k.id);
+    let kpiValues: TvDashboardKpiValue[] = [];
+    if (kpiIds.length > 0) {
+      kpiValues = await getDb().select().from(tvDashboardKpiValues)
+        .where(sql`${tvDashboardKpiValues.kpiId} IN (${sql.join(kpiIds.map(id => sql`${id}`), sql`, `)})`);
+    }
+
+    const videos = await getDb().select().from(tvDashboardVideos)
+      .where(and(eq(tvDashboardVideos.dashboardId, id), eq(tvDashboardVideos.isActive, true)))
+      .orderBy(tvDashboardVideos.sortOrder);
+
+    let department = null;
+    if (dashboard.departmentId) {
+      const [dept] = await getDb().select().from(departments).where(eq(departments.id, dashboard.departmentId));
+      department = dept || null;
+    }
+
+    return { ...dashboard, department, kpis, kpiValues, videos };
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -868,5 +1004,21 @@ export const storage = {
   getIndentApproverDepartments: () => getStorage().getIndentApproverDepartments(),
   getMyIndentApproverDepartments: (...args: Parameters<DatabaseStorage['getMyIndentApproverDepartments']>) => getStorage().getMyIndentApproverDepartments(...args),
   setIndentApproverDepartments: (...args: Parameters<DatabaseStorage['setIndentApproverDepartments']>) => getStorage().setIndentApproverDepartments(...args),
+  getTvDashboards: () => getStorage().getTvDashboards(),
+  getTvDashboard: (...args: Parameters<DatabaseStorage['getTvDashboard']>) => getStorage().getTvDashboard(...args),
+  createTvDashboard: (...args: Parameters<DatabaseStorage['createTvDashboard']>) => getStorage().createTvDashboard(...args),
+  updateTvDashboard: (...args: Parameters<DatabaseStorage['updateTvDashboard']>) => getStorage().updateTvDashboard(...args),
+  deleteTvDashboard: (...args: Parameters<DatabaseStorage['deleteTvDashboard']>) => getStorage().deleteTvDashboard(...args),
+  getTvDashboardKpis: (...args: Parameters<DatabaseStorage['getTvDashboardKpis']>) => getStorage().getTvDashboardKpis(...args),
+  createTvDashboardKpi: (...args: Parameters<DatabaseStorage['createTvDashboardKpi']>) => getStorage().createTvDashboardKpi(...args),
+  updateTvDashboardKpi: (...args: Parameters<DatabaseStorage['updateTvDashboardKpi']>) => getStorage().updateTvDashboardKpi(...args),
+  deleteTvDashboardKpi: (...args: Parameters<DatabaseStorage['deleteTvDashboardKpi']>) => getStorage().deleteTvDashboardKpi(...args),
+  getTvKpiValues: (...args: Parameters<DatabaseStorage['getTvKpiValues']>) => getStorage().getTvKpiValues(...args),
+  upsertTvKpiValues: (...args: Parameters<DatabaseStorage['upsertTvKpiValues']>) => getStorage().upsertTvKpiValues(...args),
+  getTvDashboardVideos: (...args: Parameters<DatabaseStorage['getTvDashboardVideos']>) => getStorage().getTvDashboardVideos(...args),
+  createTvDashboardVideo: (...args: Parameters<DatabaseStorage['createTvDashboardVideo']>) => getStorage().createTvDashboardVideo(...args),
+  updateTvDashboardVideo: (...args: Parameters<DatabaseStorage['updateTvDashboardVideo']>) => getStorage().updateTvDashboardVideo(...args),
+  deleteTvDashboardVideo: (...args: Parameters<DatabaseStorage['deleteTvDashboardVideo']>) => getStorage().deleteTvDashboardVideo(...args),
+  getTvDashboardDisplay: (...args: Parameters<DatabaseStorage['getTvDashboardDisplay']>) => getStorage().getTvDashboardDisplay(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

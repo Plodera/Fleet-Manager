@@ -565,3 +565,86 @@ export const indentApproverDepartmentsRelations = relations(indentApproverDepart
 export const insertIndentApproverDepartmentSchema = createInsertSchema(indentApproverDepartments).omit({ id: true });
 export type IndentApproverDepartment = typeof indentApproverDepartments.$inferSelect;
 export type InsertIndentApproverDepartment = z.infer<typeof insertIndentApproverDepartmentSchema>;
+
+// TV Dashboards
+export const tvDashboards = pgTable("tv_dashboards", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  departmentId: integer("department_id").references(() => departments.id),
+  labelEn: text("label_en").notNull().default(""),
+  labelPt: text("label_pt").notNull().default(""),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const tvDashboardKpis = pgTable("tv_dashboard_kpis", {
+  id: serial("id").primaryKey(),
+  dashboardId: integer("dashboard_id").references(() => tvDashboards.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  labelEn: text("label_en").notNull().default(""),
+  labelPt: text("label_pt").notNull().default(""),
+  unit: text("unit"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const tvDashboardKpiValues = pgTable("tv_dashboard_kpi_values", {
+  id: serial("id").primaryKey(),
+  kpiId: integer("kpi_id").references(() => tvDashboardKpis.id, { onDelete: "cascade" }).notNull(),
+  periodType: text("period_type").notNull(),
+  periodDate: date("period_date").notNull(),
+  value: numeric("value").notNull(),
+  createdById: integer("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const tvDashboardVideos = pgTable("tv_dashboard_videos", {
+  id: serial("id").primaryKey(),
+  dashboardId: integer("dashboard_id").references(() => tvDashboards.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  videoType: text("video_type").notNull().default("youtube"),
+  url: text("url").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const tvDashboardsRelations = relations(tvDashboards, ({ one, many }) => ({
+  department: one(departments, { fields: [tvDashboards.departmentId], references: [departments.id] }),
+  kpis: many(tvDashboardKpis),
+  videos: many(tvDashboardVideos),
+}));
+
+export const tvDashboardKpisRelations = relations(tvDashboardKpis, ({ one, many }) => ({
+  dashboard: one(tvDashboards, { fields: [tvDashboardKpis.dashboardId], references: [tvDashboards.id] }),
+  values: many(tvDashboardKpiValues),
+}));
+
+export const tvDashboardKpiValuesRelations = relations(tvDashboardKpiValues, ({ one }) => ({
+  kpi: one(tvDashboardKpis, { fields: [tvDashboardKpiValues.kpiId], references: [tvDashboardKpis.id] }),
+  createdBy: one(users, { fields: [tvDashboardKpiValues.createdById], references: [users.id] }),
+}));
+
+export const tvDashboardVideosRelations = relations(tvDashboardVideos, ({ one }) => ({
+  dashboard: one(tvDashboards, { fields: [tvDashboardVideos.dashboardId], references: [tvDashboards.id] }),
+}));
+
+export const insertTvDashboardSchema = createInsertSchema(tvDashboards).omit({ id: true, createdAt: true });
+export const insertTvDashboardKpiSchema = createInsertSchema(tvDashboardKpis).omit({ id: true }).extend({
+  dashboardId: z.coerce.number(),
+});
+export const insertTvDashboardKpiValueSchema = createInsertSchema(tvDashboardKpiValues).omit({ id: true, createdAt: true }).extend({
+  kpiId: z.coerce.number(),
+  createdById: z.coerce.number().optional().nullable(),
+});
+export const insertTvDashboardVideoSchema = createInsertSchema(tvDashboardVideos).omit({ id: true }).extend({
+  dashboardId: z.coerce.number(),
+});
+
+export type TvDashboard = typeof tvDashboards.$inferSelect;
+export type InsertTvDashboard = z.infer<typeof insertTvDashboardSchema>;
+export type TvDashboardKpi = typeof tvDashboardKpis.$inferSelect;
+export type InsertTvDashboardKpi = z.infer<typeof insertTvDashboardKpiSchema>;
+export type TvDashboardKpiValue = typeof tvDashboardKpiValues.$inferSelect;
+export type InsertTvDashboardKpiValue = z.infer<typeof insertTvDashboardKpiValueSchema>;
+export type TvDashboardVideo = typeof tvDashboardVideos.$inferSelect;
+export type InsertTvDashboardVideo = z.infer<typeof insertTvDashboardVideoSchema>;

@@ -1673,6 +1673,160 @@ export async function registerRoutes(
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
+  // TV Dashboards
+  app.get(api.tvDashboards.list.path, async (_req, res) => {
+    const dashboards = await storage.getTvDashboards();
+    res.json(dashboards);
+  });
+
+  app.get(api.tvDashboards.display.path.replace(':id', ':id(\\d+)'), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const data = await storage.getTvDashboardDisplay(id);
+    if (!data) return res.status(404).json({ message: "Dashboard not found" });
+    res.json(data);
+  });
+
+  app.get(api.tvDashboards.get.path.replace(':id', ':id(\\d+)'), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const dashboard = await storage.getTvDashboard(id);
+    if (!dashboard) return res.status(404).json({ message: "Dashboard not found" });
+    res.json(dashboard);
+  });
+
+  app.post(api.tvDashboards.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const data = api.tvDashboards.create.input.parse(req.body);
+      const dashboard = await storage.createTvDashboard(data);
+      res.status(201).json(dashboard);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.put('/api/tv-dashboards/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const id = parseInt(req.params.id);
+      const data = api.tvDashboards.update.input.parse(req.body);
+      const dashboard = await storage.updateTvDashboard(id, data);
+      res.json(dashboard);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete('/api/tv-dashboards/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const id = parseInt(req.params.id);
+    await storage.deleteTvDashboard(id);
+    res.status(204).send();
+  });
+
+  // TV Dashboard KPIs
+  app.get('/api/tv-dashboards/:dashboardId/kpis', async (req, res) => {
+    const dashboardId = parseInt(req.params.dashboardId);
+    const kpis = await storage.getTvDashboardKpis(dashboardId);
+    res.json(kpis);
+  });
+
+  app.post('/api/tv-dashboards/:dashboardId/kpis', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const dashboardId = parseInt(req.params.dashboardId);
+      const data = api.tvDashboardKpis.create.input.parse(req.body);
+      const kpi = await storage.createTvDashboardKpi({ ...data, dashboardId });
+      res.status(201).json(kpi);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.put('/api/tv-kpis/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const id = parseInt(req.params.id);
+      const data = api.tvDashboardKpis.update.input.parse(req.body);
+      const kpi = await storage.updateTvDashboardKpi(id, data);
+      res.json(kpi);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete('/api/tv-kpis/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const id = parseInt(req.params.id);
+    await storage.deleteTvDashboardKpi(id);
+    res.status(204).send();
+  });
+
+  // TV KPI Values
+  app.get(api.tvKpiValues.list.path, async (req, res) => {
+    const kpiIdsParam = req.query.kpiIds as string;
+    if (!kpiIdsParam) return res.json([]);
+    const kpiIds = kpiIdsParam.split(',').map(Number).filter(n => !isNaN(n));
+    const periodType = req.query.periodType as string | undefined;
+    const periodDate = req.query.periodDate as string | undefined;
+    const values = await storage.getTvKpiValues(kpiIds, periodType, periodDate);
+    res.json(values);
+  });
+
+  app.post(api.tvKpiValues.upsert.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const user = req.user as User;
+      const { values } = api.tvKpiValues.upsert.input.parse(req.body);
+      const withUser = values.map(v => ({ ...v, createdById: user.id }));
+      await storage.upsertTvKpiValues(withUser);
+      res.json({ success: true });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  // TV Dashboard Videos
+  app.get('/api/tv-dashboards/:dashboardId/videos', async (req, res) => {
+    const dashboardId = parseInt(req.params.dashboardId);
+    const videos = await storage.getTvDashboardVideos(dashboardId);
+    res.json(videos);
+  });
+
+  app.post('/api/tv-dashboards/:dashboardId/videos', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const dashboardId = parseInt(req.params.dashboardId);
+      const data = api.tvDashboardVideos.create.input.parse(req.body);
+      const video = await storage.createTvDashboardVideo({ ...data, dashboardId });
+      res.status(201).json(video);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.put('/api/tv-videos/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const id = parseInt(req.params.id);
+      const data = api.tvDashboardVideos.update.input.parse(req.body);
+      const video = await storage.updateTvDashboardVideo(id, data);
+      res.json(video);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete('/api/tv-videos/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const id = parseInt(req.params.id);
+    await storage.deleteTvDashboardVideo(id);
+    res.status(204).send();
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {
