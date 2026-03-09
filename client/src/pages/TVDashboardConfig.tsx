@@ -4,7 +4,7 @@ import { useLanguage } from "@/lib/i18n";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import { Monitor, Plus, Pencil, Trash2, Save } from "lucide-react";
+import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -272,6 +272,12 @@ export default function TVDashboardConfig() {
         icon={<Monitor className="w-5 h-5 text-primary" />}
         title={t.tvDashboard.configTitle}
         description={t.tvDashboard.configSubtitle}
+        actions={
+          <Button variant="outline" onClick={() => window.open("/tv-dashboard", "_blank")} data-testid="button-view-all-dashboards">
+            <ExternalLink className="w-4 h-4 mr-2" />
+            {t.tvDashboard.viewAllDashboards}
+          </Button>
+        }
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
@@ -322,6 +328,9 @@ export default function TVDashboardConfig() {
                         </span>
                       </td>
                       <td className="p-3 text-right">
+                        <Button variant="ghost" size="icon" onClick={() => window.open(`/tv-dashboard/${d.id}`, "_blank")} title={t.tvDashboard.viewDashboard} data-testid={`button-view-dashboard-${d.id}`}>
+                          <Eye className="w-4 h-4 text-blue-500" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => openDashDialog(d)} data-testid={`button-edit-dashboard-${d.id}`}>
                           <Pencil className="w-4 h-4" />
                         </Button>
