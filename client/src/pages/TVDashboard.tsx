@@ -149,8 +149,8 @@ export default function TVDashboard() {
   const currentVideo = videos[currentVideoIndex];
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 flex flex-col" data-testid="tv-dashboard-container">
-      <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-200 shadow-sm">
+    <div ref={containerRef} className={`bg-gradient-to-br from-slate-50 to-gray-100 flex flex-col ${isFullScreen ? "h-screen" : "min-h-screen"}`} data-testid="tv-dashboard-container">
+      <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-200 shadow-sm shrink-0">
         <div className="flex items-center gap-4">
           <Link href="/tv-dashboard">
             <span className="text-gray-400 hover:text-gray-700 cursor-pointer transition-colors" data-testid="link-back-dashboards">
@@ -173,7 +173,7 @@ export default function TVDashboard() {
         </div>
       </header>
 
-      <main className="flex-1 p-6 overflow-auto">
+      <main className="flex-1 p-6 overflow-auto flex flex-col min-h-0">
         {kpis.length === 0 && videos.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-96 text-gray-400">
             <BarChart3 className="w-16 h-16 mb-4" />
@@ -181,7 +181,7 @@ export default function TVDashboard() {
             <p className="text-sm mt-1">{t.tvDashboard.noDataMessage}</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="flex flex-col flex-1 gap-5 min-h-0">
             {kpis.length > 0 && (
               <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(kpis.length, 6)}, minmax(0, 1fr))` }} data-testid="section-kpis">
                 {kpis.map((kpi: any, idx: number) => {
@@ -265,47 +265,43 @@ export default function TVDashboard() {
             )}
 
             {videos.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="section-videos">
-                <div className="relative">
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0" data-testid="section-videos">
+                <div className="relative flex-1 min-h-0">
                   <div
-                    className="transition-opacity duration-500 ease-in-out"
+                    className="transition-opacity duration-500 ease-in-out absolute inset-0"
                     style={{ opacity: videoFading ? 0 : 1 }}
                   >
                     {currentVideo && currentVideo.videoType === "youtube" && extractYouTubeId(currentVideo.url) ? (
-                      <div className="aspect-video">
-                        <iframe
-                          key={currentVideo.id}
-                          src={`https://www.youtube.com/embed/${extractYouTubeId(currentVideo.url)}?autoplay=1&mute=1&loop=1&playlist=${extractYouTubeId(currentVideo.url)}`}
-                          className="w-full h-full"
-                          allow="autoplay; encrypted-media"
-                          allowFullScreen
-                          data-testid="video-player-youtube"
-                        />
-                      </div>
+                      <iframe
+                        key={currentVideo.id}
+                        src={`https://www.youtube.com/embed/${extractYouTubeId(currentVideo.url)}?autoplay=1&mute=1&loop=1&playlist=${extractYouTubeId(currentVideo.url)}`}
+                        className="w-full h-full"
+                        allow="autoplay; encrypted-media"
+                        allowFullScreen
+                        data-testid="video-player-youtube"
+                      />
                     ) : currentVideo ? (
-                      <div className="aspect-video">
-                        <video
-                          key={currentVideo.id}
-                          src={currentVideo.url}
-                          className="w-full h-full object-cover"
-                          autoPlay
-                          muted
-                          loop
-                          data-testid="video-player-upload"
-                        />
-                      </div>
+                      <video
+                        key={currentVideo.id}
+                        src={currentVideo.url}
+                        className="w-full h-full object-contain"
+                        autoPlay
+                        muted
+                        loop
+                        data-testid="video-player-upload"
+                      />
                     ) : null}
                   </div>
 
                   {currentVideo && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-6 py-4">
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-6 py-4 z-10">
                       <p className="text-white font-medium text-sm">{currentVideo.title}</p>
                     </div>
                   )}
                 </div>
 
                 {videos.length > 1 && (
-                  <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t border-gray-100">
+                  <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t border-gray-100 shrink-0">
                     <div className="flex items-center gap-2">
                       {videos.map((_: any, idx: number) => (
                         <button
