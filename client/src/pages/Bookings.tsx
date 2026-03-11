@@ -82,11 +82,12 @@ export default function Bookings() {
   }, [vehicleTypes]);
 
   const availableVehicles = useMemo(() => {
-    let filtered = vehicles?.filter(v => v.status === "available") || [];
+    const all = vehicles?.filter(v => v.status === "available") || [];
     if (bookableCategories && bookableCategories.length > 0) {
-      filtered = filtered.filter(v => bookableCategories.includes(v.category));
+      const filtered = all.filter(v => bookableCategories.includes(v.category));
+      return filtered.length > 0 ? filtered : all;
     }
-    return filtered;
+    return all;
   }, [vehicles, bookableCategories]);
 
   const statusCounts = useMemo(() => {

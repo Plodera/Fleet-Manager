@@ -87,11 +87,12 @@ export default function SharedRides() {
   }, [vehicleTypes]);
 
   const largeVehicles = useMemo(() => {
-    let filtered = vehicles?.filter((v: any) => v.capacity > 5 && v.status === 'available') || [];
+    const all = vehicles?.filter((v: any) => v.capacity > 5 && v.status === 'available') || [];
     if (bookableCategories && bookableCategories.length > 0) {
-      filtered = filtered.filter((v: any) => bookableCategories.includes(v.category));
+      const filtered = all.filter((v: any) => bookableCategories.includes(v.category));
+      return filtered.length > 0 ? filtered : all;
     }
-    return filtered;
+    return all;
   }, [vehicles, bookableCategories]);
 
   const joinForm = useForm({
