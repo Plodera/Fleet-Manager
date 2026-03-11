@@ -88,7 +88,7 @@ export default function SharedRides() {
 
   const largeVehicles = useMemo(() => {
     let filtered = vehicles?.filter((v: any) => v.capacity > 5 && v.status === 'available') || [];
-    if (bookableCategories) {
+    if (bookableCategories && bookableCategories.length > 0) {
       filtered = filtered.filter((v: any) => bookableCategories.includes(v.category));
     }
     return filtered;

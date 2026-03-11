@@ -83,7 +83,7 @@ export default function Bookings() {
 
   const availableVehicles = useMemo(() => {
     let filtered = vehicles?.filter(v => v.status === "available") || [];
-    if (bookableCategories) {
+    if (bookableCategories && bookableCategories.length > 0) {
       filtered = filtered.filter(v => bookableCategories.includes(v.category));
     }
     return filtered;
