@@ -11,7 +11,7 @@ import {
 const KPI_PAGE_SIZE = 6;
 
 function extractYouTubeId(url: string): string | null {
-  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   return match ? match[1] : null;
 }
 
@@ -90,7 +90,7 @@ function AnimatedValue({ value, unit, testId }: { value: string | number; unit?:
   const display = useCountUp(value);
   return (
     <div className="flex items-baseline gap-1.5">
-      <span className="text-4xl font-bold text-white leading-none" data-testid={testId}>
+      <span className="text-3xl font-bold text-white leading-none" data-testid={testId}>
         {display}
       </span>
       {unit && <span className="text-sm text-gray-500 font-medium">{unit}</span>}
@@ -220,19 +220,19 @@ function KpiCardContent({
   return (
     <div
       key={kpi.id}
-      className={`bg-[#111827] rounded-xl border ${color.border} p-4 flex flex-col justify-between kpi-card-glow`}
+      className={`bg-[#111827] rounded-xl border ${color.border} p-3 flex flex-col justify-between kpi-card-glow`}
       data-testid={`card-kpi-${kpi.id}`}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">
           {kpi.labelEn || kpi.name}
         </span>
-        <div className={`w-7 h-7 rounded-lg ${color.bg} flex items-center justify-center shrink-0 kpi-icon-pulse`}>
-          <IconComp className={`w-3.5 h-3.5 ${color.icon}`} />
+        <div className={`w-6 h-6 rounded-lg ${color.bg} flex items-center justify-center shrink-0 kpi-icon-pulse`}>
+          <IconComp className={`w-3 h-3 ${color.icon}`} />
         </div>
       </div>
       <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} />
-      <div className="mt-2">
+      <div className="mt-1">
         <span className={`text-xs font-medium ${color.accent}`}>
           {monthlyLabel}: {monthlyVal}
         </span>
