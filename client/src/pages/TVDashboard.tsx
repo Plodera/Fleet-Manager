@@ -98,12 +98,21 @@ function AnimatedValue({ value, unit, testId }: { value: string | number; unit?:
   );
 }
 
-const TRANSITION_STYLES: Record<string, string> = {
+const ENTER_CLASSES: Record<string, string> = {
   "fade": "kpi-fade-in",
   "slide-left": "kpi-slide-left-in",
   "slide-up": "kpi-slide-up-in",
   "zoom": "kpi-zoom-in",
 };
+
+const EXIT_CLASSES: Record<string, string> = {
+  "fade": "kpi-fade-out",
+  "slide-left": "kpi-slide-left-out",
+  "slide-up": "kpi-slide-up-out",
+  "zoom": "kpi-zoom-out",
+};
+
+const TRANSITION_DURATION = 400;
 
 const VideoPanel = memo(function VideoPanel({
   currentVideo,
@@ -190,8 +199,49 @@ const VideoPanel = memo(function VideoPanel({
   );
 });
 
+function KpiCardContent({
+  kpi,
+  allKpis,
+  getDailyValue,
+  getMonthlyValue,
+  monthlyLabel,
+}: {
+  kpi: any;
+  allKpis: any[];
+  getDailyValue: (kpiId: number) => string;
+  getMonthlyValue: (kpiId: number) => string;
+  monthlyLabel: string;
+}) {
+  const globalIdx = allKpis.indexOf(kpi);
+  const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
+  const IconComp = KPI_ICONS[globalIdx % KPI_ICONS.length];
+  const dailyVal = getDailyValue(kpi.id);
+  const monthlyVal = getMonthlyValue(kpi.id);
+  return (
+    <div
+      key={kpi.id}
+      className={`bg-[#111827] rounded-xl border ${color.border} p-4 flex flex-col justify-between kpi-card-glow`}
+      data-testid={`card-kpi-${kpi.id}`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">
+          {kpi.labelEn || kpi.name}
+        </span>
+        <div className={`w-7 h-7 rounded-lg ${color.bg} flex items-center justify-center shrink-0 kpi-icon-pulse`}>
+          <IconComp className={`w-3.5 h-3.5 ${color.icon}`} />
+        </div>
+      </div>
+      <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} />
+      <div className="mt-2">
+        <span className={`text-xs font-medium ${color.accent}`}>
+          {monthlyLabel}: {monthlyVal}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 interface KpiGridProps {
-  currentPageKpis: any[];
   allKpis: any[];
   kpiPages: number;
   currentKpiPage: number;
@@ -201,10 +251,11 @@ interface KpiGridProps {
   monthlyLabel: string;
   cols?: number;
   transitionStyle: string;
+  splitSide?: "left" | "right";
+  showPagination?: boolean;
 }
 
 const KpiGrid = memo(function KpiGrid({
-  currentPageKpis,
   allKpis,
   kpiPages,
   currentKpiPage,
@@ -214,52 +265,72 @@ const KpiGrid = memo(function KpiGrid({
   monthlyLabel,
   cols = 3,
   transitionStyle,
+  splitSide,
+  showPagination = true,
 }: KpiGridProps) {
-  const animClass = TRANSITION_STYLES[transitionStyle] || TRANSITION_STYLES.fade;
   const pageSize = cols === 3 ? KPI_PAGE_SIZE : cols * 2;
+  const [displayPage, setDisplayPage] = useState(currentKpiPage);
+  const [exitPage, setExitPage] = useState<number | null>(null);
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
+  useEffect(() => {
+    if (currentKpiPage === displayPage) return;
+    setExitPage(displayPage);
+    setDisplayPage(currentKpiPage);
+    if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+    exitTimerRef.current = setTimeout(() => {
+      setExitPage(null);
+    }, TRANSITION_DURATION);
+    return () => { if (exitTimerRef.current) clearTimeout(exitTimerRef.current); };
+  }, [currentKpiPage]);
+
+  const enterClass = ENTER_CLASSES[transitionStyle] || ENTER_CLASSES.fade;
+  const exitClass = EXIT_CLASSES[transitionStyle] || EXIT_CLASSES.fade;
+
+  const getPageKpis = (pageIdx: number) => {
+    const pageKpis = allKpis.slice(pageIdx * KPI_PAGE_SIZE, (pageIdx + 1) * KPI_PAGE_SIZE);
+    if (!splitSide) return pageKpis;
+    const half = Math.ceil(pageKpis.length / 2);
+    return splitSide === "left" ? pageKpis.slice(0, half) : pageKpis.slice(half);
+  };
+
+  const renderPage = (pageIdx: number, animClass: string) => {
+    const pageKpis = getPageKpis(pageIdx);
+    const fillCount = splitSide ? 0 : Math.max(0, pageSize - pageKpis.length);
+    return (
       <div
-        key={currentKpiPage}
         className={`grid gap-3 flex-1 ${animClass}`}
-        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-        data-testid="section-kpis"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+          position: exitPage !== null ? 'absolute' : 'relative',
+          inset: exitPage !== null ? 0 : undefined,
+        }}
+        data-testid={splitSide ? `section-kpis-${splitSide}` : "section-kpis"}
       >
-        {currentPageKpis.map((kpi: any) => {
-          const globalIdx = allKpis.indexOf(kpi);
-          const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
-          const IconComp = KPI_ICONS[globalIdx % KPI_ICONS.length];
-          const dailyVal = getDailyValue(kpi.id);
-          const monthlyVal = getMonthlyValue(kpi.id);
-          return (
-            <div
-              key={kpi.id}
-              className={`bg-[#111827] rounded-xl border ${color.border} p-4 flex flex-col justify-between kpi-card-glow`}
-              data-testid={`card-kpi-${kpi.id}`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">
-                  {kpi.labelEn || kpi.name}
-                </span>
-                <div className={`w-7 h-7 rounded-lg ${color.bg} flex items-center justify-center shrink-0 kpi-icon-pulse`}>
-                  <IconComp className={`w-3.5 h-3.5 ${color.icon}`} />
-                </div>
-              </div>
-              <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} />
-              <div className="mt-2">
-                <span className={`text-xs font-medium ${color.accent}`}>
-                  {monthlyLabel}: {monthlyVal}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-        {Array.from({ length: pageSize - currentPageKpis.length }).map((_, i) => (
+        {pageKpis.map((kpi: any) => (
+          <KpiCardContent
+            key={kpi.id}
+            kpi={kpi}
+            allKpis={allKpis}
+            getDailyValue={getDailyValue}
+            getMonthlyValue={getMonthlyValue}
+            monthlyLabel={monthlyLabel}
+          />
+        ))}
+        {Array.from({ length: fillCount }).map((_, i) => (
           <div key={`empty-${i}`} className="rounded-xl border border-transparent" />
         ))}
       </div>
-      {kpiPages > 1 && (
+    );
+  };
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="relative flex-1 min-h-0 overflow-hidden">
+        {exitPage !== null && renderPage(exitPage, exitClass)}
+        {renderPage(displayPage, exitPage !== null ? enterClass : "")}
+      </div>
+      {showPagination && kpiPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
           {Array.from({ length: kpiPages }).map((_, i) => (
             <button
@@ -281,22 +352,42 @@ const transitionCSS = `
   from { opacity: 0; }
   to { opacity: 1; }
 }
+@keyframes kpiFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
 @keyframes kpiSlideLeftIn {
-  from { opacity: 0; transform: translateX(60px); }
+  from { opacity: 0; transform: translateX(100%); }
   to { opacity: 1; transform: translateX(0); }
+}
+@keyframes kpiSlideLeftOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-100%); }
 }
 @keyframes kpiSlideUpIn {
   from { opacity: 0; transform: translateY(40px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes kpiSlideUpOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-40px); }
+}
 @keyframes kpiZoomIn {
   from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
 }
+@keyframes kpiZoomOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.92); }
+}
 .kpi-fade-in { animation: kpiFadeIn 0.4s ease both; }
-.kpi-slide-left-in { animation: kpiSlideLeftIn 0.35s ease both; }
-.kpi-slide-up-in { animation: kpiSlideUpIn 0.35s ease both; }
-.kpi-zoom-in { animation: kpiZoomIn 0.35s ease both; }
+.kpi-fade-out { animation: kpiFadeOut 0.4s ease both; }
+.kpi-slide-left-in { animation: kpiSlideLeftIn 0.4s ease both; }
+.kpi-slide-left-out { animation: kpiSlideLeftOut 0.4s ease both; }
+.kpi-slide-up-in { animation: kpiSlideUpIn 0.4s ease both; }
+.kpi-slide-up-out { animation: kpiSlideUpOut 0.4s ease both; }
+.kpi-zoom-in { animation: kpiZoomIn 0.4s ease both; }
+.kpi-zoom-out { animation: kpiZoomOut 0.4s ease both; }
 
 @keyframes cardGlow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
@@ -431,7 +522,6 @@ export default function TVDashboard() {
   }
 
   const currentVideo = videos[currentVideoIndex];
-  const currentPageKpis = kpis.slice(currentKpiPage * KPI_PAGE_SIZE, (currentKpiPage + 1) * KPI_PAGE_SIZE);
   const showVideo = data.showVideo !== false;
   const hasVideo = showVideo && videos.length > 0;
   const hasKpis = kpis.length > 0;
@@ -451,7 +541,6 @@ export default function TVDashboard() {
   };
 
   const kpiGridProps = {
-    currentPageKpis,
     allKpis: kpis,
     kpiPages,
     currentKpiPage,
@@ -496,72 +585,16 @@ export default function TVDashboard() {
     }
 
     if (isCenterPosition) {
-      const halfKpis = Math.ceil(currentPageKpis.length / 2);
-      const leftPageKpis = currentPageKpis.slice(0, halfKpis);
-      const rightPageKpis = currentPageKpis.slice(halfKpis);
-      const animClass = TRANSITION_STYLES[transitionStyle] || TRANSITION_STYLES.fade;
       return (
         <div className="flex-1 flex flex-row gap-3 min-h-0">
-          <div className="flex-1 flex flex-col min-h-0">
-            <div
-              key={`left-${currentKpiPage}`}
-              className={`grid grid-cols-1 gap-3 flex-1 ${animClass}`}
-              data-testid="section-kpis-left"
-            >
-              {leftPageKpis.map((kpi: any) => {
-                const globalIdx = kpis.indexOf(kpi);
-                const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
-                const IconComp = KPI_ICONS[globalIdx % KPI_ICONS.length];
-                const dailyVal = getDailyValue(kpi.id);
-                const monthlyVal = getMonthlyValue(kpi.id);
-                return (
-                  <div key={kpi.id} className={`bg-[#111827] rounded-xl border ${color.border} p-4 flex flex-col justify-between kpi-card-glow`} data-testid={`card-kpi-${kpi.id}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">{kpi.labelEn || kpi.name}</span>
-                      <div className={`w-7 h-7 rounded-lg ${color.bg} flex items-center justify-center shrink-0 kpi-icon-pulse`}><IconComp className={`w-3.5 h-3.5 ${color.icon}`} /></div>
-                    </div>
-                    <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} />
-                    <div className="mt-2"><span className={`text-xs font-medium ${color.accent}`}>{t.tvDashboard.monthly}: {monthlyVal}</span></div>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="flex-1 min-h-0">
+            <KpiGrid {...kpiGridProps} cols={1} splitSide="left" showPagination={false} />
           </div>
           <div className="flex-1 min-h-0">
             <VideoPanel {...videoPanelProps} className="h-full" />
           </div>
-          <div className="flex-1 flex flex-col min-h-0">
-            <div
-              key={`right-${currentKpiPage}`}
-              className={`grid grid-cols-1 gap-3 flex-1 ${animClass}`}
-              data-testid="section-kpis-right"
-            >
-              {rightPageKpis.map((kpi: any) => {
-                const globalIdx = kpis.indexOf(kpi);
-                const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
-                const IconComp = KPI_ICONS[globalIdx % KPI_ICONS.length];
-                const dailyVal = getDailyValue(kpi.id);
-                const monthlyVal = getMonthlyValue(kpi.id);
-                return (
-                  <div key={kpi.id} className={`bg-[#111827] rounded-xl border ${color.border} p-4 flex flex-col justify-between kpi-card-glow`} data-testid={`card-kpi-${kpi.id}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">{kpi.labelEn || kpi.name}</span>
-                      <div className={`w-7 h-7 rounded-lg ${color.bg} flex items-center justify-center shrink-0 kpi-icon-pulse`}><IconComp className={`w-3.5 h-3.5 ${color.icon}`} /></div>
-                    </div>
-                    <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} />
-                    <div className="mt-2"><span className={`text-xs font-medium ${color.accent}`}>{t.tvDashboard.monthly}: {monthlyVal}</span></div>
-                  </div>
-                );
-              })}
-            </div>
-            {kpiPages > 1 && (
-              <div className="flex items-center justify-center gap-2 pt-2">
-                {Array.from({ length: kpiPages }).map((_, i) => (
-                  <button key={i} onClick={() => switchKpiPage(i)} className={`rounded-full transition-all ${i === currentKpiPage ? "bg-blue-400 w-5 h-2" : "bg-gray-700 hover:bg-gray-500 w-2 h-2"}`} data-testid={`button-kpi-page-${i}`} />
-                ))}
-                <span className="text-xs text-gray-600 ml-2">{currentKpiPage + 1}/{kpiPages}</span>
-              </div>
-            )}
+          <div className="flex-1 min-h-0">
+            <KpiGrid {...kpiGridProps} cols={1} splitSide="right" />
           </div>
         </div>
       );
