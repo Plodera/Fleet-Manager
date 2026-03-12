@@ -578,7 +578,7 @@ export default function TVDashboard() {
     if (isCornerPosition) {
       const cornerWidth = videoSizePct / 2;
       return (
-        <div className="flex-1 relative min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 relative">
           <KpiGrid {...kpiGridProps} />
           <div
             className={`absolute top-2 ${videoPosition === "top-right" ? "right-2" : "left-2"} z-20 shadow-2xl rounded-xl overflow-hidden`}
@@ -593,13 +593,13 @@ export default function TVDashboard() {
     if (isCenterPosition) {
       return (
         <div className="flex-1 flex flex-row gap-3 min-h-0">
-          <div style={{ flex: `1 1 0`, minHeight: 0 }}>
+          <div style={{ flex: `1 1 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <KpiGrid {...kpiGridProps} cols={1} splitSide="left" showPagination={false} />
           </div>
-          <div style={{ flex: `0 0 ${videoSizePct}%`, minHeight: 0 }}>
+          <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minWidth: 0, minHeight: 0 }}>
             <VideoPanel {...videoPanelProps} className="h-full" />
           </div>
-          <div style={{ flex: `1 1 0`, minHeight: 0 }}>
+          <div style={{ flex: `1 1 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <KpiGrid {...kpiGridProps} cols={1} splitSide="right" />
           </div>
         </div>
@@ -608,12 +608,12 @@ export default function TVDashboard() {
 
     if (isSidePosition) {
       const kpiSection = (
-        <div style={{ flex: `0 0 ${kpiPct}%`, minHeight: 0 }}>
+        <div style={{ flex: `${kpiPct} ${kpiPct} 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
           <KpiGrid {...kpiGridProps} cols={2} />
         </div>
       );
       const videoSection = (
-        <div style={{ flex: `0 0 ${videoSizePct}%`, minHeight: 0 }}>
+        <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minWidth: 0, minHeight: 0 }}>
           <VideoPanel {...videoPanelProps} className="h-full" />
         </div>
       );
@@ -624,13 +624,15 @@ export default function TVDashboard() {
       );
     }
 
+    // top / bottom layouts — flex column, proportional grow so height works
+    // with both h-screen and min-h-screen containers
     const kpiSection = (
-      <div className="flex flex-col" style={{ flex: `0 0 ${kpiPct}%` }}>
+      <div style={{ flex: `${kpiPct} ${kpiPct} 0`, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <KpiGrid {...kpiGridProps} />
       </div>
     );
     const videoSection = (
-      <VideoPanel {...videoPanelProps} className="" style={{ flex: `0 0 ${videoSizePct}%` }} />
+      <VideoPanel {...videoPanelProps} className="" style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minHeight: 0 }} />
     );
 
     if (videoPosition === "top") {
