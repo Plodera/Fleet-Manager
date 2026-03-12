@@ -576,7 +576,7 @@ export default function TVDashboard() {
     const kpiPct = 100 - videoSizePct;
 
     if (isCornerPosition) {
-      const cornerWidth = Math.max(15, Math.round(videoSizePct / 2));
+      const cornerWidth = videoSizePct / 2;
       return (
         <div className="flex-1 relative min-h-0">
           <KpiGrid {...kpiGridProps} />
