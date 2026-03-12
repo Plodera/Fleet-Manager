@@ -299,11 +299,12 @@ const KpiGrid = memo(function KpiGrid({
     const fillCount = splitSide ? 0 : Math.max(0, pageSize - pageKpis.length);
     return (
       <div
-        className={`grid gap-3 flex-1 ${animClass}`}
+        className={`grid gap-3 ${animClass}`}
         style={{
           gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-          position: exitPage !== null ? 'absolute' : 'relative',
-          inset: exitPage !== null ? 0 : undefined,
+          gridTemplateRows: `repeat(2, 1fr)`,
+          position: 'absolute',
+          inset: 0,
         }}
         data-testid={splitSide ? `section-kpis-${splitSide}` : "section-kpis"}
       >
@@ -330,6 +331,7 @@ const KpiGrid = memo(function KpiGrid({
         {exitPage !== null && renderPage(exitPage, exitClass)}
         {renderPage(displayPage, exitPage !== null ? enterClass : "")}
       </div>
+
       {showPagination && kpiPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
           {Array.from({ length: kpiPages }).map((_, i) => (
@@ -531,6 +533,7 @@ export default function TVDashboard() {
   const isSidePosition = videoPosition === "left" || videoPosition === "right";
   const isCenterPosition = videoPosition === "center";
   const transitionStyle = data?.kpiTransitionStyle || "fade";
+  const videoSizePct = Math.max(20, Math.min(80, data?.videoSizePercent ?? 55));
 
   const videoPanelProps = {
     currentVideo,
@@ -570,13 +573,16 @@ export default function TVDashboard() {
       return <VideoPanel {...videoPanelProps} className="flex-1" />;
     }
 
+    const kpiPct = 100 - videoSizePct;
+
     if (isCornerPosition) {
+      const cornerWidth = Math.max(15, Math.round(videoSizePct / 2));
       return (
         <div className="flex-1 relative min-h-0">
           <KpiGrid {...kpiGridProps} />
           <div
             className={`absolute top-2 ${videoPosition === "top-right" ? "right-2" : "left-2"} z-20 shadow-2xl rounded-xl overflow-hidden`}
-            style={{ width: "28%", aspectRatio: "16/9" }}
+            style={{ width: `${cornerWidth}%`, aspectRatio: "16/9" }}
           >
             <VideoPanel {...videoPanelProps} />
           </div>
@@ -587,13 +593,13 @@ export default function TVDashboard() {
     if (isCenterPosition) {
       return (
         <div className="flex-1 flex flex-row gap-3 min-h-0">
-          <div className="flex-1 min-h-0">
+          <div style={{ flex: `1 1 0`, minHeight: 0 }}>
             <KpiGrid {...kpiGridProps} cols={1} splitSide="left" showPagination={false} />
           </div>
-          <div className="flex-1 min-h-0">
+          <div style={{ flex: `0 0 ${videoSizePct}%`, minHeight: 0 }}>
             <VideoPanel {...videoPanelProps} className="h-full" />
           </div>
-          <div className="flex-1 min-h-0">
+          <div style={{ flex: `1 1 0`, minHeight: 0 }}>
             <KpiGrid {...kpiGridProps} cols={1} splitSide="right" />
           </div>
         </div>
@@ -601,8 +607,16 @@ export default function TVDashboard() {
     }
 
     if (isSidePosition) {
-      const kpiSection = <div className="flex-1 min-h-0"><KpiGrid {...kpiGridProps} cols={2} /></div>;
-      const videoSection = <div className="flex-1 min-h-0"><VideoPanel {...videoPanelProps} className="h-full" /></div>;
+      const kpiSection = (
+        <div style={{ flex: `0 0 ${kpiPct}%`, minHeight: 0 }}>
+          <KpiGrid {...kpiGridProps} cols={2} />
+        </div>
+      );
+      const videoSection = (
+        <div style={{ flex: `0 0 ${videoSizePct}%`, minHeight: 0 }}>
+          <VideoPanel {...videoPanelProps} className="h-full" />
+        </div>
+      );
       return (
         <div className="flex-1 flex flex-row gap-3 min-h-0">
           {videoPosition === "left" ? <>{videoSection}{kpiSection}</> : <>{kpiSection}{videoSection}</>}
@@ -611,12 +625,12 @@ export default function TVDashboard() {
     }
 
     const kpiSection = (
-      <div className="flex flex-col" style={{ flex: "0 0 42%" }}>
+      <div className="flex flex-col" style={{ flex: `0 0 ${kpiPct}%` }}>
         <KpiGrid {...kpiGridProps} />
       </div>
     );
     const videoSection = (
-      <VideoPanel {...videoPanelProps} className="" style={{ flex: "1 1 58%" }} />
+      <VideoPanel {...videoPanelProps} className="" style={{ flex: `0 0 ${videoSizePct}%` }} />
     );
 
     if (videoPosition === "top") {

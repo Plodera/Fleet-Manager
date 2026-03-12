@@ -1,4 +1,5 @@
 ALTER TABLE tv_dashboards ADD COLUMN IF NOT EXISTS video_position TEXT NOT NULL DEFAULT 'bottom';
+ALTER TABLE tv_dashboards ADD COLUMN IF NOT EXISTS video_size_percent INTEGER NOT NULL DEFAULT 55;
 ALTER TABLE tv_dashboards ADD COLUMN IF NOT EXISTS kpi_rotation_seconds INTEGER NOT NULL DEFAULT 8;
 ALTER TABLE tv_dashboards ADD COLUMN IF NOT EXISTS show_video BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE tv_dashboards ADD COLUMN IF NOT EXISTS kpi_transition_style TEXT NOT NULL DEFAULT 'fade';
