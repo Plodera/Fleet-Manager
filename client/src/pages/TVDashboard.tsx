@@ -643,7 +643,7 @@ export default function TVDashboard() {
   return (
     <div
       ref={containerRef}
-      className={`bg-[#0a0e1a] text-white flex flex-col ${isFullScreen ? "h-screen" : "min-h-screen"}`}
+      className="bg-[#0a0e1a] text-white flex flex-col h-screen"
       data-testid="tv-dashboard-container"
     >
       <style>{transitionCSS}</style>
