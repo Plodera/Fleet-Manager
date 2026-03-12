@@ -382,12 +382,12 @@ const transitionCSS = `
 }
 .kpi-fade-in { animation: kpiFadeIn 0.4s ease both; }
 .kpi-fade-out { animation: kpiFadeOut 0.4s ease both; }
-.kpi-slide-left-in { animation: kpiSlideLeftIn 0.4s ease both; }
-.kpi-slide-left-out { animation: kpiSlideLeftOut 0.4s ease both; }
-.kpi-slide-up-in { animation: kpiSlideUpIn 0.4s ease both; }
-.kpi-slide-up-out { animation: kpiSlideUpOut 0.4s ease both; }
-.kpi-zoom-in { animation: kpiZoomIn 0.4s ease both; }
-.kpi-zoom-out { animation: kpiZoomOut 0.4s ease both; }
+.kpi-slide-left-in { animation: kpiSlideLeftIn 0.35s ease both; }
+.kpi-slide-left-out { animation: kpiSlideLeftOut 0.35s ease both; }
+.kpi-slide-up-in { animation: kpiSlideUpIn 0.35s ease both; }
+.kpi-slide-up-out { animation: kpiSlideUpOut 0.35s ease both; }
+.kpi-zoom-in { animation: kpiZoomIn 0.35s ease both; }
+.kpi-zoom-out { animation: kpiZoomOut 0.35s ease both; }
 
 @keyframes cardGlow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
