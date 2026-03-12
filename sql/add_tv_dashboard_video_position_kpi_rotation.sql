@@ -1,0 +1,2 @@
+ALTER TABLE tv_dashboards ADD COLUMN IF NOT EXISTS video_position TEXT NOT NULL DEFAULT 'bottom';
+ALTER TABLE tv_dashboards ADD COLUMN IF NOT EXISTS kpi_rotation_seconds INTEGER NOT NULL DEFAULT 8;

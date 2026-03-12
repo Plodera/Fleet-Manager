@@ -574,6 +574,8 @@ export const tvDashboards = pgTable("tv_dashboards", {
   labelEn: text("label_en").notNull().default(""),
   labelPt: text("label_pt").notNull().default(""),
   isActive: boolean("is_active").notNull().default(true),
+  videoPosition: text("video_position").notNull().default("bottom"),
+  kpiRotationSeconds: integer("kpi_rotation_seconds").notNull().default(8),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

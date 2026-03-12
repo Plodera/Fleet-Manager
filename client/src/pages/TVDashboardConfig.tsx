@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
-type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean };
+type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean; videoPosition: string; kpiRotationSeconds: number };
 type KPI = { id: number; dashboardId: number; name: string; labelEn: string; labelPt: string; unit: string | null; sortOrder: number; isActive: boolean };
 type VideoEntry = { id: number; dashboardId: number; title: string; videoType: string; url: string; isActive: boolean; sortOrder: number };
 
@@ -27,7 +27,7 @@ export default function TVDashboardConfig() {
 
   const [dashDialog, setDashDialog] = useState(false);
   const [editDash, setEditDash] = useState<Dashboard | null>(null);
-  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true });
+  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, videoPosition: "bottom", kpiRotationSeconds: "8" });
 
   const [kpiDialog, setKpiDialog] = useState(false);
   const [editKpi, setEditKpi] = useState<KPI | null>(null);
@@ -167,16 +167,16 @@ export default function TVDashboardConfig() {
   const openDashDialog = (dash?: Dashboard) => {
     if (dash) {
       setEditDash(dash);
-      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive });
+      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, videoPosition: dash.videoPosition || "bottom", kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString() });
     } else {
       setEditDash(null);
-      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true });
+      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, videoPosition: "bottom", kpiRotationSeconds: "8" });
     }
     setDashDialog(true);
   };
 
   const submitDash = () => {
-    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null };
+    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8 };
     if (editDash) {
       updateDashMutation.mutate({ id: editDash.id, data });
     } else {
@@ -574,6 +574,27 @@ export default function TVDashboardConfig() {
             <div>
               <Label>{t.tvDashboard.labelPt}</Label>
               <Input value={dashForm.labelPt} onChange={e => setDashForm(p => ({ ...p, labelPt: e.target.value }))} data-testid="input-dashboard-label-pt" />
+            </div>
+            <div>
+              <Label>Video Position</Label>
+              <Select value={dashForm.videoPosition} onValueChange={v => setDashForm(p => ({ ...p, videoPosition: v }))}>
+                <SelectTrigger data-testid="select-video-position">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bottom">Bottom</SelectItem>
+                  <SelectItem value="top">Top</SelectItem>
+                  <SelectItem value="right">Right</SelectItem>
+                  <SelectItem value="left">Left</SelectItem>
+                  <SelectItem value="center">Center</SelectItem>
+                  <SelectItem value="top-right">Top-Right Corner</SelectItem>
+                  <SelectItem value="top-left">Top-Left Corner</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>KPI Rotation (seconds)</Label>
+              <Input type="number" min="1" value={dashForm.kpiRotationSeconds} onChange={e => setDashForm(p => ({ ...p, kpiRotationSeconds: e.target.value }))} data-testid="input-kpi-rotation-seconds" />
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={dashForm.isActive} onCheckedChange={v => setDashForm(p => ({ ...p, isActive: v }))} data-testid="switch-dashboard-active" />

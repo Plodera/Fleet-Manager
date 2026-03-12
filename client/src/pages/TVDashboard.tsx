@@ -120,6 +120,8 @@ export default function TVDashboard() {
     return () => { if (videoTimerRef.current) clearInterval(videoTimerRef.current); };
   }, [videos.length]);
 
+  const kpiRotationMs = (Math.max(1, data?.kpiRotationSeconds ?? 8) * 1000);
+
   useEffect(() => {
     if (kpiPages <= 1) return;
     kpiTimerRef.current = setInterval(() => {
@@ -128,9 +130,9 @@ export default function TVDashboard() {
         setCurrentKpiPage(prev => (prev + 1) % kpiPages);
         setKpiFading(false);
       }, 400);
-    }, 8000);
+    }, kpiRotationMs);
     return () => { if (kpiTimerRef.current) clearInterval(kpiTimerRef.current); };
-  }, [kpiPages]);
+  }, [kpiPages, kpiRotationMs]);
 
   const toggleFullScreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -175,6 +177,275 @@ export default function TVDashboard() {
   const currentPageKpis = kpis.slice(currentKpiPage * KPI_PAGE_SIZE, (currentKpiPage + 1) * KPI_PAGE_SIZE);
   const hasVideo = videos.length > 0;
   const hasKpis = kpis.length > 0;
+  const validPositions = ["bottom", "top", "left", "right", "center", "top-right", "top-left"];
+  const videoPosition = validPositions.includes(data?.videoPosition) ? data.videoPosition : "bottom";
+  const isCornerPosition = videoPosition === "top-right" || videoPosition === "top-left";
+  const isSidePosition = videoPosition === "left" || videoPosition === "right";
+  const isCenterPosition = videoPosition === "center";
+
+  const KpiGrid = ({ cols = 3 }: { cols?: number }) => (
+    <div className="flex flex-col flex-1 min-h-0">
+      <div
+        className={`grid gap-3 flex-1 transition-opacity duration-400`}
+        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, opacity: kpiFading ? 0 : 1 }}
+        data-testid="section-kpis"
+      >
+        {currentPageKpis.map((kpi: any) => {
+          const globalIdx = kpis.indexOf(kpi);
+          const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
+          const IconComp = KPI_ICONS[globalIdx % KPI_ICONS.length];
+          const dailyVal = getDailyValue(kpi.id);
+          const monthlyVal = getMonthlyValue(kpi.id);
+          return (
+            <div
+              key={kpi.id}
+              className={`bg-[#111827] rounded-xl border ${color.border} p-4 flex flex-col justify-between`}
+              data-testid={`card-kpi-${kpi.id}`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">
+                  {kpi.labelEn || kpi.name}
+                </span>
+                <div className={`w-7 h-7 rounded-lg ${color.bg} flex items-center justify-center shrink-0`}>
+                  <IconComp className={`w-3.5 h-3.5 ${color.icon}`} />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-4xl font-bold text-white leading-none" data-testid={`text-daily-value-${kpi.id}`}>
+                  {dailyVal}
+                </span>
+                {kpi.unit && <span className="text-sm text-gray-500 font-medium">{kpi.unit}</span>}
+              </div>
+              <div className="mt-2">
+                <span className={`text-xs font-medium ${color.accent}`}>
+                  {t.tvDashboard.monthly}: {monthlyVal}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+        {Array.from({ length: (cols === 3 ? KPI_PAGE_SIZE : cols * 2) - currentPageKpis.length }).map((_, i) => (
+          <div key={`empty-${i}`} className="rounded-xl border border-transparent" />
+        ))}
+      </div>
+      {kpiPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          {Array.from({ length: kpiPages }).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => switchKpiPage(i)}
+              className={`rounded-full transition-all ${i === currentKpiPage ? "bg-blue-400 w-5 h-2" : "bg-gray-700 hover:bg-gray-500 w-2 h-2"}`}
+              data-testid={`button-kpi-page-${i}`}
+            />
+          ))}
+          <span className="text-xs text-gray-600 ml-2">{currentKpiPage + 1}/{kpiPages}</span>
+        </div>
+      )}
+    </div>
+  );
+
+  const VideoPanel = ({ className = "", style }: { className?: string; style?: React.CSSProperties }) => (
+    <div
+      className={`bg-black rounded-xl overflow-hidden flex flex-col min-h-0 ${className}`}
+      style={style}
+      data-testid="section-videos"
+    >
+      <div className="relative flex-1 min-h-0">
+        <div
+          className="absolute inset-0 transition-opacity duration-500"
+          style={{ opacity: videoFading ? 0 : 1 }}
+        >
+          {currentVideo && currentVideo.videoType === "youtube" && extractYouTubeId(currentVideo.url) ? (
+            <iframe
+              key={currentVideo.id}
+              src={`https://www.youtube.com/embed/${extractYouTubeId(currentVideo.url)}?autoplay=1&mute=1&loop=1&playlist=${extractYouTubeId(currentVideo.url)}`}
+              className="w-full h-full"
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+              data-testid="video-player-youtube"
+            />
+          ) : currentVideo ? (
+            <video
+              key={currentVideo.id}
+              src={currentVideo.url}
+              className="w-full h-full object-contain"
+              autoPlay
+              muted
+              loop
+              data-testid="video-player-upload"
+            />
+          ) : null}
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-3 z-10 flex items-end justify-between">
+          <p className="text-white font-medium text-sm">{currentVideo?.title}</p>
+          {videos.length > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => switchVideo((currentVideoIndex - 1 + videos.length) % videos.length)}
+                className="p-1 rounded hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+                data-testid="button-prev-video"
+              >
+                <SkipBack className="w-4 h-4" />
+              </button>
+              <div className="flex gap-1.5">
+                {videos.map((_: any, idx: number) => (
+                  <button
+                    key={idx}
+                    onClick={() => switchVideo(idx)}
+                    className={`rounded-full transition-all ${idx === currentVideoIndex ? "bg-white w-4 h-1.5" : "bg-white/40 hover:bg-white/60 w-1.5 h-1.5"}`}
+                    data-testid={`button-video-dot-${idx}`}
+                  />
+                ))}
+              </div>
+              <button
+                onClick={() => switchVideo((currentVideoIndex + 1) % videos.length)}
+                className="p-1 rounded hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+                data-testid="button-next-video"
+              >
+                <SkipForward className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderLayout = () => {
+    if (!hasKpis && !hasVideo) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center text-gray-600">
+          <BarChart3 className="w-16 h-16 mb-4" />
+          <p className="text-lg font-medium">{t.tvDashboard.noData}</p>
+          <p className="text-sm mt-1">{t.tvDashboard.noDataMessage}</p>
+        </div>
+      );
+    }
+
+    if (!hasVideo) {
+      return <KpiGrid />;
+    }
+
+    if (!hasKpis) {
+      return <VideoPanel className="flex-1" />;
+    }
+
+    if (isCornerPosition) {
+      return (
+        <div className="flex-1 relative min-h-0">
+          <KpiGrid />
+          <div
+            className={`absolute top-2 ${videoPosition === "top-right" ? "right-2" : "left-2"} z-20 shadow-2xl rounded-xl overflow-hidden`}
+            style={{ width: "28%", aspectRatio: "16/9" }}
+          >
+            <VideoPanel />
+          </div>
+        </div>
+      );
+    }
+
+    if (isCenterPosition) {
+      const halfKpis = Math.ceil(currentPageKpis.length / 2);
+      const leftKpis = currentPageKpis.slice(0, halfKpis);
+      const rightKpis = currentPageKpis.slice(halfKpis);
+      return (
+        <div className="flex-1 flex flex-row gap-3 min-h-0">
+          <div className="flex-1 flex flex-col min-h-0">
+            <div
+              className="grid grid-cols-1 gap-3 flex-1 transition-opacity duration-400"
+              style={{ opacity: kpiFading ? 0 : 1 }}
+              data-testid="section-kpis-left"
+            >
+              {leftKpis.map((kpi: any) => {
+                const globalIdx = kpis.indexOf(kpi);
+                const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
+                const IconComp = KPI_ICONS[globalIdx % KPI_ICONS.length];
+                const dailyVal = getDailyValue(kpi.id);
+                const monthlyVal = getMonthlyValue(kpi.id);
+                return (
+                  <div key={kpi.id} className={`bg-[#111827] rounded-xl border ${color.border} p-4 flex flex-col justify-between`} data-testid={`card-kpi-${kpi.id}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">{kpi.labelEn || kpi.name}</span>
+                      <div className={`w-7 h-7 rounded-lg ${color.bg} flex items-center justify-center shrink-0`}><IconComp className={`w-3.5 h-3.5 ${color.icon}`} /></div>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-bold text-white leading-none" data-testid={`text-daily-value-${kpi.id}`}>{dailyVal}</span>
+                      {kpi.unit && <span className="text-sm text-gray-500 font-medium">{kpi.unit}</span>}
+                    </div>
+                    <div className="mt-2"><span className={`text-xs font-medium ${color.accent}`}>{t.tvDashboard.monthly}: {monthlyVal}</span></div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex-1 min-h-0">
+            <VideoPanel className="h-full" />
+          </div>
+          <div className="flex-1 flex flex-col min-h-0">
+            <div
+              className="grid grid-cols-1 gap-3 flex-1 transition-opacity duration-400"
+              style={{ opacity: kpiFading ? 0 : 1 }}
+              data-testid="section-kpis-right"
+            >
+              {rightKpis.map((kpi: any) => {
+                const globalIdx = kpis.indexOf(kpi);
+                const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
+                const IconComp = KPI_ICONS[globalIdx % KPI_ICONS.length];
+                const dailyVal = getDailyValue(kpi.id);
+                const monthlyVal = getMonthlyValue(kpi.id);
+                return (
+                  <div key={kpi.id} className={`bg-[#111827] rounded-xl border ${color.border} p-4 flex flex-col justify-between`} data-testid={`card-kpi-${kpi.id}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">{kpi.labelEn || kpi.name}</span>
+                      <div className={`w-7 h-7 rounded-lg ${color.bg} flex items-center justify-center shrink-0`}><IconComp className={`w-3.5 h-3.5 ${color.icon}`} /></div>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-bold text-white leading-none" data-testid={`text-daily-value-${kpi.id}`}>{dailyVal}</span>
+                      {kpi.unit && <span className="text-sm text-gray-500 font-medium">{kpi.unit}</span>}
+                    </div>
+                    <div className="mt-2"><span className={`text-xs font-medium ${color.accent}`}>{t.tvDashboard.monthly}: {monthlyVal}</span></div>
+                  </div>
+                );
+              })}
+            </div>
+            {kpiPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-2">
+                {Array.from({ length: kpiPages }).map((_, i) => (
+                  <button key={i} onClick={() => switchKpiPage(i)} className={`rounded-full transition-all ${i === currentKpiPage ? "bg-blue-400 w-5 h-2" : "bg-gray-700 hover:bg-gray-500 w-2 h-2"}`} data-testid={`button-kpi-page-${i}`} />
+                ))}
+                <span className="text-xs text-gray-600 ml-2">{currentKpiPage + 1}/{kpiPages}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (isSidePosition) {
+      const kpiSection = <div className="flex-1 min-h-0"><KpiGrid cols={2} /></div>;
+      const videoSection = <div className="flex-1 min-h-0"><VideoPanel className="h-full" /></div>;
+      return (
+        <div className="flex-1 flex flex-row gap-3 min-h-0">
+          {videoPosition === "left" ? <>{videoSection}{kpiSection}</> : <>{kpiSection}{videoSection}</>}
+        </div>
+      );
+    }
+
+    const kpiSection = (
+      <div className="flex flex-col" style={{ flex: "0 0 42%" }}>
+        <KpiGrid />
+      </div>
+    );
+    const videoSection = (
+      <VideoPanel className="" style={{ flex: "1 1 58%" }} />
+    );
+
+    if (videoPosition === "top") {
+      return <>{videoSection}{kpiSection}</>;
+    }
+
+    return <>{kpiSection}{videoSection}</>;
+  };
 
   return (
     <div
@@ -182,7 +453,6 @@ export default function TVDashboard() {
       className={`bg-[#0a0e1a] text-white flex flex-col ${isFullScreen ? "h-screen" : "min-h-screen"}`}
       data-testid="tv-dashboard-container"
     >
-      {/* Header */}
       <header className="flex items-center justify-between px-6 py-3 bg-[#111827] border-b border-gray-800 shrink-0">
         <div className="flex items-center gap-4">
           <Link href="/tv-dashboard">
@@ -203,153 +473,8 @@ export default function TVDashboard() {
         </div>
       </header>
 
-      {/* Main — split vertically: KPIs top, Video bottom */}
       <main className="flex-1 flex flex-col min-h-0 p-3 gap-3">
-
-        {/* KPI Section */}
-        {hasKpis && (
-          <div className="flex flex-col" style={{ flex: hasVideo ? "0 0 42%" : "1 1 auto" }}>
-            {/* KPI grid — always 2 rows × 3 cols */}
-            <div
-              className="grid grid-cols-3 gap-3 flex-1 transition-opacity duration-400"
-              style={{ opacity: kpiFading ? 0 : 1 }}
-              data-testid="section-kpis"
-            >
-              {currentPageKpis.map((kpi: any) => {
-                const globalIdx = kpis.indexOf(kpi);
-                const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
-                const IconComp = KPI_ICONS[globalIdx % KPI_ICONS.length];
-                const dailyVal = getDailyValue(kpi.id);
-                const monthlyVal = getMonthlyValue(kpi.id);
-                return (
-                  <div
-                    key={kpi.id}
-                    className={`bg-[#111827] rounded-xl border ${color.border} p-4 flex flex-col justify-between`}
-                    data-testid={`card-kpi-${kpi.id}`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">
-                        {kpi.labelEn || kpi.name}
-                      </span>
-                      <div className={`w-7 h-7 rounded-lg ${color.bg} flex items-center justify-center shrink-0`}>
-                        <IconComp className={`w-3.5 h-3.5 ${color.icon}`} />
-                      </div>
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-4xl font-bold text-white leading-none" data-testid={`text-daily-value-${kpi.id}`}>
-                        {dailyVal}
-                      </span>
-                      {kpi.unit && <span className="text-sm text-gray-500 font-medium">{kpi.unit}</span>}
-                    </div>
-                    <div className="mt-2">
-                      <span className={`text-xs font-medium ${color.accent}`}>
-                        {t.tvDashboard.monthly}: {monthlyVal}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-              {/* Fill empty slots in last page so grid stays consistent */}
-              {Array.from({ length: KPI_PAGE_SIZE - currentPageKpis.length }).map((_, i) => (
-                <div key={`empty-${i}`} className="rounded-xl border border-transparent" />
-              ))}
-            </div>
-
-            {/* KPI page dots */}
-            {kpiPages > 1 && (
-              <div className="flex items-center justify-center gap-2 pt-2">
-                {Array.from({ length: kpiPages }).map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => switchKpiPage(i)}
-                    className={`rounded-full transition-all ${i === currentKpiPage ? "bg-blue-400 w-5 h-2" : "bg-gray-700 hover:bg-gray-500 w-2 h-2"}`}
-                    data-testid={`button-kpi-page-${i}`}
-                  />
-                ))}
-                <span className="text-xs text-gray-600 ml-2">{currentKpiPage + 1}/{kpiPages}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Video Section */}
-        {hasVideo && (
-          <div
-            className="bg-black rounded-xl overflow-hidden flex flex-col min-h-0"
-            style={{ flex: hasKpis ? "1 1 58%" : "1 1 auto" }}
-            data-testid="section-videos"
-          >
-            <div className="relative flex-1 min-h-0">
-              <div
-                className="absolute inset-0 transition-opacity duration-500"
-                style={{ opacity: videoFading ? 0 : 1 }}
-              >
-                {currentVideo && currentVideo.videoType === "youtube" && extractYouTubeId(currentVideo.url) ? (
-                  <iframe
-                    key={currentVideo.id}
-                    src={`https://www.youtube.com/embed/${extractYouTubeId(currentVideo.url)}?autoplay=1&mute=1&loop=1&playlist=${extractYouTubeId(currentVideo.url)}`}
-                    className="w-full h-full"
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen
-                    data-testid="video-player-youtube"
-                  />
-                ) : currentVideo ? (
-                  <video
-                    key={currentVideo.id}
-                    src={currentVideo.url}
-                    className="w-full h-full object-contain"
-                    autoPlay
-                    muted
-                    loop
-                    data-testid="video-player-upload"
-                  />
-                ) : null}
-              </div>
-
-              {/* Video title + controls overlay */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-3 z-10 flex items-end justify-between">
-                <p className="text-white font-medium text-sm">{currentVideo?.title}</p>
-                {videos.length > 1 && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => switchVideo((currentVideoIndex - 1 + videos.length) % videos.length)}
-                      className="p-1 rounded hover:bg-white/20 text-white/70 hover:text-white transition-colors"
-                      data-testid="button-prev-video"
-                    >
-                      <SkipBack className="w-4 h-4" />
-                    </button>
-                    <div className="flex gap-1.5">
-                      {videos.map((_: any, idx: number) => (
-                        <button
-                          key={idx}
-                          onClick={() => switchVideo(idx)}
-                          className={`rounded-full transition-all ${idx === currentVideoIndex ? "bg-white w-4 h-1.5" : "bg-white/40 hover:bg-white/60 w-1.5 h-1.5"}`}
-                          data-testid={`button-video-dot-${idx}`}
-                        />
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => switchVideo((currentVideoIndex + 1) % videos.length)}
-                      className="p-1 rounded hover:bg-white/20 text-white/70 hover:text-white transition-colors"
-                      data-testid="button-next-video"
-                    >
-                      <SkipForward className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!hasKpis && !hasVideo && (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-600">
-            <BarChart3 className="w-16 h-16 mb-4" />
-            <p className="text-lg font-medium">{t.tvDashboard.noData}</p>
-            <p className="text-sm mt-1">{t.tvDashboard.noDataMessage}</p>
-          </div>
-        )}
+        {renderLayout()}
       </main>
     </div>
   );
