@@ -175,8 +175,10 @@ export default function WorkOrderConfig() {
     },
   });
 
+  type SubEquipPayload = { name: string; labelEn: string; labelPt: string; maintenanceTypes: string[]; vehicleId: number | null; isActive?: boolean };
+
   const createSubEquipment = useMutation({
-    mutationFn: async (data: typeof subEquipForm) => {
+    mutationFn: async (data: SubEquipPayload) => {
       const res = await apiRequest("POST", api.subEquipment.create.path, { ...data, isActive: true });
       return res.json();
     },
@@ -192,7 +194,7 @@ export default function WorkOrderConfig() {
   });
 
   const updateSubEquipment = useMutation({
-    mutationFn: async ({ id, ...data }: { id: number } & typeof subEquipForm) => {
+    mutationFn: async ({ id, ...data }: { id: number } & SubEquipPayload) => {
       const res = await apiRequest("PATCH", buildUrl(api.subEquipment.update.path, { id }), data);
       return res.json();
     },
@@ -358,7 +360,7 @@ export default function WorkOrderConfig() {
   };
 
   const openEditSubEquip = (se: SubEquipment) => {
-    setSubEquipForm({ name: se.name, labelEn: se.labelEn, labelPt: se.labelPt, maintenanceTypes: (se as any).maintenanceTypes || [], vehicleId: (se as any).vehicleId ? String((se as any).vehicleId) : "" });
+    setSubEquipForm({ name: se.name, labelEn: se.labelEn, labelPt: se.labelPt, maintenanceTypes: se.maintenanceTypes || [], vehicleId: se.vehicleId ? String(se.vehicleId) : "" });
     setSubEquipDialog({ open: true, editing: se });
   };
 
@@ -372,11 +374,17 @@ export default function WorkOrderConfig() {
   };
 
   const handleSubEquipSubmit = () => {
-    const payload = { ...subEquipForm, vehicleId: subEquipForm.vehicleId ? Number(subEquipForm.vehicleId) : null };
+    const payload: SubEquipPayload = {
+      name: subEquipForm.name,
+      labelEn: subEquipForm.labelEn,
+      labelPt: subEquipForm.labelPt,
+      maintenanceTypes: subEquipForm.maintenanceTypes,
+      vehicleId: subEquipForm.vehicleId ? Number(subEquipForm.vehicleId) : null,
+    };
     if (subEquipDialog.editing) {
-      updateSubEquipment.mutate({ id: subEquipDialog.editing.id, ...payload } as any);
+      updateSubEquipment.mutate({ id: subEquipDialog.editing.id, ...payload });
     } else {
-      createSubEquipment.mutate(payload as any);
+      createSubEquipment.mutate(payload);
     }
   };
 
@@ -649,14 +657,14 @@ export default function WorkOrderConfig() {
                   <TableRow key={se.id} data-testid={`row-sub-equipment-${se.id}`}>
                     <TableCell className="font-medium">{se.name}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {(se as any).vehicleId ? (() => {
-                        const v = vehiclesList?.find((veh: any) => veh.id === (se as any).vehicleId);
+                      {se.vehicleId ? (() => {
+                        const v = vehiclesList?.find((veh: any) => veh.id === se.vehicleId);
                         return v ? `${v.make} ${v.model}${v.licensePlate ? ` (${v.licensePlate})` : ""}` : "—";
                       })() : "—"}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {((se as any).maintenanceTypes || []).map((mtName: string) => {
+                        {(se.maintenanceTypes || []).map((mtName: string) => {
                           const mtConfig = maintenanceTypeConfigs?.find(m => m.name === mtName);
                           return (
                             <Badge key={mtName} variant="outline" data-testid={`badge-sub-equip-mt-${se.id}-${mtName}`}>

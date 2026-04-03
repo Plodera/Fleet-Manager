@@ -578,8 +578,8 @@ export const api = {
   },
   subEquipment: {
     list: { method: 'GET' as const, path: '/api/sub-equipment', responses: { 200: z.array(z.custom<typeof subEquipment.$inferSelect>()) } },
-    create: { method: 'POST' as const, path: '/api/sub-equipment', input: insertSubEquipmentSchema, responses: { 201: z.custom<typeof subEquipment.$inferSelect>(), 400: errorSchemas.validation } },
-    update: { method: 'PATCH' as const, path: '/api/sub-equipment/:id', input: insertSubEquipmentSchema.partial(), responses: { 200: z.custom<typeof subEquipment.$inferSelect>(), 404: errorSchemas.notFound } },
+    create: { method: 'POST' as const, path: '/api/sub-equipment', input: insertSubEquipmentSchema.extend({ vehicleId: z.coerce.number().optional().nullable() }), responses: { 201: z.custom<typeof subEquipment.$inferSelect>(), 400: errorSchemas.validation } },
+    update: { method: 'PATCH' as const, path: '/api/sub-equipment/:id', input: insertSubEquipmentSchema.extend({ vehicleId: z.coerce.number().optional().nullable() }).partial(), responses: { 200: z.custom<typeof subEquipment.$inferSelect>(), 404: errorSchemas.notFound } },
     delete: { method: 'DELETE' as const, path: '/api/sub-equipment/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
   },
   vehicleTypes: {
