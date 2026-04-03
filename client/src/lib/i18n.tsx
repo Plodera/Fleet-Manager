@@ -388,6 +388,8 @@ const translations = {
       vehicleTypeName: "Type Name",
       vehicleTypeCategories: "Vehicle Categories",
       availableForBooking: "Available for Booking",
+      linkedVehicle: "Linked Vehicle",
+      noVehicleLink: "None (Generic)",
     },
     // User Management
     userManagement: {
@@ -1012,6 +1014,8 @@ const translations = {
       vehicleTypeName: "Nome do Tipo",
       vehicleTypeCategories: "Categorias de Veículo",
       availableForBooking: "Disponível para Reserva",
+      linkedVehicle: "Veículo Ligado",
+      noVehicleLink: "Nenhum (Genérico)",
     },
     // User Management
     userManagement: {

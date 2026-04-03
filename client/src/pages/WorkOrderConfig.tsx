@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
@@ -59,6 +60,10 @@ export default function WorkOrderConfig() {
     queryKey: [api.vehicleTypes.list.path],
   });
 
+  const { data: vehiclesList } = useQuery<any[]>({
+    queryKey: ["/api/vehicles"],
+  });
+
   const [shiftDialog, setShiftDialog] = useState<{ open: boolean; editing: Shift | null }>({ open: false, editing: null });
   const [shiftForm, setShiftForm] = useState({ name: "", nameEn: "", namePt: "", startTime: "", endTime: "" });
 
@@ -66,7 +71,7 @@ export default function WorkOrderConfig() {
   const [activityForm, setActivityForm] = useState({ name: "", labelEn: "", labelPt: "" });
 
   const [subEquipDialog, setSubEquipDialog] = useState<{ open: boolean; editing: SubEquipment | null }>({ open: false, editing: null });
-  const [subEquipForm, setSubEquipForm] = useState({ name: "", labelEn: "", labelPt: "", maintenanceTypes: [] as string[] });
+  const [subEquipForm, setSubEquipForm] = useState({ name: "", labelEn: "", labelPt: "", maintenanceTypes: [] as string[], vehicleId: "" });
 
   const [mtDialog, setMtDialog] = useState<{ open: boolean; editing: MaintenanceTypeConfig | null }>({ open: false, editing: null });
   const [mtForm, setMtForm] = useState({ name: "", labelEn: "", labelPt: "", disableActivityType: false });
@@ -348,12 +353,12 @@ export default function WorkOrderConfig() {
   };
 
   const openAddSubEquip = () => {
-    setSubEquipForm({ name: "", labelEn: "", labelPt: "", maintenanceTypes: [] });
+    setSubEquipForm({ name: "", labelEn: "", labelPt: "", maintenanceTypes: [], vehicleId: "" });
     setSubEquipDialog({ open: true, editing: null });
   };
 
   const openEditSubEquip = (se: SubEquipment) => {
-    setSubEquipForm({ name: se.name, labelEn: se.labelEn, labelPt: se.labelPt, maintenanceTypes: (se as any).maintenanceTypes || [] });
+    setSubEquipForm({ name: se.name, labelEn: se.labelEn, labelPt: se.labelPt, maintenanceTypes: (se as any).maintenanceTypes || [], vehicleId: (se as any).vehicleId ? String((se as any).vehicleId) : "" });
     setSubEquipDialog({ open: true, editing: se });
   };
 
@@ -367,10 +372,11 @@ export default function WorkOrderConfig() {
   };
 
   const handleSubEquipSubmit = () => {
+    const payload = { ...subEquipForm, vehicleId: subEquipForm.vehicleId ? Number(subEquipForm.vehicleId) : null };
     if (subEquipDialog.editing) {
-      updateSubEquipment.mutate({ id: subEquipDialog.editing.id, ...subEquipForm });
+      updateSubEquipment.mutate({ id: subEquipDialog.editing.id, ...payload } as any);
     } else {
-      createSubEquipment.mutate(subEquipForm);
+      createSubEquipment.mutate(payload as any);
     }
   };
 
@@ -625,6 +631,7 @@ export default function WorkOrderConfig() {
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead>{t.adminConfig.subEquipmentName}</TableHead>
+                  <TableHead>{t.adminConfig.linkedVehicle}</TableHead>
                   <TableHead>{t.adminConfig.maintenanceTypes}</TableHead>
                   <TableHead className="text-right">{t.buttons.edit}</TableHead>
                 </TableRow>
@@ -632,15 +639,21 @@ export default function WorkOrderConfig() {
               <TableBody>
                 {subEquipmentLoading ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center" data-testid="text-sub-equipment-loading">{t.labels.loading}</TableCell>
+                    <TableCell colSpan={4} className="h-24 text-center" data-testid="text-sub-equipment-loading">{t.labels.loading}</TableCell>
                   </TableRow>
                 ) : subEquipmentList?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center text-muted-foreground" data-testid="text-sub-equipment-empty">{t.labels.noRecords}</TableCell>
+                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground" data-testid="text-sub-equipment-empty">{t.labels.noRecords}</TableCell>
                   </TableRow>
                 ) : subEquipmentList?.map((se) => (
                   <TableRow key={se.id} data-testid={`row-sub-equipment-${se.id}`}>
                     <TableCell className="font-medium">{se.name}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {(se as any).vehicleId ? (() => {
+                        const v = vehiclesList?.find((veh: any) => veh.id === (se as any).vehicleId);
+                        return v ? `${v.make} ${v.model}${v.licensePlate ? ` (${v.licensePlate})` : ""}` : "—";
+                      })() : "—"}
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {((se as any).maintenanceTypes || []).map((mtName: string) => {
@@ -891,6 +904,22 @@ export default function WorkOrderConfig() {
                   data-testid="input-sub-equipment-label-pt"
                 />
               </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">{t.adminConfig.linkedVehicle}</label>
+              <Select value={subEquipForm.vehicleId} onValueChange={(v) => setSubEquipForm({ ...subEquipForm, vehicleId: v === "none" ? "" : v })}>
+                <SelectTrigger data-testid="select-sub-equip-vehicle">
+                  <SelectValue placeholder={t.adminConfig.noVehicleLink} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t.adminConfig.noVehicleLink}</SelectItem>
+                  {vehiclesList?.map((v: any) => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {v.licensePlate ? `${v.make} ${v.model} (${v.licensePlate})` : `${v.make} ${v.model}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-sm font-medium">{t.adminConfig.maintenanceTypes}</label>

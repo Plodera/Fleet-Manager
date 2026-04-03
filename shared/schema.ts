@@ -287,6 +287,7 @@ export const subEquipment = pgTable("sub_equipment", {
   labelEn: text("label_en").notNull(),
   labelPt: text("label_pt").notNull(),
   maintenanceTypes: text("maintenance_types").array().default([]).notNull(),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });

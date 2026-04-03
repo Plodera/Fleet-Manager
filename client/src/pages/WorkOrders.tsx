@@ -437,7 +437,11 @@ export default function WorkOrders() {
                           </SelectTrigger>
                           <SelectContent>
                             {subEquipmentData
-                              ?.filter((se: any) => !maintenanceType || !se.maintenanceTypes?.length || se.maintenanceTypes.includes(maintenanceType))
+                              ?.filter((se: any) => {
+                                const mtMatch = !maintenanceType || !se.maintenanceTypes?.length || se.maintenanceTypes.includes(maintenanceType);
+                                const vehicleMatch = !vehicleId || !se.vehicleId || String(se.vehicleId) === vehicleId;
+                                return mtMatch && vehicleMatch;
+                              })
                               ?.map((se: any) => (
                               <SelectItem key={se.id} value={String(se.id)}>{se.name}</SelectItem>
                             ))}
@@ -675,7 +679,11 @@ export default function WorkOrders() {
                           </SelectTrigger>
                           <SelectContent>
                             {subEquipmentData
-                              ?.filter((se: any) => !maintenanceType || !se.maintenanceTypes?.length || se.maintenanceTypes.includes(maintenanceType))
+                              ?.filter((se: any) => {
+                                const mtMatch = !maintenanceType || !se.maintenanceTypes?.length || se.maintenanceTypes.includes(maintenanceType);
+                                const vehicleMatch = !vehicleId || !se.vehicleId || String(se.vehicleId) === vehicleId;
+                                return mtMatch && vehicleMatch;
+                              })
                               ?.map((se: any) => (
                               <SelectItem key={se.id} value={String(se.id)}>{se.name}</SelectItem>
                             ))}
