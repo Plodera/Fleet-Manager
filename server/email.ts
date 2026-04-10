@@ -8,7 +8,7 @@ interface EmailContent {
   body: string;
 }
 
-async function sendEmail(emailContent: EmailContent): Promise<boolean> {
+export async function sendEmail(emailContent: EmailContent): Promise<boolean> {
   const settings = await storage.getEmailSettings();
   
   if (!settings || !settings.enabled) {

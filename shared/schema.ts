@@ -714,8 +714,12 @@ export const insertTrackerItemSchema = createInsertSchema(trackerItems).omit({ i
   trackerId: z.coerce.number(),
   quantity: z.coerce.number().optional().nullable(),
 });
+export const TRACKER_TRIGGER_TYPES = ["expiry_approaching", "expired"] as const;
+export type TrackerTriggerType = typeof TRACKER_TRIGGER_TYPES[number];
+
 export const insertTrackerNotificationRuleSchema = createInsertSchema(trackerNotificationRules).omit({ id: true, createdAt: true, lastRunAt: true, lastMatchCount: true }).extend({
   trackerId: z.coerce.number(),
+  triggerType: z.enum(TRACKER_TRIGGER_TYPES),
   thresholdDays: z.coerce.number().optional().nullable(),
 });
 

@@ -1,49 +1,5 @@
 import { storage } from "./storage";
-import { getDb } from "./db";
-import { trackerNotificationRules, trackerItems } from "@shared/schema";
-import { eq, and, lte, gte, sql } from "drizzle-orm";
-
-interface EmailContent {
-  to: string;
-  subject: string;
-  body: string;
-}
-
-async function sendEmail(content: EmailContent): Promise<boolean> {
-  const settings = await storage.getEmailSettings();
-
-  if (!settings || !settings.enabled) {
-    console.log("=== STATUS TRACKER EMAIL (Email disabled — logging only) ===");
-    console.log(`To: ${content.to}`);
-    console.log(`Subject: ${content.subject}`);
-    console.log(`Body:\n${content.body}`);
-    console.log("=== END EMAIL ===");
-    return false;
-  }
-
-  try {
-    const nodemailer = await import("nodemailer");
-    const transporter = nodemailer.default.createTransport({
-      host: settings.smtpHost,
-      port: settings.smtpPort,
-      secure: settings.smtpSecure,
-      auth: { user: settings.smtpUser, pass: settings.smtpPass },
-    });
-
-    await transporter.sendMail({
-      from: `"${settings.fromName}" <${settings.fromEmail}>`,
-      to: content.to,
-      subject: content.subject,
-      text: content.body,
-    });
-
-    console.log(`[trackerNotifications] Email sent to ${content.to}`);
-    return true;
-  } catch (err) {
-    console.error("[trackerNotifications] Failed to send email:", err);
-    return false;
-  }
-}
+import { sendEmail } from "./email";
 
 function daysDiff(dateStr: string): number {
   const today = new Date();

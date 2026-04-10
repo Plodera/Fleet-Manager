@@ -269,7 +269,7 @@ export default function StatusTracker() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/trackers", selectedTrackerId, "notification-rules"] });
     } catch {
-      toast({ title: "Error", variant: "destructive" });
+      toast({ title: st.errorGeneric, variant: "destructive" });
     } finally {
       setRunningCheck(false);
     }
@@ -297,7 +297,7 @@ export default function StatusTracker() {
         {/* Left panel — tracker list */}
         <div className="w-64 shrink-0 flex flex-col gap-1" data-testid="panel-trackers">
           {trackersLoading ? (
-            <div className="text-sm text-muted-foreground p-3">Loading...</div>
+            <div className="text-sm text-muted-foreground p-3">{st.loading}</div>
           ) : trackers.length === 0 ? (
             <div className="border rounded-xl p-6 text-center text-muted-foreground">
               <ShieldCheck className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -336,7 +336,7 @@ export default function StatusTracker() {
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{tracker.department.name}</p>
                 )}
                 {!tracker.isActive && (
-                  <Badge variant="outline" className="text-[10px] mt-1 px-1.5 py-0">{st.active === "Active" ? "Inactive" : "Inativo"}</Badge>
+                  <Badge variant="outline" className="text-[10px] mt-1 px-1.5 py-0">{st.inactive}</Badge>
                 )}
               </div>
             ))
@@ -366,13 +366,13 @@ export default function StatusTracker() {
                   {expiredCount > 0 && (
                     <Badge variant="destructive" className="text-xs" data-testid="badge-expired-count">
                       <XCircle className="w-3 h-3 mr-1" />
-                      {expiredCount} expired
+                      {expiredCount} {st.expiredBadge}
                     </Badge>
                   )}
                   {expiringCount > 0 && (
                     <Badge className="text-xs bg-amber-500 hover:bg-amber-500" data-testid="badge-expiring-count">
                       <AlertTriangle className="w-3 h-3 mr-1" />
-                      {expiringCount} expiring
+                      {expiringCount} {st.expiringBadge}
                     </Badge>
                   )}
                 </div>
@@ -490,10 +490,10 @@ export default function StatusTracker() {
                                     ? <Bell className="w-4 h-4 text-primary shrink-0" />
                                     : <BellOff className="w-4 h-4 text-muted-foreground shrink-0" />}
                                   <span className="font-medium text-sm">
-                                    {rule.triggerType === "expired" ? st.triggerExpired : `${st.triggerApproaching}: ${rule.thresholdDays} days`}
+                                    {rule.triggerType === "expired" ? st.triggerExpired : `${st.triggerApproaching}: ${rule.thresholdDays} ${st.days}`}
                                   </span>
                                   {!rule.isActive && (
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">Inactive</Badge>
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">{st.inactive}</Badge>
                                   )}
                                 </div>
                                 <p className="text-xs text-muted-foreground truncate">
@@ -688,7 +688,7 @@ export default function StatusTracker() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t.buttons.delete}</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.
+              {st.deleteConfirmDesc.replace("{name}", deleteTarget?.name ?? "")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
