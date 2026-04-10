@@ -691,6 +691,8 @@ const translations = {
       days: "days",
       deleteConfirmDesc: "Delete \"{name}\"? This cannot be undone.",
       errorGeneric: "An error occurred. Please try again.",
+      noUsersWithEmail: "No users with email addresses found in the system.",
+      recipientsSelected: "recipient(s) selected",
     },
   },
   pt: {
@@ -1381,6 +1383,8 @@ const translations = {
       days: "dias",
       deleteConfirmDesc: "Eliminar \"{name}\"? Esta ação não pode ser desfeita.",
       errorGeneric: "Ocorreu um erro. Por favor tente novamente.",
+      noUsersWithEmail: "Nenhum utilizador com endereço de email encontrado no sistema.",
+      recipientsSelected: "destinatário(s) selecionado(s)",
     },
   },
 };

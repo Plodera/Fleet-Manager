@@ -83,7 +83,7 @@ function ExpiryBadge({ expiryDate, t }: { expiryDate: string | null; t: any }) {
 
 const BLANK_TRACKER = { name: "", description: "", departmentId: "", isActive: true };
 const BLANK_ITEM = { name: "", serialNumber: "", location: "", quantity: "1", purchaseDate: "", expiryDate: "", notes: "", isActive: true };
-const BLANK_RULE = { triggerType: "expiry_approaching", thresholdDays: "30", recipients: "", isActive: true };
+const BLANK_RULE = { triggerType: "expiry_approaching", thresholdDays: "30", recipients: [] as string[], isActive: true };
 
 export default function StatusTracker() {
   const { t } = useLanguage();
@@ -118,6 +118,7 @@ export default function StatusTracker() {
   // Queries
   const { data: trackers = [], isLoading: trackersLoading } = useQuery<Tracker[]>({ queryKey: ["/api/trackers"] });
   const { data: departments = [] } = useQuery<any[]>({ queryKey: ["/api/departments"] });
+  const { data: users = [] } = useQuery<any[]>({ queryKey: ["/api/users"] });
   const { data: items = [] } = useQuery<TrackerItem[]>({
     queryKey: ["/api/trackers", selectedTrackerId, "items"],
     queryFn: async () => {
@@ -231,7 +232,7 @@ export default function StatusTracker() {
   const openRuleDialog = (rule?: NotificationRule) => {
     if (rule) {
       setEditRule(rule);
-      setRuleForm({ triggerType: rule.triggerType, thresholdDays: (rule.thresholdDays ?? 30).toString(), recipients: rule.recipients.join(", "), isActive: rule.isActive });
+      setRuleForm({ triggerType: rule.triggerType, thresholdDays: (rule.thresholdDays ?? 30).toString(), recipients: rule.recipients, isActive: rule.isActive });
     } else {
       setEditRule(null);
       setRuleForm(BLANK_RULE);
@@ -239,11 +240,20 @@ export default function StatusTracker() {
     setRuleDialog(true);
   };
 
+  const toggleRecipient = (email: string) => {
+    setRuleForm(p => ({
+      ...p,
+      recipients: p.recipients.includes(email)
+        ? p.recipients.filter(r => r !== email)
+        : [...p.recipients, email],
+    }));
+  };
+
   const submitRule = () => {
     const data = {
       triggerType: ruleForm.triggerType,
       thresholdDays: ruleForm.triggerType === "expiry_approaching" ? (parseInt(ruleForm.thresholdDays) || 30) : null,
-      recipients: ruleForm.recipients.split(",").map(s => s.trim()).filter(Boolean),
+      recipients: ruleForm.recipients,
       isActive: ruleForm.isActive,
     };
     if (editRule) updateRuleMut.mutate({ id: editRule.id, data });
@@ -497,7 +507,10 @@ export default function StatusTracker() {
                                   )}
                                 </div>
                                 <p className="text-xs text-muted-foreground truncate">
-                                  → {rule.recipients.join(", ")}
+                                  → {rule.recipients.map(email => {
+                                    const u = users.find((usr: any) => usr.email === email);
+                                    return u ? u.fullName : email;
+                                  }).join(", ")}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
                                   {st.lastRun}: {rule.lastRunAt ? new Date(rule.lastRunAt).toLocaleString() : st.never}
@@ -660,14 +673,37 @@ export default function StatusTracker() {
               </div>
             )}
             <div>
-              <Label>{st.recipients}</Label>
-              <Textarea
-                value={ruleForm.recipients}
-                onChange={e => setRuleForm(p => ({ ...p, recipients: e.target.value }))}
-                placeholder={st.recipientsPlaceholder}
-                rows={3}
-                data-testid="input-recipients"
-              />
+              <Label className="mb-2 block">{st.recipients}</Label>
+              <div className="border rounded-lg max-h-52 overflow-y-auto" data-testid="list-recipients">
+                {users.filter((u: any) => u.email).length === 0 ? (
+                  <p className="text-xs text-muted-foreground p-3 text-center">{st.noUsersWithEmail}</p>
+                ) : (
+                  users.filter((u: any) => u.email).map((u: any) => (
+                    <label
+                      key={u.id}
+                      className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 cursor-pointer border-b last:border-b-0"
+                      data-testid={`recipient-user-${u.id}`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="rounded accent-primary"
+                        checked={ruleForm.recipients.includes(u.email)}
+                        onChange={() => toggleRecipient(u.email)}
+                        data-testid={`checkbox-recipient-${u.id}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium leading-none">{u.fullName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{u.email}</p>
+                      </div>
+                    </label>
+                  ))
+                )}
+              </div>
+              {ruleForm.recipients.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {ruleForm.recipients.length} {st.recipientsSelected}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={ruleForm.isActive} onCheckedChange={v => setRuleForm(p => ({ ...p, isActive: v }))} data-testid="switch-rule-active" />
@@ -675,7 +711,7 @@ export default function StatusTracker() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={submitRule} disabled={!ruleForm.recipients || createRuleMut.isPending || updateRuleMut.isPending} data-testid="button-submit-rule">
+            <Button onClick={submitRule} disabled={ruleForm.recipients.length === 0 || createRuleMut.isPending || updateRuleMut.isPending} data-testid="button-submit-rule">
               {t.buttons.save}
             </Button>
           </DialogFooter>
