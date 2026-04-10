@@ -4,7 +4,7 @@ import { useLanguage } from "@/lib/i18n";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import { Network, Plus, Pencil, Trash2, Wifi, WifiOff, Camera, Globe } from "lucide-react";
+import { Network, Plus, Pencil, Trash2, Wifi, WifiOff, Camera, Globe, GitMerge, Printer, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,8 +61,20 @@ function StatusBadge({ status }: { status: Host["status"] }) {
 function HostTypeIcon({ type }: { type: string }) {
   if (type === "camera") return <Camera className="w-4 h-4 text-blue-500" />;
   if (type === "internet_link") return <Globe className="w-4 h-4 text-green-500" />;
-  return <Network className="w-4 h-4 text-gray-400" />;
+  if (type === "switch") return <GitMerge className="w-4 h-4 text-cyan-500" />;
+  if (type === "wireless_ap") return <Wifi className="w-4 h-4 text-violet-500" />;
+  if (type === "printer") return <Printer className="w-4 h-4 text-rose-500" />;
+  return <Monitor className="w-4 h-4 text-gray-400" />;
 }
+
+const HOST_TYPE_LABELS: Record<string, (t: { typeInternetLink?: string; typeCamera?: string; typeSwitch?: string; typeWirelessAp?: string; typePrinter?: string; typeOther?: string } | undefined) => string> = {
+  internet_link: t => t?.typeInternetLink || "Internet Link",
+  camera:        t => t?.typeCamera || "Camera",
+  switch:        t => t?.typeSwitch || "Switch",
+  wireless_ap:   t => t?.typeWirelessAp || "Access Point",
+  printer:       t => t?.typePrinter || "Printer",
+  other:         t => t?.typeOther || "Other",
+};
 
 export default function ITMonitorConfig() {
   const { t } = useLanguage();
@@ -257,7 +269,7 @@ export default function ITMonitorConfig() {
                       </td>
                       <td className="p-3 font-mono text-sm text-muted-foreground">{host.ipAddress}</td>
                       <td className="p-3 text-sm">
-                        {host.hostType === "internet_link" ? (it.typeInternetLink || "Internet Link") : host.hostType === "camera" ? (it.typeCamera || "Camera") : (it.typeOther || "Other")}
+                        {(HOST_TYPE_LABELS[host.hostType] || HOST_TYPE_LABELS.other)(it)}
                       </td>
                       <td className="p-3"><StatusBadge status={host.status} /></td>
                       <td className="p-3 text-center">
@@ -430,13 +442,16 @@ export default function ITMonitorConfig() {
             </div>
             <div className="space-y-1">
               <Label>{it.hostType || "Type"}</Label>
-              <Select value={hostForm.hostType} onValueChange={v => setHostForm(p => ({ ...p, hostType: v as "internet_link" | "camera" | "other" }))}>
+              <Select value={hostForm.hostType} onValueChange={v => setHostForm(p => ({ ...p, hostType: v as "internet_link" | "camera" | "switch" | "wireless_ap" | "printer" | "other" }))}>
                 <SelectTrigger data-testid="select-host-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="internet_link">{it.typeInternetLink || "Internet Link"}</SelectItem>
                   <SelectItem value="camera">{it.typeCamera || "Camera"}</SelectItem>
+                  <SelectItem value="switch">{it.typeSwitch || "Switch"}</SelectItem>
+                  <SelectItem value="wireless_ap">{it.typeWirelessAp || "Access Point"}</SelectItem>
+                  <SelectItem value="printer">{it.typePrinter || "Printer"}</SelectItem>
                   <SelectItem value="other">{it.typeOther || "Other"}</SelectItem>
                 </SelectContent>
               </Select>

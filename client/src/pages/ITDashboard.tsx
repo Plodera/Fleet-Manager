@@ -6,19 +6,37 @@ import type { ItHostWithStatus, ItKpi, ItKpiValue } from "@shared/schema";
 import {
   Wifi, WifiOff, Camera, Globe, Monitor, Network, ArrowLeft,
   Maximize, Minimize, TrendingUp, Target, Zap, Activity, Gauge,
-  BarChart3, Flame, Droplets, Box, Layers, Settings2
+  BarChart3, Flame, Droplets, Box, Layers, Settings2, GitMerge, Printer
 } from "lucide-react";
+
+type HostType = "internet_link" | "camera" | "switch" | "wireless_ap" | "printer" | "other";
+
+const DEVICE_TYPES: { type: HostType; icon: React.ElementType; label: string; labelPt: string }[] = [
+  { type: "camera",      icon: Camera,    label: "Cameras",        labelPt: "Câmeras" },
+  { type: "switch",      icon: GitMerge,  label: "Switches",       labelPt: "Switches" },
+  { type: "wireless_ap", icon: Wifi,      label: "Access Points",  labelPt: "Pontos de Acesso" },
+  { type: "printer",     icon: Printer,   label: "Printers",       labelPt: "Impressoras" },
+  { type: "other",       icon: Monitor,   label: "Other",          labelPt: "Outros" },
+];
+
+const DEVICE_COLORS = [
+  { border: "border-blue-500/25",   text: "text-blue-400",   bar: "bg-blue-500",   badge: "bg-blue-500/15" },
+  { border: "border-cyan-500/25",   text: "text-cyan-400",   bar: "bg-cyan-500",   badge: "bg-cyan-500/15" },
+  { border: "border-violet-500/25", text: "text-violet-400", bar: "bg-violet-500", badge: "bg-violet-500/15" },
+  { border: "border-rose-500/25",   text: "text-rose-400",   bar: "bg-rose-500",   badge: "bg-rose-500/15" },
+  { border: "border-gray-500/25",   text: "text-gray-400",   bar: "bg-gray-500",   badge: "bg-gray-500/15" },
+];
 
 const KPI_ICONS = [TrendingUp, Target, Zap, Activity, Gauge, Flame, Droplets, Box, Layers, Settings2, BarChart3];
 const KPI_COLORS = [
-  { bg: "bg-cyan-500/15", icon: "text-cyan-400", border: "border-cyan-500/20", accent: "text-cyan-400" },
-  { bg: "bg-emerald-500/15", icon: "text-emerald-400", border: "border-emerald-500/20", accent: "text-emerald-400" },
-  { bg: "bg-amber-500/15", icon: "text-amber-400", border: "border-amber-500/20", accent: "text-amber-400" },
+  { bg: "bg-cyan-500/15",   icon: "text-cyan-400",   border: "border-cyan-500/20",   accent: "text-cyan-400" },
+  { bg: "bg-emerald-500/15",icon: "text-emerald-400",border: "border-emerald-500/20",accent: "text-emerald-400" },
+  { bg: "bg-amber-500/15",  icon: "text-amber-400",  border: "border-amber-500/20",  accent: "text-amber-400" },
   { bg: "bg-purple-500/15", icon: "text-purple-400", border: "border-purple-500/20", accent: "text-purple-400" },
-  { bg: "bg-blue-500/15", icon: "text-blue-400", border: "border-blue-500/20", accent: "text-blue-400" },
-  { bg: "bg-rose-500/15", icon: "text-rose-400", border: "border-rose-500/20", accent: "text-rose-400" },
+  { bg: "bg-blue-500/15",   icon: "text-blue-400",   border: "border-blue-500/20",   accent: "text-blue-400" },
+  { bg: "bg-rose-500/15",   icon: "text-rose-400",   border: "border-rose-500/20",   accent: "text-rose-400" },
   { bg: "bg-orange-500/15", icon: "text-orange-400", border: "border-orange-500/20", accent: "text-orange-400" },
-  { bg: "bg-teal-500/15", icon: "text-teal-400", border: "border-teal-500/20", accent: "text-teal-400" },
+  { bg: "bg-teal-500/15",   icon: "text-teal-400",   border: "border-teal-500/20",   accent: "text-teal-400" },
 ];
 
 const PAGE_CSS = `
@@ -26,8 +44,10 @@ const PAGE_CSS = `
 .it-kpi-glow { animation: cardGlow 4s ease-in-out infinite; }
 @keyframes iconPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: 0.85; } }
 .it-icon-pulse { animation: iconPulse 3s ease-in-out infinite; }
-@keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+@keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 .it-online-pulse { animation: statusPulse 2s ease-in-out infinite; }
+@keyframes deviceGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); } 50% { box-shadow: 0 0 12px 2px rgba(99, 102, 241, 0.06); } }
+.it-device-glow { animation: deviceGlow 5s ease-in-out infinite; }
 `;
 
 function LiveClock() {
@@ -48,43 +68,99 @@ function LiveClock() {
   );
 }
 
-function useCountUp(target: number | string, duration: number = 1200) {
-  const [display, setDisplay] = useState("0");
-  const prevTarget = useRef<string>("");
-
+function useCountUp(target: number, duration: number = 1000) {
+  const [display, setDisplay] = useState(0);
+  const prevTarget = useRef<number>(-1);
   useEffect(() => {
-    const numVal = typeof target === "string" ? parseFloat(target) : target;
-    const targetStr = String(target);
-    if (isNaN(numVal) || targetStr === "-" || targetStr === "") {
-      setDisplay(targetStr);
-      prevTarget.current = targetStr;
-      return;
-    }
-    if (prevTarget.current === targetStr) return;
-    prevTarget.current = targetStr;
-    const isDecimal = targetStr.includes(".");
-    const decimalPlaces = isDecimal ? (targetStr.split(".")[1]?.length || 0) : 0;
+    if (prevTarget.current === target) return;
+    prevTarget.current = target;
     const startTime = performance.now();
+    const startVal = display;
     const animate = (now: number) => {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
-      const currentVal = numVal * eased;
-      if (progress < 1) {
-        setDisplay(isDecimal ? currentVal.toFixed(decimalPlaces) : Math.round(currentVal).toString());
-        requestAnimationFrame(animate);
-      } else {
-        setDisplay(targetStr);
-      }
+      const cur = Math.round(startVal + (target - startVal) * eased);
+      setDisplay(cur);
+      if (progress < 1) requestAnimationFrame(animate);
     };
     requestAnimationFrame(animate);
   }, [target, duration]);
-
   return display;
 }
 
+function DeviceTypeSummaryCard({
+  hosts, typeInfo, colorInfo, lang,
+}: {
+  hosts: ItHostWithStatus[];
+  typeInfo: typeof DEVICE_TYPES[0];
+  colorInfo: typeof DEVICE_COLORS[0];
+  lang: string;
+}) {
+  const total = hosts.length;
+  const online = hosts.filter(h => h.status?.isOnline).length;
+  const pct = total > 0 ? Math.round((online / total) * 100) : 0;
+  const animatedOnline = useCountUp(online);
+  const allOnline = online === total && total > 0;
+  const allOffline = online === 0 && total > 0;
+  const statusColor = allOnline ? "text-green-400" : allOffline ? "text-red-400" : "text-amber-400";
+  const barColor = allOnline ? "bg-green-500" : allOffline ? "bg-red-500" : "bg-amber-500";
+  const borderColor = allOnline ? "border-green-500/25" : allOffline ? "border-red-500/25" : "border-amber-500/25";
+  const Icon = typeInfo.icon;
+  const label = lang === "pt" ? typeInfo.labelPt : typeInfo.label;
+
+  return (
+    <div
+      className={`bg-[#111827] rounded-xl border ${borderColor} p-5 flex flex-col gap-3 it-device-glow`}
+      data-testid={`card-device-type-${typeInfo.type}`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-lg ${colorInfo.badge} flex items-center justify-center`}>
+            <Icon className={`w-4 h-4 ${colorInfo.text}`} />
+          </div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{label}</span>
+        </div>
+        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+          allOnline ? "bg-green-900/40 text-green-400" : allOffline ? "bg-red-900/40 text-red-400" : "bg-amber-900/40 text-amber-400"
+        }`}>
+          {pct}%
+        </span>
+      </div>
+
+      <div className="flex items-baseline gap-2">
+        <span className={`text-5xl font-black leading-none ${statusColor}`} data-testid={`text-online-count-${typeInfo.type}`}>
+          {animatedOnline}
+        </span>
+        <div className="flex flex-col">
+          <span className="text-sm text-gray-600 leading-none">/ {total}</span>
+          <span className="text-xs text-gray-600 mt-1">online</span>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full ${barColor} rounded-full transition-all duration-700`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        {!allOnline && total > 0 && (
+          <div className="text-xs text-gray-600">
+            {total - online} offline
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AnimatedKpiValue({ value, unit }: { value: string; unit?: string | null }) {
-  const display = useCountUp(value);
+  const numVal = parseFloat(value);
+  const animated = useCountUp(isNaN(numVal) ? 0 : numVal);
+  const isDecimal = value.includes(".");
+  const decimalPlaces = isDecimal ? (value.split(".")[1]?.length || 0) : 0;
+  const display = isNaN(numVal) ? value : (isDecimal ? animated.toFixed(decimalPlaces) : animated.toString());
   return (
     <div className="flex items-baseline gap-1.5">
       <span className="text-3xl font-bold text-white leading-none">{display}</span>
@@ -100,13 +176,10 @@ function KpiCard({ kpi, values, idx }: { kpi: ItKpi; values: ItKpiValue[]; idx: 
   const currentMonth = today.substring(0, 7);
   const dailyVal = values.find(v => v.kpiId === kpi.id && v.periodType === "daily" && v.periodDate === today);
   const monthlyVal = values.find(v => v.kpiId === kpi.id && v.periodType === "monthly" && v.periodDate?.startsWith(currentMonth));
-
   return (
     <div className={`bg-[#111827] rounded-xl border ${color.border} p-3 flex flex-col justify-between it-kpi-glow`} data-testid={`card-kpi-${kpi.id}`}>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">
-          {kpi.labelEn || kpi.name}
-        </span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 leading-tight">{kpi.labelEn || kpi.name}</span>
         <div className={`w-6 h-6 rounded-lg ${color.bg} flex items-center justify-center shrink-0 it-icon-pulse`}>
           <IconComp className={`w-3 h-3 ${color.icon}`} />
         </div>
@@ -154,34 +227,8 @@ function HostStatusPill({ host }: { host: ItHostWithStatus }) {
   );
 }
 
-function CameraCard({ host }: { host: ItHostWithStatus }) {
-  const isOnline = host.status?.isOnline;
-  const checkedAt = host.status?.checkedAt ? new Date(host.status.checkedAt) : null;
-  const timeStr = checkedAt ? checkedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
-
-  return (
-    <div
-      className={`rounded-xl border p-3 flex flex-col gap-1.5 ${
-        isOnline
-          ? "bg-green-900/20 border-green-700/30"
-          : host.status
-          ? "bg-red-900/20 border-red-700/30"
-          : "bg-gray-800/30 border-gray-700/30"
-      }`}
-      data-testid={`card-camera-${host.id}`}
-    >
-      <div className="flex items-center gap-2">
-        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? "bg-green-400 it-online-pulse" : host.status ? "bg-red-500" : "bg-gray-600"}`} />
-        <span className="text-sm font-semibold text-gray-100 truncate">{host.name}</span>
-      </div>
-      <div className="text-xs text-gray-500 font-mono">{host.ipAddress}</div>
-      <div className="text-xs text-gray-600">{timeStr}</div>
-    </div>
-  );
-}
-
 export default function ITDashboard() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isFullScreen, setIsFullScreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -244,14 +291,21 @@ export default function ITDashboard() {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
-  const internetLinks = hosts.filter(h => h.hostType === "internet_link" && h.isActive);
-  const cameras = hosts.filter(h => h.hostType === "camera" && h.isActive);
-  const otherHosts = hosts.filter(h => h.hostType === "other" && h.isActive);
+  const activeHosts = hosts.filter(h => h.isActive);
+  const internetLinks = activeHosts.filter(h => h.hostType === "internet_link");
   const activeKpis = kpis.filter(k => k.isActive);
 
+  const deviceTypeGroups = DEVICE_TYPES
+    .map((typeInfo, i) => ({
+      typeInfo,
+      colorInfo: DEVICE_COLORS[i % DEVICE_COLORS.length],
+      hosts: activeHosts.filter(h => h.hostType === typeInfo.type),
+    }))
+    .filter(g => g.hosts.length > 0);
+
+  const totalDevices = activeHosts.filter(h => h.hostType !== "internet_link").length;
+  const totalOnline = activeHosts.filter(h => h.hostType !== "internet_link" && h.status?.isOnline).length;
   const linksOnline = internetLinks.filter(h => h.status?.isOnline).length;
-  const camerasOnline = cameras.filter(h => h.status?.isOnline).length;
-  const otherOnline = otherHosts.filter(h => h.status?.isOnline).length;
 
   const it = t.itMonitor;
 
@@ -281,8 +335,8 @@ export default function ITDashboard() {
             </div>
           </div>
         </div>
+
         <div className="flex items-center gap-5">
-          {/* Summary counters */}
           <div className="flex items-center gap-4 text-xs text-gray-400">
             {internetLinks.length > 0 && (
               <div className="flex items-center gap-1.5" data-testid="text-links-summary">
@@ -293,21 +347,22 @@ export default function ITDashboard() {
                 <span>{it.linksUp || "links"}</span>
               </div>
             )}
-            {cameras.length > 0 && (
-              <div className="flex items-center gap-1.5" data-testid="text-cameras-summary">
-                <Camera className="w-3.5 h-3.5" />
-                <span className="text-green-400 font-bold">{camerasOnline}</span>
-                <span>/</span>
-                <span>{cameras.length}</span>
-                <span>{it.camerasOnline || "cams"}</span>
-              </div>
-            )}
-            {otherHosts.length > 0 && (
-              <div className="flex items-center gap-1.5" data-testid="text-other-summary">
-                <Monitor className="w-3.5 h-3.5" />
-                <span className="text-green-400 font-bold">{otherOnline}</span>
-                <span>/</span>
-                <span>{otherHosts.length}</span>
+            {deviceTypeGroups.map(({ typeInfo, hosts: g }) => {
+              const on = g.filter(h => h.status?.isOnline).length;
+              return (
+                <div key={typeInfo.type} className="flex items-center gap-1.5" data-testid={`text-summary-${typeInfo.type}`}>
+                  <typeInfo.icon className="w-3.5 h-3.5" />
+                  <span className={on === g.length ? "text-green-400 font-bold" : on === 0 ? "text-red-400 font-bold" : "text-amber-400 font-bold"}>{on}</span>
+                  <span>/</span>
+                  <span>{g.length}</span>
+                </div>
+              );
+            })}
+            {totalDevices > 0 && (
+              <div className="flex items-center gap-1 pl-2 border-l border-gray-700">
+                <span className={totalOnline === totalDevices ? "text-green-400 font-bold" : "text-amber-400 font-bold"}>{totalOnline}</span>
+                <span className="text-gray-600">/ {totalDevices}</span>
+                <span className="text-gray-500">total</span>
               </div>
             )}
           </div>
@@ -328,7 +383,7 @@ export default function ITDashboard() {
               <Globe className="w-3.5 h-3.5" />
               {it.sectionInternetLinks || "Internet Links"}
             </div>
-            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(internetLinks.length, 4)}, minmax(0, 1fr))` }}>
+            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(internetLinks.length, 6)}, minmax(0, 1fr))` }}>
               {internetLinks.map(host => (
                 <HostStatusPill key={host.id} host={host} />
               ))}
@@ -336,37 +391,32 @@ export default function ITDashboard() {
           </div>
         )}
 
-        {/* Camera grid + KPIs */}
+        {/* Device summary cards + KPIs */}
         <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
-          {/* Camera grid */}
-          {cameras.length > 0 && (
-            <div className="flex-1 min-w-0 flex flex-col" data-testid="section-cameras">
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-2">
-                <Camera className="w-3.5 h-3.5" />
-                {it.sectionCameras || "IP Cameras"}
-                <span className="text-green-400 font-bold">{camerasOnline}/{cameras.length}</span>
+
+          {/* Device type summary cards */}
+          {deviceTypeGroups.length > 0 && (
+            <div className="flex-1 min-w-0 flex flex-col" data-testid="section-devices">
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-2">
+                <Monitor className="w-3.5 h-3.5" />
+                {it.sectionDevices || "Network Devices"}
               </div>
               <div
-                className="flex-1 overflow-y-auto grid gap-2 content-start"
-                style={{ gridTemplateColumns: `repeat(${Math.min(Math.ceil(cameras.length / 3) <= 2 ? 3 : 4, cameras.length, 6)}, minmax(120px, 1fr))` }}
+                className="flex-1 grid gap-4 content-start"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.min(deviceTypeGroups.length, 4)}, minmax(0, 1fr))`,
+                  gridAutoRows: "minmax(160px, auto)",
+                }}
+                data-testid="grid-device-types"
               >
-                {cameras.map(host => (
-                  <CameraCard key={host.id} host={host} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Other hosts */}
-          {otherHosts.length > 0 && (
-            <div className="flex-1 min-w-0 flex flex-col" data-testid="section-other">
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-2">
-                <Network className="w-3.5 h-3.5" />
-                {it.sectionOther || "Other Hosts"}
-              </div>
-              <div className="flex flex-col gap-2">
-                {otherHosts.map(host => (
-                  <HostStatusPill key={host.id} host={host} />
+                {deviceTypeGroups.map(({ typeInfo, colorInfo, hosts: g }) => (
+                  <DeviceTypeSummaryCard
+                    key={typeInfo.type}
+                    hosts={g}
+                    typeInfo={typeInfo}
+                    colorInfo={colorInfo}
+                    lang={language}
+                  />
                 ))}
               </div>
             </div>
@@ -374,7 +424,7 @@ export default function ITDashboard() {
 
           {/* KPI cards */}
           {activeKpis.length > 0 && (
-            <div className="w-72 shrink-0 flex flex-col" data-testid="section-kpis">
+            <div className="w-64 shrink-0 flex flex-col" data-testid="section-kpis">
               <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-2">
                 <BarChart3 className="w-3.5 h-3.5" />
                 {it.sectionKpis || "KPIs"}

@@ -731,7 +731,7 @@ export type TrackerNotificationRule = typeof trackerNotificationRules.$inferSele
 export type InsertTrackerNotificationRule = z.infer<typeof insertTrackerNotificationRuleSchema>;
 
 // IT Operations Monitor
-export const itHostTypeEnum = pgEnum("it_host_type", ["internet_link", "camera", "other"]);
+export const itHostTypeEnum = pgEnum("it_host_type", ["internet_link", "camera", "switch", "wireless_ap", "printer", "other"]);
 
 export const itMonitoredHosts = pgTable("it_monitored_hosts", {
   id: serial("id").primaryKey(),
