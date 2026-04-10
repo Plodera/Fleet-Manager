@@ -3,6 +3,7 @@ import {
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
   indents, indentItems, indentApproverDepartments,
   tvDashboards, tvDashboardKpis, tvDashboardKpiValues, tvDashboardVideos,
+  trackers, trackerItems, trackerNotificationRules,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -24,6 +25,9 @@ import {
   type TvDashboardKpi, type InsertTvDashboardKpi,
   type TvDashboardKpiValue, type InsertTvDashboardKpiValue,
   type TvDashboardVideo, type InsertTvDashboardVideo,
+  type Tracker, type InsertTracker,
+  type TrackerItem, type InsertTrackerItem,
+  type TrackerNotificationRule, type InsertTrackerNotificationRule,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq, desc, sql, and } from "drizzle-orm";
@@ -174,6 +178,22 @@ export interface IStorage {
   updateTvDashboardVideo(id: number, updates: Partial<InsertTvDashboardVideo>): Promise<TvDashboardVideo>;
   deleteTvDashboardVideo(id: number): Promise<void>;
   getTvDashboardDisplay(id: number): Promise<any>;
+
+  // Status Trackers
+  getTrackers(): Promise<(Tracker & { department?: Department })[]>;
+  getTracker(id: number): Promise<(Tracker & { department?: Department }) | undefined>;
+  createTracker(data: InsertTracker): Promise<Tracker>;
+  updateTracker(id: number, updates: Partial<InsertTracker>): Promise<Tracker>;
+  deleteTracker(id: number): Promise<void>;
+  getTrackerItems(trackerId: number): Promise<TrackerItem[]>;
+  createTrackerItem(data: InsertTrackerItem): Promise<TrackerItem>;
+  updateTrackerItem(id: number, updates: Partial<InsertTrackerItem>): Promise<TrackerItem>;
+  deleteTrackerItem(id: number): Promise<void>;
+  getTrackerNotificationRules(trackerId: number): Promise<TrackerNotificationRule[]>;
+  getAllActiveTrackerNotificationRules(): Promise<(TrackerNotificationRule & { tracker: Tracker })[]>;
+  createTrackerNotificationRule(data: InsertTrackerNotificationRule): Promise<TrackerNotificationRule>;
+  updateTrackerNotificationRule(id: number, updates: Partial<InsertTrackerNotificationRule>): Promise<TrackerNotificationRule>;
+  deleteTrackerNotificationRule(id: number): Promise<void>;
 
   sessionStore: session.Store;
 }
@@ -899,6 +919,94 @@ export class DatabaseStorage implements IStorage {
 
     return { ...dashboard, department, kpis, kpiValues, videos };
   }
+
+  // Status Trackers
+  async getTrackers(): Promise<(Tracker & { department?: Department })[]> {
+    const rows = await getDb().select().from(trackers).orderBy(trackers.name);
+    const depts = await getDb().select().from(departments);
+    return rows.map(t => ({
+      ...t,
+      department: t.departmentId ? depts.find(d => d.id === t.departmentId) : undefined,
+    }));
+  }
+
+  async getTracker(id: number): Promise<(Tracker & { department?: Department }) | undefined> {
+    const [row] = await getDb().select().from(trackers).where(eq(trackers.id, id));
+    if (!row) return undefined;
+    let department: Department | undefined;
+    if (row.departmentId) {
+      const [dept] = await getDb().select().from(departments).where(eq(departments.id, row.departmentId));
+      department = dept;
+    }
+    return { ...row, department };
+  }
+
+  async createTracker(data: InsertTracker): Promise<Tracker> {
+    const [row] = await getDb().insert(trackers).values(data).returning();
+    return row;
+  }
+
+  async updateTracker(id: number, updates: Partial<InsertTracker>): Promise<Tracker> {
+    const [row] = await getDb().update(trackers).set(updates).where(eq(trackers.id, id)).returning();
+    return row;
+  }
+
+  async deleteTracker(id: number): Promise<void> {
+    await getDb().delete(trackers).where(eq(trackers.id, id));
+  }
+
+  async getTrackerItems(trackerId: number): Promise<TrackerItem[]> {
+    return getDb().select().from(trackerItems)
+      .where(eq(trackerItems.trackerId, trackerId))
+      .orderBy(trackerItems.name);
+  }
+
+  async createTrackerItem(data: InsertTrackerItem): Promise<TrackerItem> {
+    const [row] = await getDb().insert(trackerItems).values(data).returning();
+    return row;
+  }
+
+  async updateTrackerItem(id: number, updates: Partial<InsertTrackerItem>): Promise<TrackerItem> {
+    const [row] = await getDb().update(trackerItems).set(updates).where(eq(trackerItems.id, id)).returning();
+    return row;
+  }
+
+  async deleteTrackerItem(id: number): Promise<void> {
+    await getDb().delete(trackerItems).where(eq(trackerItems.id, id));
+  }
+
+  async getTrackerNotificationRules(trackerId: number): Promise<TrackerNotificationRule[]> {
+    return getDb().select().from(trackerNotificationRules)
+      .where(eq(trackerNotificationRules.trackerId, trackerId))
+      .orderBy(trackerNotificationRules.id);
+  }
+
+  async getAllActiveTrackerNotificationRules(): Promise<(TrackerNotificationRule & { tracker: Tracker })[]> {
+    const rules = await getDb().select().from(trackerNotificationRules)
+      .where(eq(trackerNotificationRules.isActive, true));
+    if (rules.length === 0) return [];
+    const trackerIds = [...new Set(rules.map(r => r.trackerId))];
+    const trackerRows = await getDb().select().from(trackers)
+      .where(sql`${trackers.id} IN (${sql.join(trackerIds.map(id => sql`${id}`), sql`, `)})`);
+    return rules.map(r => ({
+      ...r,
+      tracker: trackerRows.find(t => t.id === r.trackerId)!,
+    })).filter(r => r.tracker);
+  }
+
+  async createTrackerNotificationRule(data: InsertTrackerNotificationRule): Promise<TrackerNotificationRule> {
+    const [row] = await getDb().insert(trackerNotificationRules).values(data).returning();
+    return row;
+  }
+
+  async updateTrackerNotificationRule(id: number, updates: Partial<InsertTrackerNotificationRule>): Promise<TrackerNotificationRule> {
+    const [row] = await getDb().update(trackerNotificationRules).set(updates).where(eq(trackerNotificationRules.id, id)).returning();
+    return row;
+  }
+
+  async deleteTrackerNotificationRule(id: number): Promise<void> {
+    await getDb().delete(trackerNotificationRules).where(eq(trackerNotificationRules.id, id));
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -1020,5 +1128,19 @@ export const storage = {
   updateTvDashboardVideo: (...args: Parameters<DatabaseStorage['updateTvDashboardVideo']>) => getStorage().updateTvDashboardVideo(...args),
   deleteTvDashboardVideo: (...args: Parameters<DatabaseStorage['deleteTvDashboardVideo']>) => getStorage().deleteTvDashboardVideo(...args),
   getTvDashboardDisplay: (...args: Parameters<DatabaseStorage['getTvDashboardDisplay']>) => getStorage().getTvDashboardDisplay(...args),
+  getTrackers: () => getStorage().getTrackers(),
+  getTracker: (...args: Parameters<DatabaseStorage['getTracker']>) => getStorage().getTracker(...args),
+  createTracker: (...args: Parameters<DatabaseStorage['createTracker']>) => getStorage().createTracker(...args),
+  updateTracker: (...args: Parameters<DatabaseStorage['updateTracker']>) => getStorage().updateTracker(...args),
+  deleteTracker: (...args: Parameters<DatabaseStorage['deleteTracker']>) => getStorage().deleteTracker(...args),
+  getTrackerItems: (...args: Parameters<DatabaseStorage['getTrackerItems']>) => getStorage().getTrackerItems(...args),
+  createTrackerItem: (...args: Parameters<DatabaseStorage['createTrackerItem']>) => getStorage().createTrackerItem(...args),
+  updateTrackerItem: (...args: Parameters<DatabaseStorage['updateTrackerItem']>) => getStorage().updateTrackerItem(...args),
+  deleteTrackerItem: (...args: Parameters<DatabaseStorage['deleteTrackerItem']>) => getStorage().deleteTrackerItem(...args),
+  getTrackerNotificationRules: (...args: Parameters<DatabaseStorage['getTrackerNotificationRules']>) => getStorage().getTrackerNotificationRules(...args),
+  getAllActiveTrackerNotificationRules: () => getStorage().getAllActiveTrackerNotificationRules(),
+  createTrackerNotificationRule: (...args: Parameters<DatabaseStorage['createTrackerNotificationRule']>) => getStorage().createTrackerNotificationRule(...args),
+  updateTrackerNotificationRule: (...args: Parameters<DatabaseStorage['updateTrackerNotificationRule']>) => getStorage().updateTrackerNotificationRule(...args),
+  deleteTrackerNotificationRule: (...args: Parameters<DatabaseStorage['deleteTrackerNotificationRule']>) => getStorage().deleteTrackerNotificationRule(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

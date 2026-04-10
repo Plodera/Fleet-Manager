@@ -7,6 +7,7 @@ import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { sendBookingNotification, sendBookingStatusUpdate, sendTripStatusToApprover } from "./email";
+import { scheduleTrackerNotifications, runChecksForTracker } from "./trackerNotifications";
 import type { User } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
@@ -1826,6 +1827,139 @@ export async function registerRoutes(
     await storage.deleteTvDashboardVideo(id);
     res.status(204).send();
   });
+
+  // Status Trackers
+  app.get('/api/trackers', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_trackers')) return res.status(403).json({ message: "Forbidden" });
+    const rows = await storage.getTrackers();
+    res.json(rows);
+  });
+
+  app.post('/api/trackers', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const { insertTrackerSchema } = await import("@shared/schema");
+    const data = insertTrackerSchema.parse(req.body);
+    const row = await storage.createTracker(data);
+    res.status(201).json(row);
+  });
+
+  app.put('/api/trackers/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const id = parseInt(req.params.id);
+    const { insertTrackerSchema } = await import("@shared/schema");
+    const data = insertTrackerSchema.partial().parse(req.body);
+    const row = await storage.updateTracker(id, data);
+    res.json(row);
+  });
+
+  app.delete('/api/trackers/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const id = parseInt(req.params.id);
+    await storage.deleteTracker(id);
+    res.status(204).send();
+  });
+
+  // Tracker Items
+  app.get('/api/trackers/:id/items', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_trackers')) return res.status(403).json({ message: "Forbidden" });
+    const trackerId = parseInt(req.params.id);
+    const rows = await storage.getTrackerItems(trackerId);
+    res.json(rows);
+  });
+
+  app.post('/api/trackers/:id/items', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_trackers')) return res.status(403).json({ message: "Forbidden" });
+    const trackerId = parseInt(req.params.id);
+    const { insertTrackerItemSchema } = await import("@shared/schema");
+    const data = insertTrackerItemSchema.parse({ ...req.body, trackerId });
+    const row = await storage.createTrackerItem(data);
+    res.status(201).json(row);
+  });
+
+  app.put('/api/tracker-items/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_trackers')) return res.status(403).json({ message: "Forbidden" });
+    const id = parseInt(req.params.id);
+    const { insertTrackerItemSchema } = await import("@shared/schema");
+    const data = insertTrackerItemSchema.partial().parse(req.body);
+    const row = await storage.updateTrackerItem(id, data);
+    res.json(row);
+  });
+
+  app.delete('/api/tracker-items/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_trackers')) return res.status(403).json({ message: "Forbidden" });
+    const id = parseInt(req.params.id);
+    await storage.deleteTrackerItem(id);
+    res.status(204).send();
+  });
+
+  // Tracker Notification Rules
+  app.get('/api/trackers/:id/notification-rules', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const trackerId = parseInt(req.params.id);
+    const rows = await storage.getTrackerNotificationRules(trackerId);
+    res.json(rows);
+  });
+
+  app.post('/api/trackers/:id/notification-rules', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const trackerId = parseInt(req.params.id);
+    const { insertTrackerNotificationRuleSchema } = await import("@shared/schema");
+    const data = insertTrackerNotificationRuleSchema.parse({ ...req.body, trackerId });
+    const row = await storage.createTrackerNotificationRule(data);
+    res.status(201).json(row);
+  });
+
+  app.put('/api/tracker-rules/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const id = parseInt(req.params.id);
+    const { insertTrackerNotificationRuleSchema } = await import("@shared/schema");
+    const data = insertTrackerNotificationRuleSchema.partial().parse(req.body);
+    const row = await storage.updateTrackerNotificationRule(id, data);
+    res.json(row);
+  });
+
+  app.delete('/api/tracker-rules/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const id = parseInt(req.params.id);
+    await storage.deleteTrackerNotificationRule(id);
+    res.status(204).send();
+  });
+
+  app.post('/api/trackers/:id/run-check', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const trackerId = parseInt(req.params.id);
+    const matchCount = await runChecksForTracker(trackerId);
+    res.json({ success: true, matchCount });
+  });
+
+  // Schedule tracker notifications (startup + every 24h)
+  scheduleTrackerNotifications();
 
   // Seed Data
   const existingUsers = await storage.getUsers();

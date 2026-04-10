@@ -16,6 +16,7 @@ export const PERMISSIONS = {
   VIEW_REPORTS: 'view_reports',
   MANAGE_USERS: 'manage_users',
   MANAGE_VEHICLES: 'manage_vehicles',
+  VIEW_TRACKERS: 'view_trackers',
 } as const;
 
 export const AVAILABLE_PERMISSIONS = [
@@ -32,6 +33,7 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'view_reports', label: 'Reports', labelPt: 'Relatórios' },
   { id: 'view_indents', label: 'Indents', labelPt: 'Requisições' },
   { id: 'approve_indents', label: 'Approve Indents', labelPt: 'Aprovar Requisições' },
+  { id: 'view_trackers', label: 'Status Tracker', labelPt: 'Rastreador de Estado' },
   { id: 'manage_users', label: 'User Management', labelPt: 'Gestão de Utilizadores' },
 ] as const;
 

@@ -21,7 +21,8 @@ import {
   BarChart3,
   KeyRound,
   PackageSearch,
-  Monitor
+  Monitor,
+  ShieldCheck
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -144,6 +145,7 @@ export function Sidebar() {
         { href: "/work-order-reports", label: t.nav.workOrderReports, icon: BarChart3, permission: "view_work_order_reports", hideFromDriver: true },
         { href: "/fuel", label: t.nav.fuel, icon: Fuel, permission: "view_fuel", hideFromDriver: true },
         { href: "/indents", label: t.nav.indents, icon: PackageSearch, permission: "view_indents", hideFromDriver: true },
+        { href: "/status-tracker", label: t.nav.statusTracker, icon: ShieldCheck, permission: "view_trackers", hideFromDriver: true },
         { href: "/reports", label: t.nav.reports, icon: FileText, permission: "view_reports", hideFromDriver: true },
       ],
     },

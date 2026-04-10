@@ -33,6 +33,7 @@ import Indents from "@/pages/Indents";
 import TVDashboardConfig from "@/pages/TVDashboardConfig";
 import TVDashboard from "@/pages/TVDashboard";
 import TVDashboardIndex from "@/pages/TVDashboardIndex";
+import StatusTracker from "@/pages/StatusTracker";
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -161,6 +162,9 @@ function Router() {
         <PrintRoute component={SharedRidePrintView} requiredPermission="view_shared_rides" />
       </Route>
       
+      <Route path="/status-tracker">
+        <PrivateRoute component={StatusTracker} requiredPermission="view_trackers" />
+      </Route>
       <Route path="/tv-dashboard-config">
         <PrivateRoute component={TVDashboardConfig} adminOnly />
       </Route>
