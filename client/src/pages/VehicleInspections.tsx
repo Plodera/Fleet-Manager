@@ -216,7 +216,31 @@ export default function VehicleInspections() {
   });
 
   const selectedEquipmentType = form.watch("equipmentType");
-  const selectedEquipmentTypeId = equipmentTypes.find(et => et.name === selectedEquipmentType)?.id;
+  // Match by exact name OR by normalized name (handles DB records with spaces/capitals)
+  const selectedEquipmentTypeId = equipmentTypes.find(
+    et => et.name === selectedEquipmentType ||
+          et.name.toLowerCase().replace(/[\s\-]+/g, "_") === selectedEquipmentType.toLowerCase().replace(/[\s\-]+/g, "_")
+  )?.id;
+
+  // When DB equipment types load, make sure the form default matches an actual DB type name
+  useEffect(() => {
+    if (equipmentTypes.length === 0) return;
+    const current = form.getValues("equipmentType");
+    const activeTypes = equipmentTypes.filter(et => et.isActive);
+    if (activeTypes.length === 0) return;
+    // Check if current value matches any active type (exact or normalized)
+    const hasMatch = activeTypes.some(
+      et => et.name === current ||
+            et.name.toLowerCase().replace(/[\s\-]+/g, "_") === current.toLowerCase().replace(/[\s\-]+/g, "_")
+    );
+    if (!hasMatch) {
+      // Prefer a type whose normalized name matches a legacy type, otherwise use first
+      const preferred =
+        activeTypes.find(et => et.name.toLowerCase().replace(/[\s\-]+/g, "_") === "factory_vehicle") ??
+        activeTypes[0];
+      form.setValue("equipmentType", preferred.name);
+    }
+  }, [equipmentTypes]);
 
   const { data: dbChecklistItems = [] } = useQuery<EquipmentChecklistItem[]>({
     queryKey: ["/api/equipment-types", selectedEquipmentTypeId, "items"],
@@ -275,6 +299,19 @@ export default function VehicleInspections() {
     createMutation.mutate(data);
   };
 
+  // Normalize type name for comparison — handles "Factory Vehicle", "factory vehicle", "factory_vehicle" etc.
+  const normalizeEqType = (typeName: string) =>
+    typeName.toLowerCase().replace(/[\s\-]+/g, "_");
+
+  // Check if this is a legacy hardcoded type (not a new dynamic type)
+  const isLegacyType = (typeName: string) => {
+    const n = normalizeEqType(typeName);
+    return n === "factory_vehicle" || n === "transfer_trolley";
+  };
+
+  const isTransferTrolley = (typeName: string) =>
+    normalizeEqType(typeName) === "transfer_trolley";
+
   const getChecklistItems = (equipmentType: string, useDbItems: boolean = false) => {
     // Use database items if available and requested
     if (useDbItems && dbChecklistItems.length > 0) {
@@ -286,7 +323,7 @@ export default function VehicleInspections() {
       }));
     }
     // Fallback to hardcoded items
-    if (equipmentType === "transfer_trolley") {
+    if (isTransferTrolley(equipmentType)) {
       return [...TRANSFER_TROLLEY_GENERATOR_ITEMS, ...TRANSFER_TROLLEY_OTHERS_ITEMS];
     }
     return FACTORY_VEHICLE_ITEMS;
@@ -336,13 +373,8 @@ export default function VehicleInspections() {
       return language === "en" ? dbType.labelEn : dbType.labelPt;
     }
     // Fallback for legacy hardcoded types
-    if (typeName === "transfer_trolley") return l.transferTrolley;
+    if (isTransferTrolley(typeName)) return l.transferTrolley;
     return l.factoryVehicle;
-  };
-
-  // Check if this is a new dynamic type (not legacy hardcoded)
-  const isLegacyType = (typeName: string) => {
-    return typeName === "factory_vehicle" || typeName === "transfer_trolley";
   };
 
   // Get dynamic checklist items from DB, grouped by section
@@ -716,7 +748,7 @@ export default function VehicleInspections() {
                               {l.noChecklistItems || "No checklist items configured for this equipment type. Please configure items in Equipment Types."}
                             </TableCell>
                           </TableRow>
-                        )) : selectedEquipmentType === "transfer_trolley" ? (
+                        )) : isTransferTrolley(selectedEquipmentType) ? (
                           <>
                             <TableRow className="bg-muted/50">
                               <TableCell colSpan={3} className="font-semibold text-center">{l.generatorSection}</TableCell>
