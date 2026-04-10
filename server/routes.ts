@@ -1961,6 +1961,37 @@ export async function registerRoutes(
   // Schedule tracker notifications (startup + every 24h)
   scheduleTrackerNotifications();
 
+  // IT Operations Monitor — Host Types (configurable)
+  app.get('/api/it/host-types', async (req, res) => {
+    try {
+      res.json(await storage.getItHostTypes());
+    } catch { res.status(500).json({ message: "Failed to fetch host types" }); }
+  });
+
+  app.post('/api/it/host-types', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const row = await storage.createItHostType(req.body);
+      res.json(row);
+    } catch { res.status(500).json({ message: "Failed to create host type" }); }
+  });
+
+  app.put('/api/it/host-types/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const row = await storage.updateItHostType(parseInt(req.params.id), req.body);
+      res.json(row);
+    } catch { res.status(500).json({ message: "Failed to update host type" }); }
+  });
+
+  app.delete('/api/it/host-types/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      await storage.deleteItHostType(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch { res.status(500).json({ message: "Failed to delete host type" }); }
+  });
+
   // IT Operations Monitor
   app.get('/api/it/hosts', async (req, res) => {
     try {

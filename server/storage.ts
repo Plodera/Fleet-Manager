@@ -4,12 +4,12 @@ import {
   indents, indentItems, indentApproverDepartments,
   tvDashboards, tvDashboardKpis, tvDashboardKpiValues, tvDashboardVideos,
   trackers, trackerItems, trackerNotificationRules,
-  itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
+  itHostTypes, itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
-  type ItMonitoredHost, type InsertItMonitoredHost, type ItHostStatus, type ItKpi, type InsertItKpi, type ItKpiValue, type InsertItKpiValue, type ItHostWithStatus,
+  type ItHostType, type InsertItHostType, type ItMonitoredHost, type InsertItMonitoredHost, type ItHostStatus, type ItKpi, type InsertItKpi, type ItKpiValue, type InsertItKpiValue, type ItHostWithStatus,
   type VehicleInspection, type InsertVehicleInspection,
   type EquipmentType, type InsertEquipmentType,
   type EquipmentChecklistItem, type InsertEquipmentChecklistItem,
@@ -198,6 +198,10 @@ export interface IStorage {
   deleteTrackerNotificationRule(id: number): Promise<void>;
 
   // IT Operations Monitor
+  getItHostTypes(): Promise<ItHostType[]>;
+  createItHostType(data: InsertItHostType): Promise<ItHostType>;
+  updateItHostType(id: number, updates: Partial<InsertItHostType>): Promise<ItHostType>;
+  deleteItHostType(id: number): Promise<void>;
   getItHosts(): Promise<any[]>;
   getItHost(id: number): Promise<any | undefined>;
   createItHost(data: any): Promise<any>;
@@ -1027,6 +1031,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   // IT Operations Monitor
+  async getItHostTypes(): Promise<ItHostType[]> {
+    return getDb().select().from(itHostTypes).orderBy(itHostTypes.sortOrder, itHostTypes.slug);
+  }
+
+  async createItHostType(data: InsertItHostType): Promise<ItHostType> {
+    const [row] = await getDb().insert(itHostTypes).values(data).returning();
+    return row;
+  }
+
+  async updateItHostType(id: number, updates: Partial<InsertItHostType>): Promise<ItHostType> {
+    const [row] = await getDb().update(itHostTypes).set(updates).where(eq(itHostTypes.id, id)).returning();
+    return row;
+  }
+
+  async deleteItHostType(id: number): Promise<void> {
+    await getDb().delete(itHostTypes).where(eq(itHostTypes.id, id));
+  }
+
   async getItHosts(): Promise<ItMonitoredHost[]> {
     return getDb().select().from(itMonitoredHosts).orderBy(itMonitoredHosts.sortOrder, itMonitoredHosts.name);
   }
@@ -1277,6 +1299,10 @@ export const storage = {
   createTrackerNotificationRule: (...args: Parameters<DatabaseStorage['createTrackerNotificationRule']>) => getStorage().createTrackerNotificationRule(...args),
   updateTrackerNotificationRule: (...args: Parameters<DatabaseStorage['updateTrackerNotificationRule']>) => getStorage().updateTrackerNotificationRule(...args),
   deleteTrackerNotificationRule: (...args: Parameters<DatabaseStorage['deleteTrackerNotificationRule']>) => getStorage().deleteTrackerNotificationRule(...args),
+  getItHostTypes: () => getStorage().getItHostTypes(),
+  createItHostType: (...args: Parameters<DatabaseStorage['createItHostType']>) => getStorage().createItHostType(...args),
+  updateItHostType: (...args: Parameters<DatabaseStorage['updateItHostType']>) => getStorage().updateItHostType(...args),
+  deleteItHostType: (...args: Parameters<DatabaseStorage['deleteItHostType']>) => getStorage().deleteItHostType(...args),
   getItHosts: () => getStorage().getItHosts(),
   getItHost: (...args: Parameters<DatabaseStorage['getItHost']>) => getStorage().getItHost(...args),
   createItHost: (...args: Parameters<DatabaseStorage['createItHost']>) => getStorage().createItHost(...args),

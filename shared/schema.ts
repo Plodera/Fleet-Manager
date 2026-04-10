@@ -731,13 +731,25 @@ export type TrackerNotificationRule = typeof trackerNotificationRules.$inferSele
 export type InsertTrackerNotificationRule = z.infer<typeof insertTrackerNotificationRuleSchema>;
 
 // IT Operations Monitor
-export const itHostTypeEnum = pgEnum("it_host_type", ["internet_link", "camera", "switch", "wireless_ap", "printer", "other"]);
+
+// User-configurable host type definitions
+export const itHostTypes = pgTable("it_host_types", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull().unique(),          // machine key used in it_monitored_hosts.host_type
+  labelEn: text("label_en").notNull(),
+  labelPt: text("label_pt").notNull(),
+  icon: text("icon").notNull().default("monitor"), // lucide icon name
+  color: text("color").notNull().default("blue"),  // color theme name
+  isInternetLink: boolean("is_internet_link").notNull().default(false), // pill vs summary card
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
 
 export const itMonitoredHosts = pgTable("it_monitored_hosts", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   ipAddress: text("ip_address").notNull(),
-  hostType: itHostTypeEnum("host_type").notNull().default("camera"),
+  hostType: text("host_type").notNull().default("camera"), // references itHostTypes.slug
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   notes: text("notes"),
@@ -791,6 +803,7 @@ export const itKpiValuesRelations = relations(itKpiValues, ({ one }) => ({
   kpi: one(itKpis, { fields: [itKpiValues.kpiId], references: [itKpis.id] }),
 }));
 
+export const insertItHostTypeSchema = createInsertSchema(itHostTypes).omit({ id: true });
 export const insertItMonitoredHostSchema = createInsertSchema(itMonitoredHosts).omit({ id: true, createdAt: true }).extend({
   departmentId: z.coerce.number().optional().nullable(),
 });
@@ -799,6 +812,8 @@ export const insertItKpiValueSchema = createInsertSchema(itKpiValues).omit({ id:
   kpiId: z.coerce.number(),
 });
 
+export type ItHostType = typeof itHostTypes.$inferSelect;
+export type InsertItHostType = z.infer<typeof insertItHostTypeSchema>;
 export type ItMonitoredHost = typeof itMonitoredHosts.$inferSelect;
 export type InsertItMonitoredHost = z.infer<typeof insertItMonitoredHostSchema>;
 export type ItHostStatus = typeof itHostStatus.$inferSelect;
