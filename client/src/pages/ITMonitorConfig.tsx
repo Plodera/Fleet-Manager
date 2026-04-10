@@ -4,7 +4,7 @@ import { useLanguage } from "@/lib/i18n";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import { Network, Plus, Pencil, Trash2, RefreshCw, Wifi, WifiOff, Camera, Globe } from "lucide-react";
+import { Network, Plus, Pencil, Trash2, Wifi, WifiOff, Camera, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,14 +98,6 @@ export default function ITMonitorConfig() {
   useEffect(() => {
     setKpiValues({});
   }, [dataEntryDate, dataEntryPeriodType]);
-
-  const checkMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/it/check", {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/it/hosts"] });
-      toast({ title: t.itMonitor?.checkComplete || "Check complete" });
-    },
-  });
 
   const createHostMutation = useMutation({
     mutationFn: (data: InsertItMonitoredHost) => apiRequest("POST", "/api/it/hosts", data),
@@ -210,16 +202,10 @@ export default function ITMonitorConfig() {
         title={it.configTitle || "IT Monitor Configuration"}
         description={it.configSubtitle || "Manage monitored hosts and IT dashboard KPIs"}
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => window.open("/it-dashboard", "_blank")} data-testid="button-view-it-dashboard">
-              <ExternalLink className="w-4 h-4 mr-2" />
-              {it.viewDashboard || "View IT Dashboard"}
-            </Button>
-            <Button variant="outline" onClick={() => checkMutation.mutate()} disabled={checkMutation.isPending} data-testid="button-run-check">
-              <RefreshCw className={`w-4 h-4 mr-2 ${checkMutation.isPending ? "animate-spin" : ""}`} />
-              {it.runCheckNow || "Run Check Now"}
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => window.open("/it-dashboard", "_blank")} data-testid="button-view-it-dashboard">
+            <ExternalLink className="w-4 h-4 mr-2" />
+            {it.viewDashboard || "View IT Dashboard"}
+          </Button>
         }
       />
 
