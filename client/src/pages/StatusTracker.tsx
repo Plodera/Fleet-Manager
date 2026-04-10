@@ -89,7 +89,7 @@ export default function StatusTracker() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
-  const st = (t as any).statusTracker || {};
+  const st = t.statusTracker;
   const isAdmin = user?.role === "admin";
 
   const [selectedTrackerId, setSelectedTrackerId] = useState<number | null>(null);
@@ -261,10 +261,11 @@ export default function StatusTracker() {
     if (!selectedTrackerId) return;
     setRunningCheck(true);
     try {
-      const res = await apiRequest("POST", `/api/trackers/${selectedTrackerId}/run-check`, {}) as any;
+      const res = await apiRequest("POST", `/api/trackers/${selectedTrackerId}/run-check`, {});
+      const json = await res.json() as { success: boolean; matchCount: number };
       toast({
         title: st.checkComplete,
-        description: st.checkCompleteDesc?.replace("{count}", String(res.matchCount ?? 0)),
+        description: st.checkCompleteDesc?.replace("{count}", String(json.matchCount ?? 0)),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/trackers", selectedTrackerId, "notification-rules"] });
     } catch {
@@ -572,7 +573,7 @@ export default function StatusTracker() {
           </div>
           <DialogFooter>
             <Button onClick={submitTracker} disabled={!trackerForm.name || createTrackerMut.isPending || updateTrackerMut.isPending} data-testid="button-submit-tracker">
-              {(t as any).buttons?.save || "Save"}
+              {t.buttons.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -621,7 +622,7 @@ export default function StatusTracker() {
           </div>
           <DialogFooter>
             <Button onClick={submitItem} disabled={!itemForm.name || createItemMut.isPending || updateItemMut.isPending} data-testid="button-submit-item">
-              {(t as any).buttons?.save || "Save"}
+              {t.buttons.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -675,7 +676,7 @@ export default function StatusTracker() {
           </div>
           <DialogFooter>
             <Button onClick={submitRule} disabled={!ruleForm.recipients || createRuleMut.isPending || updateRuleMut.isPending} data-testid="button-submit-rule">
-              {(t as any).buttons?.save || "Save"}
+              {t.buttons.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -685,15 +686,15 @@ export default function StatusTracker() {
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{(t as any).buttons?.delete || "Delete"}</AlertDialogTitle>
+            <AlertDialogTitle>{t.buttons.delete}</AlertDialogTitle>
             <AlertDialogDescription>
               Delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{(t as any).buttons?.cancel || "Cancel"}</AlertDialogCancel>
+            <AlertDialogCancel>{t.buttons.cancel}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-              {(t as any).buttons?.delete || "Delete"}
+              {t.buttons.delete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

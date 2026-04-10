@@ -192,7 +192,7 @@ export interface IStorage {
   getTrackerNotificationRules(trackerId: number): Promise<TrackerNotificationRule[]>;
   getAllActiveTrackerNotificationRules(): Promise<(TrackerNotificationRule & { tracker: Tracker })[]>;
   createTrackerNotificationRule(data: InsertTrackerNotificationRule): Promise<TrackerNotificationRule>;
-  updateTrackerNotificationRule(id: number, updates: Partial<InsertTrackerNotificationRule>): Promise<TrackerNotificationRule>;
+  updateTrackerNotificationRule(id: number, updates: Partial<TrackerNotificationRule>): Promise<TrackerNotificationRule>;
   deleteTrackerNotificationRule(id: number): Promise<void>;
 
   sessionStore: session.Store;
@@ -982,16 +982,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllActiveTrackerNotificationRules(): Promise<(TrackerNotificationRule & { tracker: Tracker })[]> {
-    const rules = await getDb().select().from(trackerNotificationRules)
+    const rules: TrackerNotificationRule[] = await getDb().select().from(trackerNotificationRules)
       .where(eq(trackerNotificationRules.isActive, true));
     if (rules.length === 0) return [];
-    const trackerIds = [...new Set(rules.map(r => r.trackerId))];
-    const trackerRows = await getDb().select().from(trackers)
-      .where(sql`${trackers.id} IN (${sql.join(trackerIds.map(id => sql`${id}`), sql`, `)})`);
-    return rules.map(r => ({
+    const trackerIds = Array.from(new Set(rules.map((r: TrackerNotificationRule) => r.trackerId)));
+    const trackerRows: Tracker[] = await getDb().select().from(trackers)
+      .where(sql`${trackers.id} IN (${sql.join(trackerIds.map((id: number) => sql`${id}`), sql`, `)})`);
+    const combined = rules.map((r: TrackerNotificationRule) => ({
       ...r,
-      tracker: trackerRows.find(t => t.id === r.trackerId)!,
-    })).filter(r => r.tracker);
+      tracker: trackerRows.find((t: Tracker) => t.id === r.trackerId)!,
+    }));
+    return combined.filter((r: TrackerNotificationRule & { tracker: Tracker }) => r.tracker);
   }
 
   async createTrackerNotificationRule(data: InsertTrackerNotificationRule): Promise<TrackerNotificationRule> {
@@ -999,7 +1000,7 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async updateTrackerNotificationRule(id: number, updates: Partial<InsertTrackerNotificationRule>): Promise<TrackerNotificationRule> {
+  async updateTrackerNotificationRule(id: number, updates: Partial<TrackerNotificationRule>): Promise<TrackerNotificationRule> {
     const [row] = await getDb().update(trackerNotificationRules).set(updates).where(eq(trackerNotificationRules.id, id)).returning();
     return row;
   }

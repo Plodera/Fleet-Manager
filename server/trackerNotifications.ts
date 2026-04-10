@@ -117,7 +117,7 @@ export async function runChecksForTracker(trackerId: number): Promise<number> {
     await storage.updateTrackerNotificationRule(rule.id, {
       lastRunAt: new Date(),
       lastMatchCount: matchedItems.length,
-    } as any);
+    });
   }
 
   return totalMatches;
@@ -126,7 +126,7 @@ export async function runChecksForTracker(trackerId: number): Promise<number> {
 export async function runAllTrackerChecks(): Promise<void> {
   try {
     const rules = await storage.getAllActiveTrackerNotificationRules();
-    const trackerIds = [...new Set(rules.map(r => r.trackerId))];
+    const trackerIds = Array.from(new Set(rules.map(r => r.trackerId)));
     console.log(`[trackerNotifications] Running checks for ${trackerIds.length} tracker(s)...`);
     for (const tid of trackerIds) {
       await runChecksForTracker(tid);
