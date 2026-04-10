@@ -461,7 +461,8 @@ export default function ITMonitorConfig() {
             </div>
             <div className="space-y-1">
               <Label>{it.ipAddress || "IP Address"}</Label>
-              <Input value={hostForm.ipAddress} onChange={e => setHostForm(p => ({ ...p, ipAddress: e.target.value }))} placeholder="192.168.1.100" data-testid="input-ip-address" />
+              <Input value={hostForm.ipAddress} onChange={e => setHostForm(p => ({ ...p, ipAddress: e.target.value }))} placeholder="192.168.1.100" pattern="^(\d{1,3}\.){3}\d{1,3}$" data-testid="input-ip-address" />
+              <p className="text-xs text-muted-foreground">IPv4 only (e.g. 192.168.1.100)</p>
             </div>
             <div className="space-y-1">
               <Label>{it.hostType || "Type"}</Label>

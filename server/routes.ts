@@ -1971,10 +1971,18 @@ export async function registerRoutes(
     }
   });
 
+  // Validate IPv4 — reject anything with shell metacharacters
+  const SAFE_IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
+  function isValidIPv4(ip: string): boolean {
+    if (!SAFE_IP_RE.test(ip)) return false;
+    return ip.split(".").every(p => { const n = parseInt(p, 10); return n >= 0 && n <= 255; });
+  }
+
   app.post('/api/it/hosts', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
     if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    if (!isValidIPv4(req.body.ipAddress)) return res.status(400).json({ message: "Invalid IP address. Only IPv4 addresses are supported (e.g. 192.168.1.100)." });
     try {
       const host = await storage.createItHost(req.body);
       res.json(host);
@@ -1987,6 +1995,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
     if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    if (req.body.ipAddress !== undefined && !isValidIPv4(req.body.ipAddress)) return res.status(400).json({ message: "Invalid IP address. Only IPv4 addresses are supported (e.g. 192.168.1.100)." });
     try {
       const host = await storage.updateItHost(parseInt(req.params.id), req.body);
       res.json(host);

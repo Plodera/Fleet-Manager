@@ -23,7 +23,8 @@ import {
   PackageSearch,
   Monitor,
   ShieldCheck,
-  Network
+  Network,
+  Activity
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -159,6 +160,7 @@ export function Sidebar() {
         { href: "/work-order-config", label: t.nav.workOrderConfig, icon: Cog, permission: "admin_only", hideFromDriver: true },
         { href: "/tv-dashboard-config", label: t.nav.tvDashboards, icon: Monitor, permission: "admin_only", hideFromDriver: true },
         { href: "/it-monitor-config", label: t.nav.itMonitorConfig, icon: Network, permission: "admin_only", hideFromDriver: true },
+        { href: "/it-dashboard", label: t.nav.itDashboard, icon: Activity, permission: "admin_only", hideFromDriver: true },
       ],
     },
   ];
