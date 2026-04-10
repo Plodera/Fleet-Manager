@@ -22,7 +22,8 @@ import {
   KeyRound,
   PackageSearch,
   Monitor,
-  ShieldCheck
+  ShieldCheck,
+  Network
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -157,6 +158,7 @@ export function Sidebar() {
         { href: "/equipment-types", label: t.nav.equipmentTypes, icon: Settings2, permission: "admin_only", hideFromDriver: true },
         { href: "/work-order-config", label: t.nav.workOrderConfig, icon: Cog, permission: "admin_only", hideFromDriver: true },
         { href: "/tv-dashboard-config", label: t.nav.tvDashboards, icon: Monitor, permission: "admin_only", hideFromDriver: true },
+        { href: "/it-monitor-config", label: t.nav.itMonitorConfig, icon: Network, permission: "admin_only", hideFromDriver: true },
       ],
     },
   ];

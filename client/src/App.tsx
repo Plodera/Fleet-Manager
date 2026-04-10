@@ -34,6 +34,8 @@ import TVDashboardConfig from "@/pages/TVDashboardConfig";
 import TVDashboard from "@/pages/TVDashboard";
 import TVDashboardIndex from "@/pages/TVDashboardIndex";
 import StatusTracker from "@/pages/StatusTracker";
+import ITMonitorConfig from "@/pages/ITMonitorConfig";
+import ITDashboard from "@/pages/ITDashboard";
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -170,6 +172,10 @@ function Router() {
       </Route>
       <Route path="/tv-dashboard/:id" component={TVDashboard} />
       <Route path="/tv-dashboard" component={TVDashboardIndex} />
+      <Route path="/it-monitor-config">
+        <PrivateRoute component={ITMonitorConfig} adminOnly />
+      </Route>
+      <Route path="/it-dashboard" component={ITDashboard} />
       
       <Route component={NotFound} />
     </Switch>

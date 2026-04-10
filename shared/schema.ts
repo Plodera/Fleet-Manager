@@ -729,3 +729,78 @@ export type TrackerItem = typeof trackerItems.$inferSelect;
 export type InsertTrackerItem = z.infer<typeof insertTrackerItemSchema>;
 export type TrackerNotificationRule = typeof trackerNotificationRules.$inferSelect;
 export type InsertTrackerNotificationRule = z.infer<typeof insertTrackerNotificationRuleSchema>;
+
+// IT Operations Monitor
+export const itHostTypeEnum = pgEnum("it_host_type", ["internet_link", "camera", "other"]);
+
+export const itMonitoredHosts = pgTable("it_monitored_hosts", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  ipAddress: text("ip_address").notNull(),
+  hostType: itHostTypeEnum("host_type").notNull().default("camera"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  notes: text("notes"),
+  departmentId: integer("department_id").references(() => departments.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const itHostStatus = pgTable("it_host_status", {
+  id: serial("id").primaryKey(),
+  hostId: integer("host_id").references(() => itMonitoredHosts.id, { onDelete: "cascade" }).notNull(),
+  isOnline: boolean("is_online").notNull().default(false),
+  responseTimeMs: integer("response_time_ms"),
+  checkedAt: timestamp("checked_at").defaultNow().notNull(),
+});
+
+export const itKpis = pgTable("it_kpis", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  labelEn: text("label_en").notNull().default(""),
+  labelPt: text("label_pt").notNull().default(""),
+  unit: text("unit"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const itKpiValues = pgTable("it_kpi_values", {
+  id: serial("id").primaryKey(),
+  kpiId: integer("kpi_id").references(() => itKpis.id, { onDelete: "cascade" }).notNull(),
+  periodType: text("period_type").notNull(),
+  periodDate: date("period_date").notNull(),
+  value: numeric("value").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const itMonitoredHostsRelations = relations(itMonitoredHosts, ({ one, many }) => ({
+  department: one(departments, { fields: [itMonitoredHosts.departmentId], references: [departments.id] }),
+  statusHistory: many(itHostStatus),
+}));
+
+export const itHostStatusRelations = relations(itHostStatus, ({ one }) => ({
+  host: one(itMonitoredHosts, { fields: [itHostStatus.hostId], references: [itMonitoredHosts.id] }),
+}));
+
+export const itKpisRelations = relations(itKpis, ({ many }) => ({
+  values: many(itKpiValues),
+}));
+
+export const itKpiValuesRelations = relations(itKpiValues, ({ one }) => ({
+  kpi: one(itKpis, { fields: [itKpiValues.kpiId], references: [itKpis.id] }),
+}));
+
+export const insertItMonitoredHostSchema = createInsertSchema(itMonitoredHosts).omit({ id: true, createdAt: true }).extend({
+  departmentId: z.coerce.number().optional().nullable(),
+});
+export const insertItKpiSchema = createInsertSchema(itKpis).omit({ id: true });
+export const insertItKpiValueSchema = createInsertSchema(itKpiValues).omit({ id: true, createdAt: true }).extend({
+  kpiId: z.coerce.number(),
+});
+
+export type ItMonitoredHost = typeof itMonitoredHosts.$inferSelect;
+export type InsertItMonitoredHost = z.infer<typeof insertItMonitoredHostSchema>;
+export type ItHostStatus = typeof itHostStatus.$inferSelect;
+export type ItKpi = typeof itKpis.$inferSelect;
+export type InsertItKpi = z.infer<typeof insertItKpiSchema>;
+export type ItKpiValue = typeof itKpiValues.$inferSelect;
+export type InsertItKpiValue = z.infer<typeof insertItKpiValueSchema>;

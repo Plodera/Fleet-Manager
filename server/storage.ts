@@ -4,6 +4,7 @@ import {
   indents, indentItems, indentApproverDepartments,
   tvDashboards, tvDashboardKpis, tvDashboardKpiValues, tvDashboardVideos,
   trackers, trackerItems, trackerNotificationRules,
+  itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -194,6 +195,21 @@ export interface IStorage {
   createTrackerNotificationRule(data: InsertTrackerNotificationRule): Promise<TrackerNotificationRule>;
   updateTrackerNotificationRule(id: number, updates: Partial<TrackerNotificationRule>): Promise<TrackerNotificationRule>;
   deleteTrackerNotificationRule(id: number): Promise<void>;
+
+  // IT Operations Monitor
+  getItHosts(): Promise<any[]>;
+  getItHost(id: number): Promise<any | undefined>;
+  createItHost(data: any): Promise<any>;
+  updateItHost(id: number, updates: any): Promise<any>;
+  deleteItHost(id: number): Promise<void>;
+  upsertItHostStatus(hostId: number, isOnline: boolean, responseTimeMs: number | null): Promise<void>;
+  getItHostsWithStatus(): Promise<any[]>;
+  getItKpis(): Promise<any[]>;
+  createItKpi(data: any): Promise<any>;
+  updateItKpi(id: number, updates: any): Promise<any>;
+  deleteItKpi(id: number): Promise<void>;
+  getItKpiValues(periodType: string, periodDate: string): Promise<any[]>;
+  upsertItKpiValues(values: any[]): Promise<void>;
 
   sessionStore: session.Store;
 }
@@ -1008,6 +1024,104 @@ export class DatabaseStorage implements IStorage {
   async deleteTrackerNotificationRule(id: number): Promise<void> {
     await getDb().delete(trackerNotificationRules).where(eq(trackerNotificationRules.id, id));
   }
+
+  // IT Operations Monitor
+  async getItHosts(): Promise<any[]> {
+    return getDb().select().from(itMonitoredHosts).orderBy(itMonitoredHosts.sortOrder, itMonitoredHosts.name);
+  }
+
+  async getItHost(id: number): Promise<any | undefined> {
+    const [row] = await getDb().select().from(itMonitoredHosts).where(eq(itMonitoredHosts.id, id));
+    return row;
+  }
+
+  async createItHost(data: any): Promise<any> {
+    const [row] = await getDb().insert(itMonitoredHosts).values(data).returning();
+    return row;
+  }
+
+  async updateItHost(id: number, updates: any): Promise<any> {
+    const [row] = await getDb().update(itMonitoredHosts).set(updates).where(eq(itMonitoredHosts.id, id)).returning();
+    return row;
+  }
+
+  async deleteItHost(id: number): Promise<void> {
+    await getDb().delete(itMonitoredHosts).where(eq(itMonitoredHosts.id, id));
+  }
+
+  async upsertItHostStatus(hostId: number, isOnline: boolean, responseTimeMs: number | null): Promise<void> {
+    await getDb().insert(itHostStatus).values({
+      hostId,
+      isOnline,
+      responseTimeMs,
+      checkedAt: new Date(),
+    });
+  }
+
+  async getItHostsWithStatus(): Promise<any[]> {
+    const hosts = await getDb().select().from(itMonitoredHosts).orderBy(itMonitoredHosts.sortOrder, itMonitoredHosts.name);
+    
+    const result = await Promise.all(hosts.map(async (host) => {
+      const [latestStatus] = await getDb()
+        .select()
+        .from(itHostStatus)
+        .where(eq(itHostStatus.hostId, host.id))
+        .orderBy(desc(itHostStatus.checkedAt))
+        .limit(1);
+      
+      return {
+        ...host,
+        status: latestStatus || null,
+      };
+    }));
+    
+    return result;
+  }
+
+  async getItKpis(): Promise<any[]> {
+    return getDb().select().from(itKpis).orderBy(itKpis.sortOrder, itKpis.name);
+  }
+
+  async createItKpi(data: any): Promise<any> {
+    const [row] = await getDb().insert(itKpis).values(data).returning();
+    return row;
+  }
+
+  async updateItKpi(id: number, updates: any): Promise<any> {
+    const [row] = await getDb().update(itKpis).set(updates).where(eq(itKpis.id, id)).returning();
+    return row;
+  }
+
+  async deleteItKpi(id: number): Promise<void> {
+    await getDb().delete(itKpis).where(eq(itKpis.id, id));
+  }
+
+  async getItKpiValues(periodType: string, periodDate: string): Promise<any[]> {
+    return getDb()
+      .select()
+      .from(itKpiValues)
+      .where(and(eq(itKpiValues.periodType, periodType), eq(itKpiValues.periodDate, periodDate)));
+  }
+
+  async upsertItKpiValues(values: any[]): Promise<void> {
+    for (const v of values) {
+      const existing = await getDb()
+        .select()
+        .from(itKpiValues)
+        .where(and(
+          eq(itKpiValues.kpiId, v.kpiId),
+          eq(itKpiValues.periodType, v.periodType),
+          eq(itKpiValues.periodDate, v.periodDate),
+        ))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        await getDb().update(itKpiValues).set({ value: v.value }).where(eq(itKpiValues.id, existing[0].id));
+      } else {
+        await getDb().insert(itKpiValues).values(v);
+      }
+    }
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -1143,5 +1257,18 @@ export const storage = {
   createTrackerNotificationRule: (...args: Parameters<DatabaseStorage['createTrackerNotificationRule']>) => getStorage().createTrackerNotificationRule(...args),
   updateTrackerNotificationRule: (...args: Parameters<DatabaseStorage['updateTrackerNotificationRule']>) => getStorage().updateTrackerNotificationRule(...args),
   deleteTrackerNotificationRule: (...args: Parameters<DatabaseStorage['deleteTrackerNotificationRule']>) => getStorage().deleteTrackerNotificationRule(...args),
+  getItHosts: () => getStorage().getItHosts(),
+  getItHost: (...args: Parameters<DatabaseStorage['getItHost']>) => getStorage().getItHost(...args),
+  createItHost: (...args: Parameters<DatabaseStorage['createItHost']>) => getStorage().createItHost(...args),
+  updateItHost: (...args: Parameters<DatabaseStorage['updateItHost']>) => getStorage().updateItHost(...args),
+  deleteItHost: (...args: Parameters<DatabaseStorage['deleteItHost']>) => getStorage().deleteItHost(...args),
+  upsertItHostStatus: (...args: Parameters<DatabaseStorage['upsertItHostStatus']>) => getStorage().upsertItHostStatus(...args),
+  getItHostsWithStatus: () => getStorage().getItHostsWithStatus(),
+  getItKpis: () => getStorage().getItKpis(),
+  createItKpi: (...args: Parameters<DatabaseStorage['createItKpi']>) => getStorage().createItKpi(...args),
+  updateItKpi: (...args: Parameters<DatabaseStorage['updateItKpi']>) => getStorage().updateItKpi(...args),
+  deleteItKpi: (...args: Parameters<DatabaseStorage['deleteItKpi']>) => getStorage().deleteItKpi(...args),
+  getItKpiValues: (...args: Parameters<DatabaseStorage['getItKpiValues']>) => getStorage().getItKpiValues(...args),
+  upsertItKpiValues: (...args: Parameters<DatabaseStorage['upsertItKpiValues']>) => getStorage().upsertItKpiValues(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

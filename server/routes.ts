@@ -1961,6 +1961,138 @@ export async function registerRoutes(
   // Schedule tracker notifications (startup + every 24h)
   scheduleTrackerNotifications();
 
+  // IT Operations Monitor
+  app.get('/api/it/hosts', async (req, res) => {
+    try {
+      const hosts = await storage.getItHostsWithStatus();
+      res.json(hosts);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch IT hosts" });
+    }
+  });
+
+  app.post('/api/it/hosts', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const host = await storage.createItHost(req.body);
+      res.json(host);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create host" });
+    }
+  });
+
+  app.put('/api/it/hosts/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const host = await storage.updateItHost(parseInt(req.params.id), req.body);
+      res.json(host);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update host" });
+    }
+  });
+
+  app.delete('/api/it/hosts/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      await storage.deleteItHost(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete host" });
+    }
+  });
+
+  app.post('/api/it/check', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { triggerITCheck } = await import("./itMonitor");
+      await triggerITCheck();
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to trigger check" });
+    }
+  });
+
+  app.get('/api/it/kpis', async (req, res) => {
+    try {
+      const kpis = await storage.getItKpis();
+      res.json(kpis);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch IT KPIs" });
+    }
+  });
+
+  app.post('/api/it/kpis', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const kpi = await storage.createItKpi(req.body);
+      res.json(kpi);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create KPI" });
+    }
+  });
+
+  app.put('/api/it/kpis/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const kpi = await storage.updateItKpi(parseInt(req.params.id), req.body);
+      res.json(kpi);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update KPI" });
+    }
+  });
+
+  app.delete('/api/it/kpis/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      await storage.deleteItKpi(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete KPI" });
+    }
+  });
+
+  app.get('/api/it/kpi-values', async (req, res) => {
+    try {
+      const { periodType = 'daily', periodDate } = req.query as any;
+      const date = periodDate || new Date().toISOString().split('T')[0];
+      const values = await storage.getItKpiValues(periodType, date);
+      res.json(values);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch KPI values" });
+    }
+  });
+
+  app.post('/api/it/kpi-values', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { values } = req.body;
+      await storage.upsertItKpiValues(values);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to save KPI values" });
+    }
+  });
+
+  // Start IT monitor background service
+  const { startITMonitor } = await import("./itMonitor");
+  startITMonitor();
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {
