@@ -654,3 +654,72 @@ export type TvDashboardKpiValue = typeof tvDashboardKpiValues.$inferSelect;
 export type InsertTvDashboardKpiValue = z.infer<typeof insertTvDashboardKpiValueSchema>;
 export type TvDashboardVideo = typeof tvDashboardVideos.$inferSelect;
 export type InsertTvDashboardVideo = z.infer<typeof insertTvDashboardVideoSchema>;
+
+// Asset Trackers
+export const trackers = pgTable("trackers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  departmentId: integer("department_id").references(() => departments.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const trackerItems = pgTable("tracker_items", {
+  id: serial("id").primaryKey(),
+  trackerId: integer("tracker_id").references(() => trackers.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  serialNumber: text("serial_number"),
+  location: text("location"),
+  quantity: integer("quantity").default(1),
+  purchaseDate: date("purchase_date"),
+  expiryDate: date("expiry_date"),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const trackerNotificationRules = pgTable("tracker_notification_rules", {
+  id: serial("id").primaryKey(),
+  trackerId: integer("tracker_id").references(() => trackers.id, { onDelete: "cascade" }).notNull(),
+  triggerType: text("trigger_type").notNull(), // "expiry_approaching" | "expired"
+  thresholdDays: integer("threshold_days"),
+  recipients: text("recipients").array().notNull().default([]),
+  isActive: boolean("is_active").notNull().default(true),
+  lastRunAt: timestamp("last_run_at"),
+  lastMatchCount: integer("last_match_count"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const trackersRelations = relations(trackers, ({ one, many }) => ({
+  department: one(departments, { fields: [trackers.departmentId], references: [departments.id] }),
+  items: many(trackerItems),
+  notificationRules: many(trackerNotificationRules),
+}));
+
+export const trackerItemsRelations = relations(trackerItems, ({ one }) => ({
+  tracker: one(trackers, { fields: [trackerItems.trackerId], references: [trackers.id] }),
+}));
+
+export const trackerNotificationRulesRelations = relations(trackerNotificationRules, ({ one }) => ({
+  tracker: one(trackers, { fields: [trackerNotificationRules.trackerId], references: [trackers.id] }),
+}));
+
+export const insertTrackerSchema = createInsertSchema(trackers).omit({ id: true, createdAt: true }).extend({
+  departmentId: z.coerce.number().optional().nullable(),
+});
+export const insertTrackerItemSchema = createInsertSchema(trackerItems).omit({ id: true, createdAt: true }).extend({
+  trackerId: z.coerce.number(),
+  quantity: z.coerce.number().optional().nullable(),
+});
+export const insertTrackerNotificationRuleSchema = createInsertSchema(trackerNotificationRules).omit({ id: true, createdAt: true, lastRunAt: true, lastMatchCount: true }).extend({
+  trackerId: z.coerce.number(),
+  thresholdDays: z.coerce.number().optional().nullable(),
+});
+
+export type Tracker = typeof trackers.$inferSelect;
+export type InsertTracker = z.infer<typeof insertTrackerSchema>;
+export type TrackerItem = typeof trackerItems.$inferSelect;
+export type InsertTrackerItem = z.infer<typeof insertTrackerItemSchema>;
+export type TrackerNotificationRule = typeof trackerNotificationRules.$inferSelect;
+export type InsertTrackerNotificationRule = z.infer<typeof insertTrackerNotificationRuleSchema>;
