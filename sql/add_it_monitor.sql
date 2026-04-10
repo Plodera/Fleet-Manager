@@ -52,6 +52,17 @@ CREATE INDEX IF NOT EXISTS idx_it_kpi_values_kpi_id ON it_kpi_values(kpi_id);
 
 SELECT 'IT monitor tables created successfully' AS result;
 
+-- Add new host types (idempotent)
+DO $$ BEGIN
+  ALTER TYPE it_host_type ADD VALUE IF NOT EXISTS 'switch';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE it_host_type ADD VALUE IF NOT EXISTS 'wireless_ap';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE it_host_type ADD VALUE IF NOT EXISTS 'printer';
+EXCEPTION WHEN others THEN NULL; END $$;
+
 -- Update it_host_status to upsert semantics (one current status row per host)
 -- Drop old rows and add unique constraint on host_id
 DO $$ BEGIN
