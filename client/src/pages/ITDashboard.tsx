@@ -48,7 +48,7 @@ const PAGE_CSS = `
   100% { transform: translateY(100vh); opacity: 0; }
 }
 .it-scan-line {
-  position: fixed; left: 0; right: 0; top: 0; height: 2px; z-index: 50; pointer-events: none;
+  position: fixed; left: 0; right: 0; top: 0; height: 2px; z-index: 1; pointer-events: none;
   background: linear-gradient(90deg, transparent 0%, rgba(59,130,246,0.04) 15%, rgba(99,179,237,0.18) 50%, rgba(59,130,246,0.04) 85%, transparent 100%);
   animation: itScanLine 12s linear infinite;
 }
