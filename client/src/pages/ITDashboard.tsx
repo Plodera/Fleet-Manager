@@ -344,6 +344,12 @@ export default function ITDashboard() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Version counters force card remount (and replay entrance animation) on each data refresh
+  const [hostsVersion, setHostsVersion] = useState(0);
+  const [kpisVersion, setKpisVersion] = useState(0);
+  const prevHostsRef = useRef<ItHostWithStatus[]>([]);
+  const prevKpisRef = useRef<ItKpi[]>([]);
+
   const { data: hosts = [] } = useQuery<ItHostWithStatus[]>({
     queryKey: ["/api/it/hosts"],
     queryFn: async () => {
@@ -386,6 +392,22 @@ export default function ITDashboard() {
   });
 
   const allKpiValues = [...dailyValues, ...monthlyValues];
+
+  // Detect when hosts data changes (new refetch cycle) and bump version to remount cards
+  useEffect(() => {
+    if (hosts !== prevHostsRef.current && hosts.length > 0) {
+      prevHostsRef.current = hosts;
+      setHostsVersion(v => v + 1);
+    }
+  }, [hosts]);
+
+  // Detect when kpis data changes and bump version to remount KPI cards
+  useEffect(() => {
+    if (kpis !== prevKpisRef.current && kpis.length > 0) {
+      prevKpisRef.current = kpis;
+      setKpisVersion(v => v + 1);
+    }
+  }, [kpis]);
 
   const toggleFullScreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -505,7 +527,7 @@ export default function ITDashboard() {
             </div>
             <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(internetLinks.length, 6)}, minmax(0, 1fr))` }}>
               {internetLinks.map((host, i) => (
-                <HostStatusPill key={host.id} host={host} idx={i} />
+                <HostStatusPill key={`${host.id}-v${hostsVersion}`} host={host} idx={i} />
               ))}
             </div>
           </div>
@@ -532,7 +554,7 @@ export default function ITDashboard() {
               >
                 {deviceTypeGroups.map(({ typeInfo, colorInfo, hosts: g }, i) => (
                   <DeviceTypeSummaryCard
-                    key={typeInfo.type}
+                    key={`${typeInfo.type}-v${hostsVersion}`}
                     hosts={g}
                     typeInfo={typeInfo}
                     colorInfo={colorInfo}
@@ -554,7 +576,7 @@ export default function ITDashboard() {
               </div>
               <div className="flex-1 grid gap-2 content-start" style={{ gridTemplateColumns: "1fr", gridAutoRows: "minmax(80px, auto)" }}>
                 {activeKpis.map((kpi, idx) => (
-                  <KpiCard key={kpi.id} kpi={kpi} values={allKpiValues} idx={idx} />
+                  <KpiCard key={`${kpi.id}-v${kpisVersion}`} kpi={kpi} values={allKpiValues} idx={idx} />
                 ))}
               </div>
             </div>
