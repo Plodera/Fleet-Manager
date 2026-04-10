@@ -806,3 +806,13 @@ export type ItKpi = typeof itKpis.$inferSelect;
 export type InsertItKpi = z.infer<typeof insertItKpiSchema>;
 export type ItKpiValue = typeof itKpiValues.$inferSelect;
 export type InsertItKpiValue = z.infer<typeof insertItKpiValueSchema>;
+
+// Composite: host with latest status (from LEFT JOIN)
+export type ItHostWithStatus = ItMonitoredHost & {
+  status: {
+    id: number;
+    isOnline: boolean;
+    responseTimeMs: number | null;
+    checkedAt: Date;
+  } | null;
+};

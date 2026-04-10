@@ -9,6 +9,7 @@ import {
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
+  type ItMonitoredHost, type InsertItMonitoredHost, type ItHostStatus, type ItKpi, type InsertItKpi, type ItKpiValue, type InsertItKpiValue, type ItHostWithStatus,
   type VehicleInspection, type InsertVehicleInspection,
   type EquipmentType, type InsertEquipmentType,
   type EquipmentChecklistItem, type InsertEquipmentChecklistItem,
@@ -1026,21 +1027,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   // IT Operations Monitor
-  async getItHosts(): Promise<any[]> {
+  async getItHosts(): Promise<ItMonitoredHost[]> {
     return getDb().select().from(itMonitoredHosts).orderBy(itMonitoredHosts.sortOrder, itMonitoredHosts.name);
   }
 
-  async getItHost(id: number): Promise<any | undefined> {
+  async getItHost(id: number): Promise<ItMonitoredHost | undefined> {
     const [row] = await getDb().select().from(itMonitoredHosts).where(eq(itMonitoredHosts.id, id));
     return row;
   }
 
-  async createItHost(data: any): Promise<any> {
+  async createItHost(data: InsertItMonitoredHost): Promise<ItMonitoredHost> {
     const [row] = await getDb().insert(itMonitoredHosts).values(data).returning();
     return row;
   }
 
-  async updateItHost(id: number, updates: any): Promise<any> {
+  async updateItHost(id: number, updates: Partial<InsertItMonitoredHost>): Promise<ItMonitoredHost> {
     const [row] = await getDb().update(itMonitoredHosts).set(updates).where(eq(itMonitoredHosts.id, id)).returning();
     return row;
   }
@@ -1060,7 +1061,7 @@ export class DatabaseStorage implements IStorage {
       });
   }
 
-  async getItHostsWithStatus(): Promise<any[]> {
+  async getItHostsWithStatus(): Promise<ItHostWithStatus[]> {
     // it_host_status has a UNIQUE constraint on host_id (one current-status row per host)
     // so a LEFT JOIN is sufficient — no subquery needed
     const rows = await getDb()
@@ -1097,16 +1098,16 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getItKpis(): Promise<any[]> {
+  async getItKpis(): Promise<ItKpi[]> {
     return getDb().select().from(itKpis).orderBy(itKpis.sortOrder, itKpis.name);
   }
 
-  async createItKpi(data: any): Promise<any> {
+  async createItKpi(data: InsertItKpi): Promise<ItKpi> {
     const [row] = await getDb().insert(itKpis).values(data).returning();
     return row;
   }
 
-  async updateItKpi(id: number, updates: any): Promise<any> {
+  async updateItKpi(id: number, updates: Partial<InsertItKpi>): Promise<ItKpi> {
     const [row] = await getDb().update(itKpis).set(updates).where(eq(itKpis.id, id)).returning();
     return row;
   }
@@ -1115,14 +1116,14 @@ export class DatabaseStorage implements IStorage {
     await getDb().delete(itKpis).where(eq(itKpis.id, id));
   }
 
-  async getItKpiValues(periodType: string, periodDate: string): Promise<any[]> {
+  async getItKpiValues(periodType: string, periodDate: string): Promise<ItKpiValue[]> {
     return getDb()
       .select()
       .from(itKpiValues)
       .where(and(eq(itKpiValues.periodType, periodType), eq(itKpiValues.periodDate, periodDate)));
   }
 
-  async upsertItKpiValues(values: any[]): Promise<void> {
+  async upsertItKpiValues(values: InsertItKpiValue[]): Promise<void> {
     for (const v of values) {
       const existing = await getDb()
         .select()

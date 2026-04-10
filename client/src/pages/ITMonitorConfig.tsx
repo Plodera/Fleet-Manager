@@ -16,32 +16,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink } from "lucide-react";
+import type { ItHostWithStatus, ItKpi, ItKpiValue, InsertItMonitoredHost, InsertItKpi, InsertItKpiValue } from "@shared/schema";
 
-type Host = {
-  id: number;
-  name: string;
-  ipAddress: string;
-  hostType: "internet_link" | "camera" | "other";
-  isActive: boolean;
-  sortOrder: number;
-  notes: string | null;
-  departmentId: number | null;
-  status: {
-    isOnline: boolean;
-    responseTimeMs: number | null;
-    checkedAt: string;
-  } | null;
-};
-
-type Kpi = {
-  id: number;
-  name: string;
-  labelEn: string;
-  labelPt: string;
-  unit: string | null;
-  sortOrder: number;
-  isActive: boolean;
-};
+type Host = ItHostWithStatus;
+type Kpi = ItKpi;
 
 const BLANK_HOST = {
   name: "",
@@ -109,7 +87,7 @@ export default function ITMonitorConfig() {
 
   const { data: kpis = [] } = useQuery<Kpi[]>({ queryKey: ["/api/it/kpis"] });
 
-  const { data: existingValues = [] } = useQuery<any[]>({
+  const { data: existingValues = [] } = useQuery<ItKpiValue[]>({
     queryKey: ["/api/it/kpi-values", dataEntryPeriodType, dataEntryDate],
     queryFn: async () => {
       const res = await fetch(`/api/it/kpi-values?periodType=${dataEntryPeriodType}&periodDate=${dataEntryDate}`);
@@ -130,12 +108,12 @@ export default function ITMonitorConfig() {
   });
 
   const createHostMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/it/hosts", data),
+    mutationFn: (data: InsertItMonitoredHost) => apiRequest("POST", "/api/it/hosts", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/hosts"] }); setHostDialog(false); toast({ title: t.itMonitor?.hostAdded || "Host added" }); },
   });
 
   const updateHostMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/it/hosts/${id}`, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<InsertItMonitoredHost> }) => apiRequest("PUT", `/api/it/hosts/${id}`, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/hosts"] }); setHostDialog(false); toast({ title: t.itMonitor?.hostUpdated || "Host updated" }); },
   });
 
@@ -145,12 +123,12 @@ export default function ITMonitorConfig() {
   });
 
   const createKpiMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/it/kpis", data),
+    mutationFn: (data: InsertItKpi) => apiRequest("POST", "/api/it/kpis", data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/kpis"] }); setKpiDialog(false); toast({ title: t.itMonitor?.kpiAdded || "KPI added" }); },
   });
 
   const updateKpiMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/it/kpis/${id}`, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<InsertItKpi> }) => apiRequest("PUT", `/api/it/kpis/${id}`, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/kpis"] }); setKpiDialog(false); toast({ title: t.itMonitor?.kpiUpdated || "KPI updated" }); },
   });
 
@@ -160,7 +138,7 @@ export default function ITMonitorConfig() {
   });
 
   const saveValuesMutation = useMutation({
-    mutationFn: (values: any[]) => apiRequest("POST", "/api/it/kpi-values", { values }),
+    mutationFn: (values: InsertItKpiValue[]) => apiRequest("POST", "/api/it/kpi-values", { values }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/kpi-values"] }); toast({ title: t.tvDashboard?.saveValues || "Values saved" }); },
   });
 
@@ -212,8 +190,8 @@ export default function ITMonitorConfig() {
   };
 
   const getExistingValue = (kpiId: number) => {
-    const v = existingValues.find((v: any) => v.kpiId === kpiId);
-    return v ? v.value : "";
+    const v = existingValues.find(v => v.kpiId === kpiId);
+    return v ? String(v.value) : "";
   };
 
   const handleDelete = () => {
@@ -222,8 +200,8 @@ export default function ITMonitorConfig() {
     else if (deleteTarget.type === "kpi") deleteKpiMutation.mutate(deleteTarget.id);
   };
 
-  const it = t.itMonitor || ({} as any);
-  const tvT = t.tvDashboard || ({} as any);
+  const it = t.itMonitor;
+  const tvT = t.tvDashboard;
 
   return (
     <div>
@@ -466,7 +444,7 @@ export default function ITMonitorConfig() {
             </div>
             <div className="space-y-1">
               <Label>{it.hostType || "Type"}</Label>
-              <Select value={hostForm.hostType} onValueChange={v => setHostForm(p => ({ ...p, hostType: v as any }))}>
+              <Select value={hostForm.hostType} onValueChange={v => setHostForm(p => ({ ...p, hostType: v as "internet_link" | "camera" | "other" }))}>
                 <SelectTrigger data-testid="select-host-type">
                   <SelectValue />
                 </SelectTrigger>

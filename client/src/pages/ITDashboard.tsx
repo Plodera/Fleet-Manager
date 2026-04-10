@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n";
 import { Link } from "wouter";
+import type { ItHostWithStatus, ItKpi, ItKpiValue } from "@shared/schema";
 import {
   Wifi, WifiOff, Camera, Globe, Monitor, Network, ArrowLeft,
   Maximize, Minimize, TrendingUp, Target, Zap, Activity, Gauge,
@@ -92,7 +93,7 @@ function AnimatedKpiValue({ value, unit }: { value: string; unit?: string | null
   );
 }
 
-function KpiCard({ kpi, values, idx }: { kpi: any; values: any[]; idx: number }) {
+function KpiCard({ kpi, values, idx }: { kpi: ItKpi; values: ItKpiValue[]; idx: number }) {
   const color = KPI_COLORS[idx % KPI_COLORS.length];
   const IconComp = KPI_ICONS[idx % KPI_ICONS.length];
   const today = new Date().toISOString().split("T")[0];
@@ -120,7 +121,7 @@ function KpiCard({ kpi, values, idx }: { kpi: any; values: any[]; idx: number })
   );
 }
 
-function HostStatusPill({ host }: { host: any }) {
+function HostStatusPill({ host }: { host: ItHostWithStatus }) {
   const isOnline = host.status?.isOnline;
   return (
     <div
@@ -153,7 +154,7 @@ function HostStatusPill({ host }: { host: any }) {
   );
 }
 
-function CameraCard({ host }: { host: any }) {
+function CameraCard({ host }: { host: ItHostWithStatus }) {
   const isOnline = host.status?.isOnline;
   const checkedAt = host.status?.checkedAt ? new Date(host.status.checkedAt) : null;
   const timeStr = checkedAt ? checkedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
@@ -184,7 +185,7 @@ export default function ITDashboard() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { data: hosts = [] } = useQuery<any[]>({
+  const { data: hosts = [] } = useQuery<ItHostWithStatus[]>({
     queryKey: ["/api/it/hosts"],
     queryFn: async () => {
       const res = await fetch("/api/it/hosts");
@@ -194,7 +195,7 @@ export default function ITDashboard() {
     refetchInterval: 30000,
   });
 
-  const { data: kpis = [] } = useQuery<any[]>({
+  const { data: kpis = [] } = useQuery<ItKpi[]>({
     queryKey: ["/api/it/kpis"],
     queryFn: async () => {
       const res = await fetch("/api/it/kpis");
@@ -207,7 +208,7 @@ export default function ITDashboard() {
   const today = new Date().toISOString().split("T")[0];
   const currentMonth = today.substring(0, 7) + "-01";
 
-  const { data: dailyValues = [] } = useQuery<any[]>({
+  const { data: dailyValues = [] } = useQuery<ItKpiValue[]>({
     queryKey: ["/api/it/kpi-values", "daily", today],
     queryFn: async () => {
       const res = await fetch(`/api/it/kpi-values?periodType=daily&periodDate=${today}`);
@@ -216,7 +217,7 @@ export default function ITDashboard() {
     refetchInterval: 60000,
   });
 
-  const { data: monthlyValues = [] } = useQuery<any[]>({
+  const { data: monthlyValues = [] } = useQuery<ItKpiValue[]>({
     queryKey: ["/api/it/kpi-values", "monthly", currentMonth],
     queryFn: async () => {
       const res = await fetch(`/api/it/kpi-values?periodType=monthly&periodDate=${currentMonth}`);
@@ -252,7 +253,7 @@ export default function ITDashboard() {
   const camerasOnline = cameras.filter(h => h.status?.isOnline).length;
   const otherOnline = otherHosts.filter(h => h.status?.isOnline).length;
 
-  const it = t.itMonitor || ({} as any);
+  const it = t.itMonitor;
 
   return (
     <div
