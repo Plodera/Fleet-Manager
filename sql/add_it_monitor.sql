@@ -51,3 +51,16 @@ CREATE INDEX IF NOT EXISTS idx_it_host_status_checked_at ON it_host_status(check
 CREATE INDEX IF NOT EXISTS idx_it_kpi_values_kpi_id ON it_kpi_values(kpi_id);
 
 SELECT 'IT monitor tables created successfully' AS result;
+
+-- Update it_host_status to upsert semantics (one current status row per host)
+-- Drop old rows and add unique constraint on host_id
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'it_host_status_host_id_unique'
+  ) THEN
+    -- Keep only the most recent row per host before adding unique constraint
+    DELETE FROM it_host_status a USING it_host_status b
+    WHERE a.id < b.id AND a.host_id = b.host_id;
+    ALTER TABLE it_host_status ADD CONSTRAINT it_host_status_host_id_unique UNIQUE (host_id);
+  END IF;
+END $$;

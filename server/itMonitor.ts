@@ -7,14 +7,11 @@ import { eq } from "drizzle-orm";
 const execFileAsync = promisify(execFile);
 
 // Strict allowlist regex: IPv4 only (no shell metacharacters possible)
-// Format: 1-3 digits, dot, repeated 4 times (e.g. 192.168.1.100)
 const SAFE_IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
-function isSafeIpAddress(ip: string): boolean {
+export function isSafeIpAddress(ip: string): boolean {
   if (!SAFE_IP_RE.test(ip)) return false;
-  // Also validate each octet is 0-255
-  const parts = ip.split(".");
-  return parts.every(p => {
+  return ip.split(".").every(p => {
     const n = parseInt(p, 10);
     return n >= 0 && n <= 255;
   });
@@ -48,7 +45,6 @@ async function runPingChecks() {
   try {
     const db = getDb();
 
-    // Get all active hosts
     const hosts = await db
       .select()
       .from(itMonitoredHosts)
@@ -58,7 +54,6 @@ async function runPingChecks() {
 
     console.log(`[itMonitor] Pinging ${hosts.length} host(s)...`);
 
-    // Ping all hosts in parallel
     const results = await Promise.all(
       hosts.map(async (host) => {
         const result = await pingHost(host.ipAddress);
@@ -66,14 +61,16 @@ async function runPingChecks() {
       })
     );
 
-    // Insert status records
+    // Upsert: one current-status row per host (UNIQUE host_id constraint)
+    const now = new Date();
     for (const { host, isOnline, responseTimeMs } of results) {
-      await db.insert(itHostStatus).values({
-        hostId: host.id,
-        isOnline,
-        responseTimeMs,
-        checkedAt: new Date(),
-      });
+      await db
+        .insert(itHostStatus)
+        .values({ hostId: host.id, isOnline, responseTimeMs, checkedAt: now })
+        .onConflictDoUpdate({
+          target: itHostStatus.hostId,
+          set: { isOnline, responseTimeMs, checkedAt: now },
+        });
     }
 
     const online = results.filter(r => r.isOnline).length;
@@ -86,10 +83,9 @@ async function runPingChecks() {
 let monitorInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startITMonitor() {
+  if (monitorInterval) return; // prevent double-start
   console.log("[itMonitor] Starting IT monitor (30s interval)");
-  // Run immediately on start
   runPingChecks();
-  // Then every 30 seconds
   monitorInterval = setInterval(runPingChecks, 30_000);
 }
 

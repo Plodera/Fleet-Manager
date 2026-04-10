@@ -1050,32 +1050,51 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertItHostStatus(hostId: number, isOnline: boolean, responseTimeMs: number | null): Promise<void> {
-    await getDb().insert(itHostStatus).values({
-      hostId,
-      isOnline,
-      responseTimeMs,
-      checkedAt: new Date(),
-    });
+    // Upsert: one current-status row per host (unique constraint on host_id)
+    await getDb()
+      .insert(itHostStatus)
+      .values({ hostId, isOnline, responseTimeMs, checkedAt: new Date() })
+      .onConflictDoUpdate({
+        target: itHostStatus.hostId,
+        set: { isOnline, responseTimeMs, checkedAt: new Date() },
+      });
   }
 
   async getItHostsWithStatus(): Promise<any[]> {
-    const hosts = await getDb().select().from(itMonitoredHosts).orderBy(itMonitoredHosts.sortOrder, itMonitoredHosts.name);
-    
-    const result = await Promise.all(hosts.map(async (host) => {
-      const [latestStatus] = await getDb()
-        .select()
-        .from(itHostStatus)
-        .where(eq(itHostStatus.hostId, host.id))
-        .orderBy(desc(itHostStatus.checkedAt))
-        .limit(1);
-      
-      return {
-        ...host,
-        status: latestStatus || null,
-      };
+    // it_host_status has a UNIQUE constraint on host_id (one current-status row per host)
+    // so a LEFT JOIN is sufficient — no subquery needed
+    const rows = await getDb()
+      .select({
+        id: itMonitoredHosts.id,
+        name: itMonitoredHosts.name,
+        ipAddress: itMonitoredHosts.ipAddress,
+        hostType: itMonitoredHosts.hostType,
+        isActive: itMonitoredHosts.isActive,
+        sortOrder: itMonitoredHosts.sortOrder,
+        notes: itMonitoredHosts.notes,
+        departmentId: itMonitoredHosts.departmentId,
+        statusId: itHostStatus.id,
+        isOnline: itHostStatus.isOnline,
+        responseTimeMs: itHostStatus.responseTimeMs,
+        checkedAt: itHostStatus.checkedAt,
+      })
+      .from(itMonitoredHosts)
+      .leftJoin(itHostStatus, eq(itHostStatus.hostId, itMonitoredHosts.id))
+      .orderBy(itMonitoredHosts.sortOrder, itMonitoredHosts.name);
+
+    return rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      ipAddress: r.ipAddress,
+      hostType: r.hostType,
+      isActive: r.isActive,
+      sortOrder: r.sortOrder,
+      notes: r.notes,
+      departmentId: r.departmentId,
+      status: r.statusId != null
+        ? { id: r.statusId, isOnline: r.isOnline, responseTimeMs: r.responseTimeMs, checkedAt: r.checkedAt }
+        : null,
     }));
-    
-    return result;
   }
 
   async getItKpis(): Promise<any[]> {

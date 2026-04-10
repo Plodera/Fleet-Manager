@@ -2098,10 +2098,6 @@ export async function registerRoutes(
     }
   });
 
-  // Start IT monitor background service
-  const { startITMonitor } = await import("./itMonitor");
-  startITMonitor();
-
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {
