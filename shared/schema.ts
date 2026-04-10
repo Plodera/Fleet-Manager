@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, numeric, date, pgEnum, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, numeric, date, pgEnum, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -751,7 +751,9 @@ export const itHostStatus = pgTable("it_host_status", {
   isOnline: boolean("is_online").notNull().default(false),
   responseTimeMs: integer("response_time_ms"),
   checkedAt: timestamp("checked_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  hostIdUniq: uniqueIndex("it_host_status_host_id_unique").on(table.hostId),
+}));
 
 export const itKpis = pgTable("it_kpis", {
   id: serial("id").primaryKey(),
