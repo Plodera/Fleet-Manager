@@ -30,6 +30,7 @@ const translations = {
       sectionOverview: "Overview",
       sectionFleet: "Fleet Management",
       sectionOperations: "Operations",
+      sectionDashboards: "Dashboards",
       sectionAdmin: "Administration",
     },
     // Common buttons
@@ -776,6 +777,7 @@ const translations = {
       sectionOverview: "Visão Geral",
       sectionFleet: "Gestão de Frota",
       sectionOperations: "Operações",
+      sectionDashboards: "Painéis",
       sectionAdmin: "Administração",
     },
     // Common buttons

@@ -152,15 +152,20 @@ export function Sidebar() {
       ],
     },
     {
+      label: t.nav.sectionDashboards,
+      links: [
+        { href: "/tv-dashboard-config", label: t.nav.tvDashboards, icon: Monitor, permission: "admin_only", hideFromDriver: true },
+        { href: "/it-monitor-config", label: t.nav.itMonitorConfig, icon: Network, permission: "admin_only", hideFromDriver: true },
+        { href: "/it-dashboard", label: t.nav.itDashboard, icon: Activity, permission: "admin_only", hideFromDriver: true },
+      ],
+    },
+    {
       label: t.nav.sectionAdmin,
       links: [
         { href: "/users", label: t.nav.users, icon: Users, permission: "admin_only", hideFromDriver: true },
         { href: "/settings", label: t.nav.settings, icon: Settings, permission: "admin_only", hideFromDriver: true },
         { href: "/equipment-types", label: t.nav.equipmentTypes, icon: Settings2, permission: "admin_only", hideFromDriver: true },
         { href: "/work-order-config", label: t.nav.workOrderConfig, icon: Cog, permission: "admin_only", hideFromDriver: true },
-        { href: "/tv-dashboard-config", label: t.nav.tvDashboards, icon: Monitor, permission: "admin_only", hideFromDriver: true },
-        { href: "/it-monitor-config", label: t.nav.itMonitorConfig, icon: Network, permission: "admin_only", hideFromDriver: true },
-        { href: "/it-dashboard", label: t.nav.itDashboard, icon: Activity, permission: "admin_only", hideFromDriver: true },
       ],
     },
   ];
