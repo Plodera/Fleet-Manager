@@ -569,7 +569,7 @@ export default function VehicleInspections() {
                               {equipmentTypes.length > 0 ? (
                                 equipmentTypes.filter(et => et.isActive).map(et => (
                                   <SelectItem key={et.id} value={et.name}>
-                                    {language === "en" ? et.labelEn : et.labelPt}
+                                    {(language === "en" ? et.labelEn : et.labelPt) || et.labelEn || et.name}
                                   </SelectItem>
                                 ))
                               ) : (
