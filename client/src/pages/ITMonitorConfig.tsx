@@ -300,10 +300,12 @@ export default function ITMonitorConfig() {
         title={it.configTitle || "IT Monitor Configuration"}
         description={it.configSubtitle || "Manage monitored hosts, cameras, and IT dashboard KPIs"}
         actions={
-          <Button variant="outline" onClick={() => window.open("/it-dashboard", "_blank")} data-testid="button-view-it-dashboard">
-            <ExternalLink className="w-4 h-4 mr-2" />
-            {it.viewDashboard || "View IT Dashboard"}
-          </Button>
+          <a href="/it-dashboard" target="_blank" rel="noopener noreferrer" data-testid="button-view-it-dashboard">
+            <Button variant="outline">
+              <ExternalLink className="w-4 h-4 mr-2" />
+              {it.viewDashboard || "View IT Dashboard"}
+            </Button>
+          </a>
         }
       />
 

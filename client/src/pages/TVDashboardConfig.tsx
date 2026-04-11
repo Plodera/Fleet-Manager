@@ -273,10 +273,12 @@ export default function TVDashboardConfig() {
         title={t.tvDashboard.configTitle}
         description={t.tvDashboard.configSubtitle}
         actions={
-          <Button variant="outline" onClick={() => window.open("/tv-dashboard", "_blank")} data-testid="button-view-all-dashboards">
-            <ExternalLink className="w-4 h-4 mr-2" />
-            {t.tvDashboard.viewAllDashboards}
-          </Button>
+          <a href="/tv-dashboard" target="_blank" rel="noopener noreferrer" data-testid="button-view-all-dashboards">
+            <Button variant="outline">
+              <ExternalLink className="w-4 h-4 mr-2" />
+              {t.tvDashboard.viewAllDashboards}
+            </Button>
+          </a>
         }
       />
 
@@ -328,9 +330,11 @@ export default function TVDashboardConfig() {
                         </span>
                       </td>
                       <td className="p-3 text-right">
-                        <Button variant="ghost" size="icon" onClick={() => window.open(`/tv-dashboard/${d.id}`, "_blank")} title={t.tvDashboard.viewDashboard} data-testid={`button-view-dashboard-${d.id}`}>
-                          <Eye className="w-4 h-4 text-blue-500" />
-                        </Button>
+                        <a href={`/tv-dashboard/${d.id}`} target="_blank" rel="noopener noreferrer" title={t.tvDashboard.viewDashboard} data-testid={`button-view-dashboard-${d.id}`}>
+                          <Button variant="ghost" size="icon">
+                            <Eye className="w-4 h-4 text-blue-500" />
+                          </Button>
+                        </a>
                         <Button variant="ghost" size="icon" onClick={() => openDashDialog(d)} data-testid={`button-edit-dashboard-${d.id}`}>
                           <Pencil className="w-4 h-4" />
                         </Button>
