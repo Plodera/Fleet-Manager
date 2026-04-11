@@ -245,7 +245,7 @@ export default function ITMonitorConfig() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/kpi-values"] }); toast({ title: t.tvDashboard?.saveValues || "Values saved" }); },
   });
 
-  // GLPI query & mutations
+  // GLPI query & mutations — poll every 30s while tab is open to reflect auto-sync status
   const { data: glpiSettings, refetch: refetchGlpi } = useQuery<any>({
     queryKey: ["/api/it/glpi-settings"],
     queryFn: async () => {
@@ -253,6 +253,7 @@ export default function ITMonitorConfig() {
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
+    refetchInterval: activeTab === "glpi" ? 30000 : false,
   });
 
   useEffect(() => {
@@ -276,7 +277,7 @@ export default function ITMonitorConfig() {
   const syncGlpiMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/it/glpi-sync", {}),
     onSuccess: () => { refetchGlpi(); queryClient.invalidateQueries({ queryKey: ["/api/it/kpis"] }); queryClient.invalidateQueries({ queryKey: ["/api/it/kpi-values"] }); toast({ title: "GLPI sync complete" }); },
-    onError: (err: any) => toast({ title: err?.message || "GLPI sync failed", variant: "destructive" }),
+    onError: (err: any) => { refetchGlpi(); toast({ title: err?.message || "GLPI sync failed", variant: "destructive" }); },
   });
 
   // Dialog handlers

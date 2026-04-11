@@ -154,24 +154,31 @@ async function runGlpiSync(): Promise<void> {
   console.log(`[glpiSync] Synced — open=${openCount} new=${newTodayCount} resolved=${resolvedTodayCount}`);
 }
 
-export async function triggerGlpiSync(): Promise<void> {
+/** Returns the lastError string if sync failed, null if successful */
+export async function triggerGlpiSync(): Promise<string | null> {
   await runGlpiSync();
+  const settings = await storage.getGlpiSettings();
+  return settings?.lastError ?? null;
+}
+
+async function reschedule() {
+  try {
+    const settings = await storage.getGlpiSettings();
+    const intervalMs = Math.max(1, settings?.syncIntervalMinutes ?? 15) * 60 * 1000;
+    if (syncTimer) clearInterval(syncTimer);
+    syncTimer = setInterval(async () => {
+      await runGlpiSync().catch(err => console.error("[glpiSync] Sync error:", err));
+      reschedule();
+    }, intervalMs);
+  } catch {}
+}
+
+/** Call after saving settings to apply the new interval immediately */
+export function rescheduleGlpiSync(): void {
+  reschedule().catch(() => {});
 }
 
 export function startGlpiSync(): void {
   runGlpiSync().catch(err => console.error("[glpiSync] Initial sync error:", err));
-
-  const reschedule = async () => {
-    try {
-      const settings = await storage.getGlpiSettings();
-      const intervalMs = Math.max(1, settings?.syncIntervalMinutes ?? 15) * 60 * 1000;
-      if (syncTimer) clearInterval(syncTimer);
-      syncTimer = setInterval(async () => {
-        await runGlpiSync().catch(err => console.error("[glpiSync] Sync error:", err));
-        reschedule();
-      }, intervalMs);
-    } catch {}
-  };
-
   reschedule();
 }

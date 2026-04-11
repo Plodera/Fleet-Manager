@@ -2155,6 +2155,9 @@ export async function registerRoutes(
         syncIntervalMinutes: parseInt(syncIntervalMinutes) || 15,
         enabled: !!enabled,
       });
+      // Apply new interval immediately without waiting for next tick
+      const { rescheduleGlpiSync } = await import("./glpiSync");
+      rescheduleGlpiSync();
       res.json(settings);
     } catch (err) {
       res.status(500).json({ message: "Failed to save GLPI settings" });
@@ -2167,9 +2170,12 @@ export async function registerRoutes(
     if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
     try {
       const { triggerGlpiSync } = await import("./glpiSync");
-      await triggerGlpiSync();
+      const lastError = await triggerGlpiSync();
       const settings = await storage.getGlpiSettings();
-      res.json({ success: true, lastSyncAt: settings?.lastSyncAt, lastError: settings?.lastError });
+      if (lastError) {
+        return res.status(502).json({ message: lastError, lastSyncAt: settings?.lastSyncAt, lastError });
+      }
+      res.json({ success: true, lastSyncAt: settings?.lastSyncAt, lastError: null });
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Sync failed" });
     }
