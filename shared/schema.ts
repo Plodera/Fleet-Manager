@@ -831,3 +831,20 @@ export type ItHostWithStatus = ItMonitoredHost & {
     checkedAt: Date;
   } | null;
 };
+
+// GLPI ticketing system integration settings
+export const glpiSettings = pgTable("glpi_settings", {
+  id: serial("id").primaryKey(),
+  url: text("url").notNull().default(""),           // e.g. http://192.168.1.100/glpi
+  appToken: text("app_token").notNull().default(""), // GLPI Application Token
+  userToken: text("user_token").notNull().default(""), // GLPI User API Token
+  syncIntervalMinutes: integer("sync_interval_minutes").notNull().default(15),
+  enabled: boolean("enabled").notNull().default(false),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertGlpiSettingsSchema = createInsertSchema(glpiSettings).omit({ id: true, lastSyncAt: true, lastError: true, updatedAt: true });
+export type GlpiSettings = typeof glpiSettings.$inferSelect;
+export type InsertGlpiSettings = z.infer<typeof insertGlpiSettingsSchema>;
