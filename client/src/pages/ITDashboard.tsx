@@ -2,31 +2,55 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n";
 import { Link } from "wouter";
-import type { ItHostWithStatus, ItKpi, ItKpiValue } from "@shared/schema";
+import type { ItHostWithStatus, ItKpi, ItKpiValue, ItHostType } from "@shared/schema";
 import {
   Wifi, WifiOff, Camera, Globe, Monitor, Network, ArrowLeft,
   Maximize, Minimize, TrendingUp, Target, Zap, Activity, Gauge,
   BarChart3, Flame, Droplets, Box, Layers, Settings2, GitMerge, Printer,
-  AlertTriangle
+  AlertTriangle, Server, HardDrive, Cpu, Smartphone, Tv, Shield
 } from "lucide-react";
 
-type HostType = "internet_link" | "camera" | "switch" | "wireless_ap" | "printer" | "other";
+// Dynamic icon registry — matches ITMonitorConfig.tsx
+const ICON_MAP: Record<string, React.ElementType> = {
+  "camera":     Camera,
+  "monitor":    Monitor,
+  "wifi":       Wifi,
+  "git-merge":  GitMerge,
+  "printer":    Printer,
+  "globe":      Globe,
+  "server":     Server,
+  "hard-drive": HardDrive,
+  "cpu":        Cpu,
+  "smartphone": Smartphone,
+  "tv":         Tv,
+  "shield":     Shield,
+  "zap":        Zap,
+  "activity":   Activity,
+  "layers":     Layers,
+  "network":    Network,
+};
 
-const DEVICE_TYPES: { type: HostType; icon: React.ElementType; label: string; labelPt: string }[] = [
-  { type: "camera",      icon: Camera,    label: "Cameras",        labelPt: "Câmeras" },
-  { type: "switch",      icon: GitMerge,  label: "Switches",       labelPt: "Switches" },
-  { type: "wireless_ap", icon: Wifi,      label: "Access Points",  labelPt: "Pontos de Acesso" },
-  { type: "printer",     icon: Printer,   label: "Printers",       labelPt: "Impressoras" },
-  { type: "other",       icon: Monitor,   label: "Other",          labelPt: "Outros" },
-];
+// Color name → Tailwind classes
+const COLOR_MAP: Record<string, { text: string; badge: string; glow: string }> = {
+  blue:   { text: "text-blue-400",   badge: "bg-blue-500/15",   glow: "rgba(59,130,246,0.6)"   },
+  cyan:   { text: "text-cyan-400",   badge: "bg-cyan-500/15",   glow: "rgba(34,211,238,0.6)"   },
+  green:  { text: "text-green-400",  badge: "bg-green-500/15",  glow: "rgba(34,197,94,0.6)"    },
+  violet: { text: "text-violet-400", badge: "bg-violet-500/15", glow: "rgba(139,92,246,0.6)"   },
+  rose:   { text: "text-rose-400",   badge: "bg-rose-500/15",   glow: "rgba(244,63,94,0.6)"    },
+  amber:  { text: "text-amber-400",  badge: "bg-amber-500/15",  glow: "rgba(245,158,11,0.6)"   },
+  orange: { text: "text-orange-400", badge: "bg-orange-500/15", glow: "rgba(249,115,22,0.6)"   },
+  teal:   { text: "text-teal-400",   badge: "bg-teal-500/15",   glow: "rgba(20,184,166,0.6)"   },
+  gray:   { text: "text-gray-400",   badge: "bg-gray-500/15",   glow: "rgba(156,163,175,0.6)"  },
+  purple: { text: "text-purple-400", badge: "bg-purple-500/15", glow: "rgba(168,85,247,0.6)"   },
+};
 
-const DEVICE_COLORS = [
-  { text: "text-blue-400",   badge: "bg-blue-500/15" },
-  { text: "text-cyan-400",   badge: "bg-cyan-500/15" },
-  { text: "text-violet-400", badge: "bg-violet-500/15" },
-  { text: "text-rose-400",   badge: "bg-rose-500/15" },
-  { text: "text-gray-400",   badge: "bg-gray-500/15" },
-];
+function getIcon(iconName: string): React.ElementType {
+  return ICON_MAP[iconName] || Monitor;
+}
+
+function getColor(colorName: string) {
+  return COLOR_MAP[colorName] || COLOR_MAP.gray;
+}
 
 const KPI_ICONS = [TrendingUp, Target, Zap, Activity, Gauge, Flame, Droplets, Box, Layers, Settings2, BarChart3];
 const KPI_COLORS = [
@@ -265,11 +289,10 @@ function HostStatusCard({ host, idx }: { host: ItHostWithStatus; idx: number }) 
 
 /* ─── Device type summary card ─── */
 function DeviceTypeSummaryCard({
-  hosts, typeInfo, colorInfo, lang, idx,
+  hosts, hostType, lang, idx,
 }: {
   hosts: ItHostWithStatus[];
-  typeInfo: typeof DEVICE_TYPES[0];
-  colorInfo: typeof DEVICE_COLORS[0];
+  hostType: ItHostType;
   lang: string;
   idx: number;
 }) {
@@ -282,8 +305,9 @@ function DeviceTypeSummaryCard({
   const allOffline = online === 0 && total > 0;
   const statusColor = allOnline ? "text-green-400" : allOffline ? "text-red-400" : "text-amber-400";
   const glowClass = allOnline ? "it-glow-green" : allOffline ? "it-glow-red" : "it-glow-amber";
-  const Icon = typeInfo.icon;
-  const label = lang === "pt" ? typeInfo.labelPt : typeInfo.label;
+  const Icon = getIcon(hostType.icon);
+  const colorInfo = getColor(hostType.color);
+  const label = lang === "pt" ? hostType.labelPt : hostType.labelEn;
 
   const haloShadow = allOnline
     ? "0 0 32px rgba(34,197,94,0.65), 0 0 60px rgba(34,197,94,0.25)"
@@ -295,7 +319,7 @@ function DeviceTypeSummaryCard({
     <div
       className={`bg-[#111827] rounded-xl p-5 flex flex-col gap-3 it-card-enter ${glowClass}`}
       style={{ animationDelay: `${idx * 90}ms` }}
-      data-testid={`card-device-type-${typeInfo.type}`}
+      data-testid={`card-device-type-${hostType.slug}`}
     >
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -317,7 +341,7 @@ function DeviceTypeSummaryCard({
         <span
           className={`text-6xl font-black leading-none ${statusColor} ${allOffline ? "it-status-glow-red" : ""}`}
           style={{ textShadow: haloShadow }}
-          data-testid={`text-online-count-${typeInfo.type}`}
+          data-testid={`text-online-count-${hostType.slug}`}
         >
           {animatedOnline}
         </span>
@@ -333,7 +357,7 @@ function DeviceTypeSummaryCard({
       {/* ── Offline device list ── */}
       {offlineHosts.length > 0 && (
         <div className="border border-red-900/40 bg-red-950/30 rounded-lg px-3 py-2 space-y-1.5"
-          data-testid={`offline-list-${typeInfo.type}`}>
+          data-testid={`offline-list-${hostType.slug}`}>
           <div className="flex items-center gap-1.5 text-xs font-bold text-red-400 uppercase tracking-wide it-offline-pulse">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
             {offlineHosts.length} offline
@@ -489,20 +513,42 @@ export default function ITDashboard() {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
+  const { data: hostTypes = [] } = useQuery<ItHostType[]>({
+    queryKey: ["/api/it/host-types"],
+    queryFn: async () => {
+      const res = await fetch("/api/it/host-types");
+      return res.json();
+    },
+    refetchInterval: 300000,
+  });
+
   const activeHosts = hosts.filter(h => h.isActive);
-  const internetLinks = activeHosts.filter(h => h.hostType === "internet_link");
   const activeKpis = kpis.filter(k => k.isActive);
 
-  const deviceTypeGroups = DEVICE_TYPES
-    .map((typeInfo, i) => ({
-      typeInfo,
-      colorInfo: DEVICE_COLORS[i % DEVICE_COLORS.length],
-      hosts: activeHosts.filter(h => h.hostType === typeInfo.type),
+  // Determine internet link slugs dynamically from configured types
+  const internetLinkSlugs = new Set(
+    hostTypes.filter(t => t.isInternetLink && t.isActive).map(t => t.slug)
+  );
+
+  const internetLinks = activeHosts.filter(h => internetLinkSlugs.has(h.hostType));
+
+  // Build device groups from all active non-internet-link host types that have hosts
+  const deviceTypeGroups = hostTypes
+    .filter(ht => ht.isActive && !ht.isInternetLink)
+    .map(ht => ({
+      hostType: ht,
+      hosts: activeHosts.filter(h => h.hostType === ht.slug),
     }))
     .filter(g => g.hosts.length > 0);
 
-  const totalDevices = activeHosts.filter(h => h.hostType !== "internet_link").length;
-  const totalOnline = activeHosts.filter(h => h.hostType !== "internet_link" && h.status?.isOnline).length;
+  // Catch hosts whose type doesn't match any configured type (safety net)
+  const knownSlugs = new Set(hostTypes.map(t => t.slug));
+  const unknownTypeHosts = activeHosts.filter(
+    h => !knownSlugs.has(h.hostType) && !internetLinkSlugs.has(h.hostType)
+  );
+
+  const totalDevices = activeHosts.filter(h => !internetLinkSlugs.has(h.hostType)).length;
+  const totalOnline = activeHosts.filter(h => !internetLinkSlugs.has(h.hostType) && h.status?.isOnline).length;
   const linksOnline = internetLinks.filter(h => h.status?.isOnline).length;
   const allLinksUp = linksOnline === internetLinks.length && internetLinks.length > 0;
   const anyLinkDown = linksOnline < internetLinks.length && internetLinks.length > 0;
@@ -550,11 +596,12 @@ export default function ITDashboard() {
                 <span>{it.linksUp || "links"}</span>
               </div>
             )}
-            {deviceTypeGroups.map(({ typeInfo, hosts: g }) => {
+            {deviceTypeGroups.map(({ hostType: ht, hosts: g }) => {
               const on = g.filter(h => h.status?.isOnline).length;
+              const Icon = getIcon(ht.icon);
               return (
-                <div key={typeInfo.type} className="flex items-center gap-1.5" data-testid={`text-summary-${typeInfo.type}`}>
-                  <typeInfo.icon className="w-3.5 h-3.5" />
+                <div key={ht.slug} className="flex items-center gap-1.5" data-testid={`text-summary-${ht.slug}`}>
+                  <Icon className="w-3.5 h-3.5" />
                   <span className={on === g.length ? "text-green-400 font-bold" : on === 0 ? "text-red-400 font-bold" : "text-amber-400 font-bold"}>{on}</span>
                   <span>/</span>
                   <span>{g.length}</span>
@@ -616,10 +663,9 @@ export default function ITDashboard() {
               >
                 {deviceTypeGroups.map((g, i) => (
                   <DeviceTypeSummaryCard
-                    key={`${g.typeInfo.type}-v${hostsVersion}`}
+                    key={`${g.hostType.slug}-v${hostsVersion}`}
                     hosts={g.hosts}
-                    typeInfo={g.typeInfo}
-                    colorInfo={g.colorInfo}
+                    hostType={g.hostType}
                     lang={language}
                     idx={i}
                   />
