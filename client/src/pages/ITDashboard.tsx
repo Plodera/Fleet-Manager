@@ -441,7 +441,7 @@ function KpiCard({ kpi, values, idx }: { kpi: ItKpi; values: ItKpiValue[]; idx: 
   const monthlyVal = values.find(v => v.kpiId === kpi.id && v.periodType === "monthly" && v.periodDate?.startsWith(currentMonth));
   return (
     <div
-      className={`bg-[#111827] rounded-xl border ${color.border} p-3 flex flex-col justify-between it-kpi-glow it-card-enter`}
+      className={`h-full bg-[#111827] rounded-xl border ${color.border} p-3 flex flex-col justify-between it-kpi-glow it-card-enter`}
       style={{ animationDelay: `${idx * 70 + 200}ms` }}
       data-testid={`card-kpi-${kpi.id}`}
     >
@@ -706,17 +706,32 @@ export default function ITDashboard() {
           )}
 
           {activeKpis.length > 0 && (
-            <div className="w-72 shrink-0 flex flex-col" data-testid="section-kpis">
+            <div
+              className={`shrink-0 flex flex-col ${activeKpis.length > 4 ? "w-[36rem]" : "w-72"}`}
+              data-testid="section-kpis"
+            >
               <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-2">
                 <span className="it-dot it-dot-blink bg-blue-400" />
                 <BarChart3 className="w-3.5 h-3.5" />
                 {it.sectionKpis || "KPIs"}
               </div>
-              <div className="flex-1 grid grid-cols-1 gap-3 content-start overflow-y-auto">
-                {activeKpis.map((kpi, i) => (
-                  <KpiCard key={`${kpi.id}-v${kpisVersion}`} kpi={kpi} values={allKpiValues} idx={i} />
-                ))}
-              </div>
+              {(() => {
+                const cols = activeKpis.length > 4 ? 2 : 1;
+                const rows = Math.ceil(activeKpis.length / cols);
+                return (
+                  <div
+                    className="flex-1 grid gap-3 overflow-hidden"
+                    style={{
+                      gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                      gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    {activeKpis.map((kpi, i) => (
+                      <KpiCard key={`${kpi.id}-v${kpisVersion}`} kpi={kpi} values={allKpiValues} idx={i} />
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
