@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   Network, Plus, Pencil, Trash2, Wifi, WifiOff, Camera, Globe, GitMerge,
   Printer, Monitor, Server, HardDrive, Cpu, Smartphone, Tv, Shield,
-  Zap, Activity, Layers, ExternalLink,
+  Zap, Activity, Layers, ExternalLink, RefreshCw, CheckCircle2, AlertCircle,
   Cctv, Webcam, ScanEye, Eye, Video, Router, Database, DatabaseBackup,
   ShieldCheck, ShieldAlert, Lock, KeyRound, Fingerprint,
   BellRing, Siren, AlarmSmoke, RadioTower, Antenna, Signal, MonitorPlay, Scan
@@ -173,6 +173,9 @@ export default function ITMonitorConfig() {
   // Delete
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: number; name: string } | null>(null);
 
+  // GLPI state
+  const [glpiForm, setGlpiForm] = useState({ url: "", appToken: "", userToken: "", syncIntervalMinutes: "15", enabled: false });
+
   // Data entry
   const [dataEntryPeriodType, setDataEntryPeriodType] = useState("daily");
   const [dataEntryDate, setDataEntryDate] = useState(new Date().toISOString().split("T")[0]);
@@ -240,6 +243,40 @@ export default function ITMonitorConfig() {
   const saveValuesMutation = useMutation({
     mutationFn: (values: InsertItKpiValue[]) => apiRequest("POST", "/api/it/kpi-values", { values }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/kpi-values"] }); toast({ title: t.tvDashboard?.saveValues || "Values saved" }); },
+  });
+
+  // GLPI query & mutations
+  const { data: glpiSettings, refetch: refetchGlpi } = useQuery<any>({
+    queryKey: ["/api/it/glpi-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/it/glpi-settings");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    if (glpiSettings) {
+      setGlpiForm({
+        url: glpiSettings.url || "",
+        appToken: glpiSettings.appToken || "",
+        userToken: glpiSettings.userToken || "",
+        syncIntervalMinutes: String(glpiSettings.syncIntervalMinutes ?? 15),
+        enabled: !!glpiSettings.enabled,
+      });
+    }
+  }, [glpiSettings]);
+
+  const saveGlpiMutation = useMutation({
+    mutationFn: (data: object) => apiRequest("PUT", "/api/it/glpi-settings", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/glpi-settings"] }); toast({ title: "GLPI settings saved" }); },
+    onError: () => toast({ title: "Failed to save GLPI settings", variant: "destructive" }),
+  });
+
+  const syncGlpiMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/it/glpi-sync", {}),
+    onSuccess: () => { refetchGlpi(); queryClient.invalidateQueries({ queryKey: ["/api/it/kpis"] }); queryClient.invalidateQueries({ queryKey: ["/api/it/kpi-values"] }); toast({ title: "GLPI sync complete" }); },
+    onError: (err: any) => toast({ title: err?.message || "GLPI sync failed", variant: "destructive" }),
   });
 
   // Dialog handlers
@@ -346,6 +383,7 @@ export default function ITMonitorConfig() {
           <TabsTrigger value="types" data-testid="tab-types">Device Types</TabsTrigger>
           <TabsTrigger value="kpis" data-testid="tab-kpis">{it.kpisTab || "KPIs"}</TabsTrigger>
           <TabsTrigger value="dataentry" data-testid="tab-data-entry">{it.dataEntryTab || "Data Entry"}</TabsTrigger>
+          <TabsTrigger value="glpi" data-testid="tab-glpi">GLPI</TabsTrigger>
         </TabsList>
 
         {/* ── Monitored Hosts tab ── */}
@@ -587,6 +625,130 @@ export default function ITMonitorConfig() {
               </div>
             </div>
           )}
+        </TabsContent>
+
+        {/* ── GLPI Integration tab ── */}
+        <TabsContent value="glpi" className="mt-4">
+          <div className="max-w-xl space-y-6">
+            <Card>
+              <CardContent className="pt-6 space-y-5">
+                <div className="flex items-center gap-3 pb-2 border-b">
+                  <Database className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="font-semibold">GLPI Integration</p>
+                    <p className="text-sm text-muted-foreground">Automatically pull ticket counts into IT Dashboard KPIs</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>GLPI URL</Label>
+                  <Input
+                    value={glpiForm.url}
+                    onChange={e => setGlpiForm(p => ({ ...p, url: e.target.value }))}
+                    placeholder="http://192.168.1.100/glpi"
+                    data-testid="input-glpi-url"
+                  />
+                  <p className="text-xs text-muted-foreground">Base URL of your GLPI installation (no trailing slash)</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Application Token</Label>
+                  <Input
+                    value={glpiForm.appToken}
+                    onChange={e => setGlpiForm(p => ({ ...p, appToken: e.target.value }))}
+                    placeholder="Your GLPI App-Token"
+                    data-testid="input-glpi-app-token"
+                  />
+                  <p className="text-xs text-muted-foreground">Found in GLPI → Setup → General → API (Application token)</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>User API Token</Label>
+                  <Input
+                    type="password"
+                    value={glpiForm.userToken}
+                    onChange={e => setGlpiForm(p => ({ ...p, userToken: e.target.value }))}
+                    placeholder="Your GLPI User Token"
+                    data-testid="input-glpi-user-token"
+                  />
+                  <p className="text-xs text-muted-foreground">Found in GLPI → User profile → Remote access keys (API token)</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Sync Interval (minutes)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="1440"
+                    value={glpiForm.syncIntervalMinutes}
+                    onChange={e => setGlpiForm(p => ({ ...p, syncIntervalMinutes: e.target.value }))}
+                    className="w-32"
+                    data-testid="input-glpi-interval"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={glpiForm.enabled}
+                    onCheckedChange={v => setGlpiForm(p => ({ ...p, enabled: v }))}
+                    data-testid="switch-glpi-enabled"
+                  />
+                  <Label>Enable automatic sync</Label>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    onClick={() => saveGlpiMutation.mutate({ ...glpiForm, syncIntervalMinutes: parseInt(glpiForm.syncIntervalMinutes) || 15 })}
+                    disabled={saveGlpiMutation.isPending}
+                    data-testid="button-save-glpi"
+                  >
+                    {saveGlpiMutation.isPending ? "Saving..." : "Save Settings"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => syncGlpiMutation.mutate()}
+                    disabled={syncGlpiMutation.isPending || !glpiSettings?.url}
+                    data-testid="button-sync-glpi-now"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${syncGlpiMutation.isPending ? "animate-spin" : ""}`} />
+                    {syncGlpiMutation.isPending ? "Syncing..." : "Sync Now"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sync Status */}
+            {(glpiSettings?.lastSyncAt || glpiSettings?.lastError) && (
+              <Card>
+                <CardContent className="pt-6 space-y-3">
+                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Sync Status</p>
+                  {glpiSettings?.lastSyncAt && (
+                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      Last synced: {new Date(glpiSettings.lastSyncAt).toLocaleString()}
+                    </div>
+                  )}
+                  {glpiSettings?.lastError && (
+                    <div className="flex items-start gap-2 text-sm text-destructive">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span className="font-mono text-xs bg-destructive/10 rounded px-2 py-1 break-all">{glpiSettings.lastError}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="border-muted/50">
+              <CardContent className="pt-6">
+                <p className="text-sm font-semibold mb-3">KPIs created automatically</p>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />Open Tickets — active tickets (New, Processing, Pending)</li>
+                  <li className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />New Today — tickets opened today</li>
+                  <li className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />Resolved Today — tickets resolved or closed today</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 

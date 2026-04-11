@@ -2129,6 +2129,52 @@ export async function registerRoutes(
     }
   });
 
+  // GLPI Integration Settings
+  app.get('/api/it/glpi-settings', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const settings = await storage.getGlpiSettings();
+      res.json(settings || { url: "", appToken: "", userToken: "", syncIntervalMinutes: 15, enabled: false, lastSyncAt: null, lastError: null });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch GLPI settings" });
+    }
+  });
+
+  app.put('/api/it/glpi-settings', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { url, appToken, userToken, syncIntervalMinutes, enabled } = req.body;
+      const settings = await storage.upsertGlpiSettings({
+        url: url || "",
+        appToken: appToken || "",
+        userToken: userToken || "",
+        syncIntervalMinutes: parseInt(syncIntervalMinutes) || 15,
+        enabled: !!enabled,
+      });
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to save GLPI settings" });
+    }
+  });
+
+  app.post('/api/it/glpi-sync', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { triggerGlpiSync } = await import("./glpiSync");
+      await triggerGlpiSync();
+      const settings = await storage.getGlpiSettings();
+      res.json({ success: true, lastSyncAt: settings?.lastSyncAt, lastError: settings?.lastError });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Sync failed" });
+    }
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

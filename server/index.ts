@@ -102,6 +102,10 @@ import { initDatabase } from "./db";
   const { startITMonitor } = await import("./itMonitor");
   startITMonitor();
 
+  // Start GLPI ticket sync service
+  const { startGlpiSync } = await import("./glpiSync");
+  startGlpiSync();
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

@@ -5,6 +5,7 @@ import {
   tvDashboards, tvDashboardKpis, tvDashboardKpiValues, tvDashboardVideos,
   trackers, trackerItems, trackerNotificationRules,
   itHostTypes, itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
+  glpiSettings,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -30,6 +31,7 @@ import {
   type Tracker, type InsertTracker,
   type TrackerItem, type InsertTrackerItem,
   type TrackerNotificationRule, type InsertTrackerNotificationRule,
+  type GlpiSettings, type InsertGlpiSettings,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq, desc, sql, and } from "drizzle-orm";
@@ -1164,6 +1166,33 @@ export class DatabaseStorage implements IStorage {
       }
     }
   }
+
+  async getGlpiSettings(): Promise<GlpiSettings | undefined> {
+    const rows = await getDb().select().from(glpiSettings).limit(1);
+    return rows[0];
+  }
+
+  async upsertGlpiSettings(data: InsertGlpiSettings): Promise<GlpiSettings> {
+    const existing = await getDb().select().from(glpiSettings).limit(1);
+    if (existing.length > 0) {
+      const [row] = await getDb().update(glpiSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(glpiSettings.id, existing[0].id))
+        .returning();
+      return row;
+    }
+    const [row] = await getDb().insert(glpiSettings).values(data).returning();
+    return row;
+  }
+
+  async updateGlpiSyncStatus(lastSyncAt: Date | null, lastError: string | null): Promise<void> {
+    const existing = await getDb().select().from(glpiSettings).limit(1);
+    if (existing.length > 0) {
+      await getDb().update(glpiSettings)
+        .set({ lastSyncAt, lastError, updatedAt: new Date() })
+        .where(eq(glpiSettings.id, existing[0].id));
+    }
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -1316,5 +1345,8 @@ export const storage = {
   deleteItKpi: (...args: Parameters<DatabaseStorage['deleteItKpi']>) => getStorage().deleteItKpi(...args),
   getItKpiValues: (...args: Parameters<DatabaseStorage['getItKpiValues']>) => getStorage().getItKpiValues(...args),
   upsertItKpiValues: (...args: Parameters<DatabaseStorage['upsertItKpiValues']>) => getStorage().upsertItKpiValues(...args),
+  getGlpiSettings: () => getStorage().getGlpiSettings(),
+  upsertGlpiSettings: (...args: Parameters<DatabaseStorage['upsertGlpiSettings']>) => getStorage().upsertGlpiSettings(...args),
+  updateGlpiSyncStatus: (...args: Parameters<DatabaseStorage['updateGlpiSyncStatus']>) => getStorage().updateGlpiSyncStatus(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };
