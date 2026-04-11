@@ -7,7 +7,10 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   Network, Plus, Pencil, Trash2, Wifi, WifiOff, Camera, Globe, GitMerge,
   Printer, Monitor, Server, HardDrive, Cpu, Smartphone, Tv, Shield,
-  Zap, Activity, Layers, ExternalLink
+  Zap, Activity, Layers, ExternalLink,
+  Cctv, Webcam, ScanEye, Eye, Video, Router, Database, DatabaseBackup,
+  ShieldCheck, ShieldAlert, Lock, KeyRound, Fingerprint,
+  BellRing, Siren, AlarmSmoke, RadioTower, Antenna, Signal, MonitorPlay, Scan
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,24 +27,52 @@ import type { ItHostWithStatus, ItKpi, ItKpiValue, ItHostType, InsertItMonitored
 type Host = ItHostWithStatus;
 type Kpi = ItKpi;
 
-// Icon registry for the icon picker
+// Icon registry for the icon picker — organized by category
 const ICON_OPTIONS: { name: string; icon: React.ElementType; label: string }[] = [
-  { name: "camera",     icon: Camera,     label: "Camera" },
-  { name: "monitor",    icon: Monitor,    label: "Monitor" },
-  { name: "wifi",       icon: Wifi,       label: "WiFi / AP" },
-  { name: "git-merge",  icon: GitMerge,   label: "Switch" },
-  { name: "printer",    icon: Printer,    label: "Printer" },
-  { name: "globe",      icon: Globe,      label: "Globe / Link" },
-  { name: "server",     icon: Server,     label: "Server" },
-  { name: "hard-drive", icon: HardDrive,  label: "Hard Drive" },
-  { name: "cpu",        icon: Cpu,        label: "CPU" },
-  { name: "smartphone", icon: Smartphone, label: "Phone" },
-  { name: "tv",         icon: Tv,         label: "TV / Display" },
-  { name: "shield",     icon: Shield,     label: "Security" },
-  { name: "zap",        icon: Zap,        label: "Power / UPS" },
-  { name: "activity",   icon: Activity,   label: "Activity" },
-  { name: "layers",     icon: Layers,     label: "Layers" },
-  { name: "network",    icon: Network,    label: "Network" },
+  // Surveillance & Cameras
+  { name: "cctv",            icon: Cctv,           label: "CCTV Camera" },
+  { name: "webcam",          icon: Webcam,          label: "IP Camera / Webcam" },
+  { name: "scan-eye",        icon: ScanEye,         label: "Surveillance Eye" },
+  { name: "eye",             icon: Eye,             label: "Eye / Monitor" },
+  { name: "video",           icon: Video,           label: "Video / DVR" },
+  { name: "camera",          icon: Camera,          label: "Camera" },
+  { name: "scan",            icon: Scan,            label: "Scanner" },
+  // Storage & Recording
+  { name: "database",        icon: Database,        label: "NVR / Database" },
+  { name: "database-backup", icon: DatabaseBackup,  label: "NVR Backup" },
+  { name: "hard-drive",      icon: HardDrive,       label: "Hard Drive / Storage" },
+  { name: "server",          icon: Server,          label: "Server" },
+  { name: "cpu",             icon: Cpu,             label: "CPU / Computer" },
+  // Network
+  { name: "router",          icon: Router,          label: "Router" },
+  { name: "wifi",            icon: Wifi,            label: "WiFi / Access Point" },
+  { name: "git-merge",       icon: GitMerge,        label: "Network Switch" },
+  { name: "antenna",         icon: Antenna,         label: "Antenna" },
+  { name: "radio-tower",     icon: RadioTower,      label: "Radio Tower" },
+  { name: "signal",          icon: Signal,          label: "Signal" },
+  { name: "network",         icon: Network,         label: "Network" },
+  { name: "globe",           icon: Globe,           label: "Internet Link" },
+  // Security & Access Control
+  { name: "shield-check",    icon: ShieldCheck,     label: "Security OK" },
+  { name: "shield-alert",    icon: ShieldAlert,     label: "Security Alert" },
+  { name: "shield",          icon: Shield,          label: "Security" },
+  { name: "lock",            icon: Lock,            label: "Access Control" },
+  { name: "key-round",       icon: KeyRound,        label: "Key / Auth" },
+  { name: "fingerprint",     icon: Fingerprint,     label: "Biometrics" },
+  // Alarms & Alerts
+  { name: "siren",           icon: Siren,           label: "Alarm / Siren" },
+  { name: "bell-ring",       icon: BellRing,        label: "Alert / Bell" },
+  { name: "alarm-smoke",     icon: AlarmSmoke,      label: "Smoke Detector" },
+  // Displays & Output
+  { name: "monitor-play",    icon: MonitorPlay,     label: "Display / Screen" },
+  { name: "monitor",         icon: Monitor,         label: "Monitor" },
+  { name: "tv",              icon: Tv,              label: "TV / Display" },
+  { name: "printer",         icon: Printer,         label: "Printer" },
+  { name: "smartphone",      icon: Smartphone,      label: "Phone / Mobile" },
+  // General
+  { name: "zap",             icon: Zap,             label: "Power / UPS" },
+  { name: "activity",        icon: Activity,        label: "Activity / Health" },
+  { name: "layers",          icon: Layers,          label: "Layers / Stack" },
 ];
 
 const ICON_MAP: Record<string, React.ElementType> = Object.fromEntries(

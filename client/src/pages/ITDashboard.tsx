@@ -7,27 +7,58 @@ import {
   Wifi, WifiOff, Camera, Globe, Monitor, Network, ArrowLeft,
   Maximize, Minimize, TrendingUp, Target, Zap, Activity, Gauge,
   BarChart3, Flame, Droplets, Box, Layers, Settings2, GitMerge, Printer,
-  AlertTriangle, Server, HardDrive, Cpu, Smartphone, Tv, Shield
+  AlertTriangle, Server, HardDrive, Cpu, Smartphone, Tv, Shield,
+  Cctv, Webcam, ScanEye, Eye, Video, Router, Database, DatabaseBackup,
+  ShieldCheck, ShieldAlert, Lock, KeyRound, Fingerprint,
+  BellRing, Siren, AlarmSmoke, RadioTower, Antenna, Signal, MonitorPlay, Scan
 } from "lucide-react";
 
-// Dynamic icon registry — matches ITMonitorConfig.tsx
+// Dynamic icon registry — must match ITMonitorConfig.tsx ICON_OPTIONS
 const ICON_MAP: Record<string, React.ElementType> = {
-  "camera":     Camera,
-  "monitor":    Monitor,
-  "wifi":       Wifi,
-  "git-merge":  GitMerge,
-  "printer":    Printer,
-  "globe":      Globe,
-  "server":     Server,
-  "hard-drive": HardDrive,
-  "cpu":        Cpu,
-  "smartphone": Smartphone,
-  "tv":         Tv,
-  "shield":     Shield,
-  "zap":        Zap,
-  "activity":   Activity,
-  "layers":     Layers,
-  "network":    Network,
+  // Surveillance & Cameras
+  "cctv":            Cctv,
+  "webcam":          Webcam,
+  "scan-eye":        ScanEye,
+  "eye":             Eye,
+  "video":           Video,
+  "camera":          Camera,
+  "scan":            Scan,
+  // Storage & Recording
+  "database":        Database,
+  "database-backup": DatabaseBackup,
+  "hard-drive":      HardDrive,
+  "server":          Server,
+  "cpu":             Cpu,
+  // Network
+  "router":          Router,
+  "wifi":            Wifi,
+  "git-merge":       GitMerge,
+  "antenna":         Antenna,
+  "radio-tower":     RadioTower,
+  "signal":          Signal,
+  "network":         Network,
+  "globe":           Globe,
+  // Security & Access Control
+  "shield-check":    ShieldCheck,
+  "shield-alert":    ShieldAlert,
+  "shield":          Shield,
+  "lock":            Lock,
+  "key-round":       KeyRound,
+  "fingerprint":     Fingerprint,
+  // Alarms & Alerts
+  "siren":           Siren,
+  "bell-ring":       BellRing,
+  "alarm-smoke":     AlarmSmoke,
+  // Displays & Output
+  "monitor-play":    MonitorPlay,
+  "monitor":         Monitor,
+  "tv":              Tv,
+  "printer":         Printer,
+  "smartphone":      Smartphone,
+  // General
+  "zap":             Zap,
+  "activity":        Activity,
+  "layers":          Layers,
 };
 
 // Color name → Tailwind classes
