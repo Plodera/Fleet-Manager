@@ -2137,7 +2137,12 @@ export async function registerRoutes(
     try {
       const settings = await storage.getGlpiSettings();
       res.json(settings || { url: "", appToken: "", userToken: "", syncIntervalMinutes: 15, enabled: false, lastSyncAt: null, lastError: null });
-    } catch (err) {
+    } catch (err: any) {
+      // Table may not exist yet on older installations — return safe defaults
+      const isTableMissing = err?.message?.includes("glpi_settings") || err?.code === "42P01";
+      if (isTableMissing) {
+        return res.json({ url: "", appToken: "", userToken: "", syncIntervalMinutes: 15, enabled: false, lastSyncAt: null, lastError: null });
+      }
       res.status(500).json({ message: "Failed to fetch GLPI settings" });
     }
   });
@@ -2159,7 +2164,11 @@ export async function registerRoutes(
       const { rescheduleGlpiSync } = await import("./glpiSync");
       rescheduleGlpiSync();
       res.json(settings);
-    } catch (err) {
+    } catch (err: any) {
+      const isTableMissing = err?.message?.includes("glpi_settings") || err?.code === "42P01";
+      if (isTableMissing) {
+        return res.status(503).json({ message: "Database table 'glpi_settings' not found. Please run the SQL migration: sql/add_glpi_settings.sql" });
+      }
       res.status(500).json({ message: "Failed to save GLPI settings" });
     }
   });
