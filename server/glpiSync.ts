@@ -3,9 +3,9 @@ import { storage } from "./storage";
 let syncTimer: ReturnType<typeof setInterval> | null = null;
 
 const GLPI_KPI_DEFS = [
-  { name: "glpi_open_tickets",     labelEn: "Open Tickets",    labelPt: "Tickets Abertos",   unit: "tickets" },
-  { name: "glpi_new_today",        labelEn: "New Today",       labelPt: "Novos Hoje",         unit: "tickets" },
-  { name: "glpi_resolved_today",   labelEn: "Resolved Today",  labelPt: "Resolvidos Hoje",    unit: "tickets" },
+  { name: "open_tickets",    labelEn: "Open Tickets",   labelPt: "Tickets Abertos",  unit: "tickets" },
+  { name: "new_today",       labelEn: "New Today",      labelPt: "Novos Hoje",        unit: "tickets" },
+  { name: "resolved_today",  labelEn: "Resolved Today", labelPt: "Resolvidos Hoje",   unit: "tickets" },
 ];
 
 function buildSearchUrl(
@@ -22,17 +22,7 @@ function buildSearchUrl(
   return `${base}/apirest.php/search/Ticket?${parts.join("&")}`;
 }
 
-async function glpiFetch(url: string, headers: Record<string, string>): Promise<any> {
-  const res = await fetch(url, { headers });
-  if (!res.ok && res.status !== 206) {
-    const body = await res.text();
-    throw new Error(`GLPI ${res.status}: ${body.slice(0, 200)}`);
-  }
-  const text = await res.text();
-  if (!text) return {};
-  return JSON.parse(text);
-}
-
+/** Throws on any non-206/200 response or JSON parse failure */
 async function countTickets(
   base: string,
   appToken: string,
@@ -40,13 +30,20 @@ async function countTickets(
   criteria: Array<{ field: number; searchtype: string; value: string; link?: string }>,
 ): Promise<number> {
   const url = buildSearchUrl(base, criteria);
-  const headers = { "App-Token": appToken, "Session-Token": sessionToken };
-  try {
-    const data = await glpiFetch(url, headers);
-    return typeof data.totalcount === "number" ? data.totalcount : 0;
-  } catch {
-    return 0;
+  const res = await fetch(url, {
+    headers: { "App-Token": appToken, "Session-Token": sessionToken },
+  });
+
+  // GLPI returns 206 Partial Content when search results exist; 200 on zero results
+  if (!res.ok && res.status !== 206) {
+    const body = await res.text();
+    throw new Error(`Search failed (${res.status}): ${body.slice(0, 200)}`);
   }
+
+  const text = await res.text();
+  if (!text) return 0;
+  const data = JSON.parse(text);
+  return typeof data.totalcount === "number" ? data.totalcount : 0;
 }
 
 async function runGlpiSync(): Promise<void> {
@@ -58,6 +55,7 @@ async function runGlpiSync(): Promise<void> {
   const base = settings.url.replace(/\/+$/, "");
   const appToken = settings.appToken;
 
+  // ── 1. Authenticate ──────────────────────────────────────────────────────
   let sessionToken: string;
   try {
     const initRes = await fetch(`${base}/apirest.php/initSession`, {
@@ -75,11 +73,13 @@ async function runGlpiSync(): Promise<void> {
     sessionToken = initData.session_token;
     if (!sessionToken) throw new Error("No session_token in GLPI response");
   } catch (err: any) {
-    console.error("[glpiSync] Auth failed:", err.message);
-    await storage.updateGlpiSyncStatus(null, `Auth failed: ${err.message}`);
+    const msg = `Auth failed: ${err.message}`;
+    console.error("[glpiSync]", msg);
+    await storage.updateGlpiSyncStatus(null, msg);
     return;
   }
 
+  // ── 2. Fetch ticket counts (propagate errors — do not silently zero out) ─
   const today = new Date().toISOString().split("T")[0];
 
   const openCriteria = [
@@ -88,29 +88,42 @@ async function runGlpiSync(): Promise<void> {
     { field: 12, searchtype: "equals", value: "3", link: "OR" },
     { field: 12, searchtype: "equals", value: "4", link: "OR" },
   ];
-
   const newTodayCriteria = [
     { field: 15, searchtype: "contains", value: today },
   ];
-
   const resolvedTodayCriteria = [
     { field: 12, searchtype: "equals", value: "5" },
     { field: 12, searchtype: "equals", value: "6", link: "OR" },
     { field: 16, searchtype: "contains", value: today, link: "AND" },
   ];
 
-  const [openCount, newTodayCount, resolvedTodayCount] = await Promise.all([
-    countTickets(base, appToken, sessionToken, openCriteria),
-    countTickets(base, appToken, sessionToken, newTodayCriteria),
-    countTickets(base, appToken, sessionToken, resolvedTodayCriteria),
-  ]);
+  let openCount: number;
+  let newTodayCount: number;
+  let resolvedTodayCount: number;
 
+  try {
+    [openCount, newTodayCount, resolvedTodayCount] = await Promise.all([
+      countTickets(base, appToken, sessionToken, openCriteria),
+      countTickets(base, appToken, sessionToken, newTodayCriteria),
+      countTickets(base, appToken, sessionToken, resolvedTodayCriteria),
+    ]);
+  } catch (err: any) {
+    const msg = `Query failed: ${err.message}`;
+    console.error("[glpiSync]", msg);
+    await storage.updateGlpiSyncStatus(null, msg);
+    // Kill session without crashing
+    try { await fetch(`${base}/apirest.php/killSession`, { headers: { "App-Token": appToken, "Session-Token": sessionToken } }); } catch {}
+    return;
+  }
+
+  // ── 3. Kill session ───────────────────────────────────────────────────────
   try {
     await fetch(`${base}/apirest.php/killSession`, {
       headers: { "App-Token": appToken, "Session-Token": sessionToken },
     });
   } catch {}
 
+  // ── 4. Ensure KPIs exist, then upsert values ──────────────────────────────
   const allKpis = await storage.getItKpis();
   const kpiMap: Record<string, number> = {};
   for (const def of GLPI_KPI_DEFS) {
@@ -130,12 +143,13 @@ async function runGlpiSync(): Promise<void> {
 
   const monthDate = today.substring(0, 7) + "-01";
   await storage.upsertItKpiValues([
-    { kpiId: kpiMap["glpi_open_tickets"],   periodType: "daily",   periodDate: today,      value: String(openCount) },
-    { kpiId: kpiMap["glpi_open_tickets"],   periodType: "monthly", periodDate: monthDate,   value: String(openCount) },
-    { kpiId: kpiMap["glpi_new_today"],      periodType: "daily",   periodDate: today,      value: String(newTodayCount) },
-    { kpiId: kpiMap["glpi_resolved_today"], periodType: "daily",   periodDate: today,      value: String(resolvedTodayCount) },
+    { kpiId: kpiMap["open_tickets"],   periodType: "daily",   periodDate: today,     value: String(openCount) },
+    { kpiId: kpiMap["open_tickets"],   periodType: "monthly", periodDate: monthDate,  value: String(openCount) },
+    { kpiId: kpiMap["new_today"],      periodType: "daily",   periodDate: today,     value: String(newTodayCount) },
+    { kpiId: kpiMap["resolved_today"], periodType: "daily",   periodDate: today,     value: String(resolvedTodayCount) },
   ]);
 
+  // ── 5. Record successful sync ─────────────────────────────────────────────
   await storage.updateGlpiSyncStatus(new Date(), null);
   console.log(`[glpiSync] Synced — open=${openCount} new=${newTodayCount} resolved=${resolvedTodayCount}`);
 }
@@ -146,8 +160,6 @@ export async function triggerGlpiSync(): Promise<void> {
 
 export function startGlpiSync(): void {
   runGlpiSync().catch(err => console.error("[glpiSync] Initial sync error:", err));
-
-  if (syncTimer) clearInterval(syncTimer);
 
   const reschedule = async () => {
     try {
