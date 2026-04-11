@@ -32,6 +32,25 @@ export async function initDatabase() {
     console.log('Database: Using Neon serverless driver');
   }
   
+  // Auto-create tables that may be missing on older installations
+  try {
+    await _pool.query(`
+      CREATE TABLE IF NOT EXISTS glpi_settings (
+        id                    SERIAL PRIMARY KEY,
+        url                   TEXT NOT NULL DEFAULT '',
+        app_token             TEXT NOT NULL DEFAULT '',
+        user_token            TEXT NOT NULL DEFAULT '',
+        sync_interval_minutes INTEGER NOT NULL DEFAULT 15,
+        enabled               BOOLEAN NOT NULL DEFAULT FALSE,
+        last_sync_at          TIMESTAMP,
+        last_error            TEXT,
+        updated_at            TIMESTAMP DEFAULT NOW()
+      )
+    `);
+  } catch (err: any) {
+    console.warn('[db] Auto-migration warning:', err.message);
+  }
+
   return { pool: _pool, db: _db };
 }
 
