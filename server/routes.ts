@@ -2289,6 +2289,8 @@ export async function registerRoutes(
       const result = await fetchNvrRawXml(parseInt(req.params.id));
       if (result.ok) {
         res.json(result);
+      } else if (result.error === "NVR not found") {
+        res.status(404).json(result);
       } else {
         res.status(502).json(result);
       }

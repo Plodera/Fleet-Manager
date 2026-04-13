@@ -54,7 +54,7 @@ async function digestFetch(url: string, username: string, password: string): Pro
 // most once, regardless of how many status fields the NVR includes per block.
 function parseCameraChannels(xml: string): { total: number; online: number } {
   // Split into individual <InputProxyChannel>…</InputProxyChannel> blocks.
-  // Works with both self-closed attributes and normal open/close pairs.
+  // Hikvision ISAPI always returns full open/close pairs for channel elements.
   const channelBlocks = xml.match(/<InputProxyChannel[\s\S]*?<\/InputProxyChannel>/gi) ?? [];
   const total = channelBlocks.length;
 
