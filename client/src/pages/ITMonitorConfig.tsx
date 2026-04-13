@@ -181,7 +181,7 @@ export default function ITMonitorConfig() {
   const [nvrDialog, setNvrDialog] = useState(false);
   const [editNvr, setEditNvr] = useState<any>(null);
   const [nvrForm, setNvrForm] = useState(BLANK_NVR);
-  const [hikGlobalForm, setHikGlobalForm] = useState({ syncIntervalMinutes: "1", enabled: false, dashboardId: "" });
+  const [hikGlobalForm, setHikGlobalForm] = useState({ syncIntervalMinutes: "1", enabled: false });
   const [testingNvrId, setTestingNvrId] = useState<number | null>(null);
 
   // Data entry
@@ -314,7 +314,6 @@ export default function ITMonitorConfig() {
       setHikGlobalForm({
         syncIntervalMinutes: String(hikGlobalSettings.syncIntervalMinutes ?? 1),
         enabled: !!hikGlobalSettings.enabled,
-        dashboardId: hikGlobalSettings.dashboardId ? String(hikGlobalSettings.dashboardId) : "",
       });
     }
   }, [hikGlobalSettings]);
@@ -989,7 +988,7 @@ export default function ITMonitorConfig() {
 
                 <div className="flex gap-3 pt-2">
                   <Button
-                    onClick={() => saveHikSettingsMutation.mutate({ ...hikGlobalForm, syncIntervalMinutes: parseInt(hikGlobalForm.syncIntervalMinutes) || 1, dashboardId: hikGlobalForm.dashboardId ? parseInt(hikGlobalForm.dashboardId) : null })}
+                    onClick={() => saveHikSettingsMutation.mutate({ ...hikGlobalForm, syncIntervalMinutes: parseInt(hikGlobalForm.syncIntervalMinutes) || 1 })}
                     disabled={saveHikSettingsMutation.isPending}
                     data-testid="button-save-hik-settings"
                   >
