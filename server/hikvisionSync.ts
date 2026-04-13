@@ -50,20 +50,21 @@ async function digestFetch(url: string, username: string, password: string): Pro
 }
 
 // ── Parse Hikvision ISAPI XML for channel counts ──────────────────────────────
+// Splits the response into per-channel blocks so each channel is counted at
+// most once, regardless of how many status fields the NVR includes per block.
 function parseCameraChannels(xml: string): { total: number; online: number } {
-  // Count all <InputProxyChannel> elements (total channels configured)
-  const totalMatches = xml.match(/<InputProxyChannel[\s>]/g);
-  const total = totalMatches ? totalMatches.length : 0;
+  // Split into individual <InputProxyChannel>…</InputProxyChannel> blocks.
+  // Works with both self-closed attributes and normal open/close pairs.
+  const channelBlocks = xml.match(/<InputProxyChannel[\s\S]*?<\/InputProxyChannel>/gi) ?? [];
+  const total = channelBlocks.length;
 
-  // Match status values that indicate a camera is online/connected.
-  // Different NVR firmware versions use different field names and capitalisation:
-  //   <connectionStatus>online</connectionStatus>
-  //   <connectionStatus>Connected</connectionStatus>
-  //   <streamStatus>online</streamStatus>
-  //   <streamStatus>connected</streamStatus>
-  //   <onlineStatus>online</onlineStatus>
-  const onlineMatches = xml.match(/<(?:connectionStatus|streamStatus|onlineStatus)>\s*(?:online|connected)\s*<\/(?:connectionStatus|streamStatus|onlineStatus)>/gi);
-  const online = onlineMatches ? onlineMatches.length : 0;
+  // For each channel block check whether ANY status field indicates online/connected.
+  // Known field names across Hikvision firmware versions:
+  //   connectionStatus, streamStatus, onlineStatus
+  // Known positive values (case-insensitive):
+  //   online, connected
+  const statusRe = /<(?:connectionStatus|streamStatus|onlineStatus)>\s*(?:online|connected)\s*<\/(?:connectionStatus|streamStatus|onlineStatus)>/i;
+  const online = channelBlocks.filter(block => statusRe.test(block)).length;
 
   return { total, online };
 }
