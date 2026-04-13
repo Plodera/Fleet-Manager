@@ -34,12 +34,15 @@ export async function testFortigateConnection(settings: {
 }
 
 function buildBase(host: string, port: number): string {
-  const base = host.replace(/\/+$/, "");
-  // If port is already in the URL or default HTTPS port, don't append
-  if (base.includes(":") && !base.startsWith("http")) return base;
-  const url = new URL(base.startsWith("http") ? base : `https://${base}`);
-  if ((url.protocol === "https:" && port !== 443) || (url.protocol === "http:" && port !== 80)) {
-    url.port = String(port);
+  const trimmed = host.replace(/\/+$/, "").trim();
+  // Ensure we always have a scheme for URL parsing
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const url = new URL(withScheme);
+  // Override port only when the input URL has no explicit port and the specified port is non-default
+  if (!url.port) {
+    if ((url.protocol === "https:" && port !== 443) || (url.protocol === "http:" && port !== 80)) {
+      url.port = String(port);
+    }
   }
   return url.toString().replace(/\/+$/, "");
 }

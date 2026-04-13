@@ -484,7 +484,7 @@ function buildChartData(rows: FortigateBandwidth[]): { time: string; [key: strin
 }
 
 const BandwidthChart = memo(function BandwidthChart({ rows, label }: { rows: FortigateBandwidth[]; label: string }) {
-  if (rows.length === 0) return null;
+  const isEmpty = rows.length === 0;
 
   const interfaces = Array.from(new Set(rows.map(r => r.interfaceName)));
   const chartData = buildChartData(rows);
@@ -496,55 +496,59 @@ const BandwidthChart = memo(function BandwidthChart({ rows, label }: { rows: For
         <Activity className="w-3.5 h-3.5 text-gray-500" />
         <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</span>
       </div>
-      <ResponsiveContainer width="100%" height={120}>
-        <LineChart data={chartData} margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
-          <XAxis
-            dataKey="time"
-            tick={{ fill: "#6b7280", fontSize: 9 }}
-            tickLine={false}
-            axisLine={false}
-            interval="preserveStartEnd"
-          />
-          <YAxis
-            tick={{ fill: "#6b7280", fontSize: 9 }}
-            tickLine={false}
-            axisLine={false}
-            width={32}
-          />
-          <Tooltip
-            contentStyle={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, fontSize: 11 }}
-            labelStyle={{ color: "#9ca3af" }}
-            itemStyle={{ color: "#e5e7eb" }}
-          />
-          <Legend
-            wrapperStyle={{ fontSize: 10, color: "#9ca3af", paddingTop: 4 }}
-            iconSize={8}
-          />
-          {interfaces.flatMap((iface, i) => [
-            <Line
-              key={`${iface}_tx`}
-              type="monotone"
-              dataKey={`${iface}_tx`}
-              name={`${iface} TX`}
-              stroke={CHART_COLORS[i % CHART_COLORS.length]}
-              strokeWidth={1.5}
-              dot={false}
-              activeDot={{ r: 3 }}
-            />,
-            <Line
-              key={`${iface}_rx`}
-              type="monotone"
-              dataKey={`${iface}_rx`}
-              name={`${iface} RX`}
-              stroke={CHART_COLORS[i % CHART_COLORS.length]}
-              strokeWidth={1.5}
-              strokeDasharray="4 2"
-              dot={false}
-              activeDot={{ r: 3 }}
-            />,
-          ])}
-        </LineChart>
-      </ResponsiveContainer>
+      {isEmpty ? (
+        <div className="flex items-center justify-center h-[120px] text-gray-600 text-xs">Awaiting first poll…</div>
+      ) : (
+        <ResponsiveContainer width="100%" height={120}>
+          <LineChart data={chartData} margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
+            <XAxis
+              dataKey="time"
+              tick={{ fill: "#6b7280", fontSize: 9 }}
+              tickLine={false}
+              axisLine={false}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tick={{ fill: "#6b7280", fontSize: 9 }}
+              tickLine={false}
+              axisLine={false}
+              width={32}
+            />
+            <Tooltip
+              contentStyle={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, fontSize: 11 }}
+              labelStyle={{ color: "#9ca3af" }}
+              itemStyle={{ color: "#e5e7eb" }}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 10, color: "#9ca3af", paddingTop: 4 }}
+              iconSize={8}
+            />
+            {interfaces.flatMap((iface, i) => [
+              <Line
+                key={`${iface}_tx`}
+                type="monotone"
+                dataKey={`${iface}_tx`}
+                name={`${iface} TX`}
+                stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                strokeWidth={1.5}
+                dot={false}
+                activeDot={{ r: 3 }}
+              />,
+              <Line
+                key={`${iface}_rx`}
+                type="monotone"
+                dataKey={`${iface}_rx`}
+                name={`${iface} RX`}
+                stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                strokeWidth={1.5}
+                strokeDasharray="4 2"
+                dot={false}
+                activeDot={{ r: 3 }}
+              />,
+            ])}
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 });
@@ -786,8 +790,8 @@ export default function ITDashboard() {
           </div>
         )}
 
-        {/* FortiGate bandwidth chart — only shown when enabled+configured and data exists */}
-        {fortigateEnabled && bandwidthRows.length > 0 && (
+        {/* FortiGate bandwidth chart — shown whenever enabled+configured (hides only when disabled/unconfigured) */}
+        {fortigateEnabled && (
           <BandwidthChart rows={bandwidthRows} label={it.sectionBandwidth || "FortiGate Bandwidth (Mbps)"} />
         )}
 
