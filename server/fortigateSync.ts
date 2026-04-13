@@ -50,12 +50,30 @@ export async function testFortigateConnection(settings: {
       return { ok: false, interfaces: [], error: `HTTP ${status}: ${body.slice(0, 200)}` };
     }
     const data = JSON.parse(body);
-    const ifaceList: any[] = Array.isArray(data.results) ? data.results : [];
-    const interfaces = ifaceList.map((i: any) => i.name || i.id || "").filter(Boolean);
+    const interfaces = parseInterfaceNames(data);
     return { ok: true, interfaces };
   } catch (err: any) {
     return { ok: false, interfaces: [], error: err.message || String(err) };
   }
+}
+
+/**
+ * Parse interface names from a FortiGate API response.
+ * Different FortiOS versions return results as:
+ *   - Array:  { results: [ { name: "wan1", ... }, ... ] }
+ *   - Object: { results: { "wan1": { ... }, "wan2": { ... } } }
+ * Both formats are handled here.
+ */
+function parseInterfaceNames(data: any): string[] {
+  const results = data?.results;
+  if (!results) return [];
+  if (Array.isArray(results)) {
+    return results.map((i: any) => i.name || i.id || "").filter(Boolean);
+  }
+  if (typeof results === "object") {
+    return Object.keys(results).filter(Boolean);
+  }
+  return [];
 }
 
 function buildBase(host: string, port: number): string {
@@ -91,14 +109,24 @@ async function pollFortigate(): Promise<void> {
     }
 
     const data = JSON.parse(body);
-    const ifaceList: any[] = Array.isArray(data.results) ? data.results : [];
+
+    // Build a flat list of { name, obj } regardless of array or object response format
+    const ifaceEntries: { name: string; obj: any }[] = [];
+    if (Array.isArray(data.results)) {
+      for (const item of data.results) {
+        const name = item.name || item.id || "";
+        if (name) ifaceEntries.push({ name, obj: item });
+      }
+    } else if (data.results && typeof data.results === "object") {
+      for (const [name, obj] of Object.entries(data.results)) {
+        if (name) ifaceEntries.push({ name, obj });
+      }
+    }
 
     const now = Date.now();
     const rows: { interfaceName: string; txKbps: string; rxKbps: string }[] = [];
 
-    for (const iface of ifaceList) {
-      const name: string = iface.name || iface.id || "";
-      if (!name) continue;
+    for (const { name, obj: iface } of ifaceEntries) {
       if (ifaces.length > 0 && !ifaces.includes(name)) continue;
 
       const txBytes: number = Number(iface.tx_bytes ?? iface.statistics?.tx_bytes ?? 0);
