@@ -66,33 +66,77 @@ function parseCameraChannels(xml: string): { total: number; online: number } {
   const statusRe = /<(?:connectionStatus|streamStatus|onlineStatus)>\s*(?:online|connected)\s*<\/(?:connectionStatus|streamStatus|onlineStatus)>/i;
   const online = channelBlocks.filter(block => statusRe.test(block)).length;
 
+  // Debug: when cameras are found but none are online, log the first block so
+  // admins can check pm2 logs to see the actual XML structure
+  if (total > 0 && online === 0 && channelBlocks[0]) {
+    console.warn("[hikvisionSync] WARNING: 0 online out of", total, "— first channel block:\n", channelBlocks[0].slice(0, 600));
+  }
+
   return { total, online };
 }
 
 // ── Fetch raw ISAPI XML from a single NVR (for diagnostics) ──────────────────
-export async function fetchNvrRawXml(nvrId: number): Promise<{ ok: boolean; xml?: string; error?: string }> {
+// Returns up to 4 KB from both /channels and /channels/status endpoints.
+export async function fetchNvrRawXml(nvrId: number): Promise<{ ok: boolean; channelsXml?: string; statusXml?: string; error?: string }> {
   const nvr = await storage.getHikvisionNvr(nvrId);
   if (!nvr) return { ok: false, error: "NVR not found" };
-  const url = `http://${nvr.ipAddress}:${nvr.port}/ISAPI/ContentMgmt/InputProxy/channels`;
+  const base = `http://${nvr.ipAddress}:${nvr.port}/ISAPI/ContentMgmt/InputProxy`;
   try {
-    const result = await digestFetch(url, nvr.username, nvr.password);
-    if (!result.ok) return { ok: false, error: `HTTP ${result.status}: ${result.text.slice(0, 200)}` };
-    return { ok: true, xml: result.text.slice(0, 4096) };
+    const [chRes, stRes] = await Promise.allSettled([
+      digestFetch(`${base}/channels`, nvr.username, nvr.password),
+      digestFetch(`${base}/channels/status`, nvr.username, nvr.password),
+    ]);
+    const channelsXml = chRes.status === "fulfilled" && chRes.value.ok ? chRes.value.text.slice(0, 4096) : `ERROR: ${chRes.status === "fulfilled" ? chRes.value.status : (chRes as any).reason?.message}`;
+    const statusXml   = stRes.status === "fulfilled" && stRes.value.ok ? stRes.value.text.slice(0, 4096) : `ERROR: ${stRes.status === "fulfilled" ? stRes.value.status : (stRes as any).reason?.message}`;
+    return { ok: true, channelsXml, statusXml };
   } catch (err: any) {
     return { ok: false, error: err.message };
   }
 }
 
-// ── Poll one NVR and return camera counts ─────────────────────────────────────
-async function pollNvr(nvrId: number, ipAddress: string, port: number, username: string, password: string): Promise<{ total: number; online: number }> {
-  const url = `http://${ipAddress}:${port}/ISAPI/ContentMgmt/InputProxy/channels`;
-  const result = await digestFetch(url, username, password);
+// ── Parse the dedicated /channels/status endpoint ────────────────────────────
+// Newer and high-channel-count NVRs separate live status into this endpoint.
+// Returns {total, online} where total is the number of status entries returned.
+function parseChannelStatusXml(xml: string): { total: number; online: number } {
+  // <InputProxyChannelStatus> blocks (singular per channel)
+  const blocks = xml.match(/<InputProxyChannelStatus[\s\S]*?<\/InputProxyChannelStatus>/gi) ?? [];
+  const total = blocks.length;
+  // onlineStatus is the primary field in the status endpoint
+  const onlineRe = /<(?:onlineStatus|connectionStatus|streamStatus)>\s*(?:online|connected)\s*<\/(?:onlineStatus|connectionStatus|streamStatus)>/i;
+  const online = blocks.filter(b => onlineRe.test(b)).length;
+  return { total, online };
+}
 
-  if (!result.ok) {
-    throw new Error(`ISAPI returned ${result.status}: ${result.text.slice(0, 200)}`);
+// ── Poll one NVR and return camera counts ─────────────────────────────────────
+// Strategy:
+//   1. Always fetch /channels for total channel count.
+//   2. Try /channels/status (newer NVRs) for online count — takes priority.
+//   3. Fall back to status fields embedded in /channels (older NVRs).
+async function pollNvr(nvrId: number, ipAddress: string, port: number, username: string, password: string): Promise<{ total: number; online: number }> {
+  const base = `http://${ipAddress}:${port}/ISAPI/ContentMgmt/InputProxy`;
+
+  // Step 1 — channel list (for total count)
+  const chResult = await digestFetch(`${base}/channels`, username, password);
+  if (!chResult.ok) {
+    throw new Error(`ISAPI /channels returned ${chResult.status}: ${chResult.text.slice(0, 200)}`);
+  }
+  const { total, online: onlineFromChannels } = parseCameraChannels(chResult.text);
+
+  // Step 2 — dedicated status endpoint (for online count on newer/larger NVRs)
+  try {
+    const stResult = await digestFetch(`${base}/channels/status`, username, password);
+    if (stResult.ok && stResult.text.length > 10) {
+      const { online: onlineFromStatus } = parseChannelStatusXml(stResult.text);
+      if (onlineFromStatus > 0 || onlineFromChannels === 0) {
+        console.log(`[hikvisionSync] Using /channels/status for online count: ${onlineFromStatus}/${total}`);
+        return { total, online: onlineFromStatus };
+      }
+    }
+  } catch {
+    // status endpoint not available — fall through to embedded status
   }
 
-  return parseCameraChannels(result.text);
+  return { total, online: onlineFromChannels };
 }
 
 // ── Main sync function ────────────────────────────────────────────────────────
