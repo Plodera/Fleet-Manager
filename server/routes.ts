@@ -2022,6 +2022,36 @@ export async function registerRoutes(
     }
   });
 
+  // Bulk create hosts from CSV import
+  app.post('/api/it/hosts/bulk', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    const { hosts: rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ message: "No hosts provided" });
+    const created: any[] = [];
+    const errors: { row: number; message: string }[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row.name?.trim()) { errors.push({ row: i + 1, message: "Missing name" }); continue; }
+      if (!isValidIPv4(row.ipAddress?.trim() ?? "")) { errors.push({ row: i + 1, message: `Invalid IP: ${row.ipAddress}` }); continue; }
+      try {
+        const host = await storage.createItHost({
+          name: row.name.trim(),
+          ipAddress: row.ipAddress.trim(),
+          hostType: row.hostType?.trim() || "camera",
+          isActive: row.isActive !== false,
+          notes: row.notes?.trim() || null,
+          sortOrder: row.sortOrder ?? 0,
+        });
+        created.push(host);
+      } catch {
+        errors.push({ row: i + 1, message: "Database error" });
+      }
+    }
+    res.json({ created: created.length, errors });
+  });
+
   app.put('/api/it/hosts/:id', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;

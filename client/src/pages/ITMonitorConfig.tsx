@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -184,6 +184,11 @@ export default function ITMonitorConfig() {
   const [hikGlobalForm, setHikGlobalForm] = useState({ syncIntervalMinutes: "1", enabled: false });
   const [testingNvrId, setTestingNvrId] = useState<number | null>(null);
 
+  // CSV Import state
+  const csvFileRef = useRef<HTMLInputElement>(null);
+  const [importDialog, setImportDialog] = useState(false);
+  const [importRows, setImportRows] = useState<{ name: string; ipAddress: string; hostType: string; notes: string; valid: boolean; error?: string }[]>([]);
+
   // Data entry
   const [dataEntryPeriodType, setDataEntryPeriodType] = useState("daily");
   const [dataEntryDate, setDataEntryDate] = useState(new Date().toISOString().split("T")[0]);
@@ -233,6 +238,53 @@ export default function ITMonitorConfig() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/it/hosts/${id}`),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/hosts"] }); setDeleteTarget(null); toast({ title: t.itMonitor?.hostDeleted || "Host deleted" }); },
   });
+  const bulkImportMutation = useMutation({
+    mutationFn: (hosts: object[]) => apiRequest("POST", "/api/it/hosts/bulk", { hosts }),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/it/hosts"] });
+      setImportDialog(false);
+      setImportRows([]);
+      toast({ title: `Imported ${res.created} host${res.created !== 1 ? "s" : ""}${res.errors?.length ? ` (${res.errors.length} skipped)` : ""}` });
+    },
+  });
+
+  // Parse a CSV file into import rows
+  function parseCsv(text: string) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return [];
+    // Detect delimiter (comma or semicolon)
+    const delim = lines[0].includes(";") ? ";" : ",";
+    const headers = lines[0].split(delim).map(h => h.trim().toLowerCase().replace(/[\s-]/g, "_"));
+    const col = (row: string[], key: string) => {
+      const i = headers.indexOf(key);
+      return i >= 0 ? (row[i] ?? "").trim() : "";
+    };
+    const ipRe = /^(\d{1,3}\.){3}\d{1,3}$/;
+    function validIp(ip: string) {
+      if (!ipRe.test(ip)) return false;
+      return ip.split(".").every(p => { const n = parseInt(p); return n >= 0 && n <= 255; });
+    }
+    return lines.slice(1).map(line => {
+      const parts = line.split(delim).map(c => c.trim().replace(/^"|"$/g, ""));
+      const name = col(parts, "name");
+      const ipAddress = col(parts, "ip_address") || col(parts, "ipaddress") || col(parts, "ip");
+      const hostType = col(parts, "host_type") || col(parts, "type") || "camera";
+      const notes = col(parts, "notes") || col(parts, "note") || "";
+      const valid = !!name && validIp(ipAddress);
+      const error = !name ? "Missing name" : !validIp(ipAddress) ? "Invalid IP" : undefined;
+      return { name, ipAddress, hostType, notes, valid, error };
+    }).filter(r => r.name || r.ipAddress);
+  }
+
+  function handleCsvFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const text = e.target?.result as string;
+      setImportRows(parseCsv(text));
+      setImportDialog(true);
+    };
+    reader.readAsText(file);
+  }
 
   // KPI mutations
   const createKpiMutation = useMutation({
@@ -501,7 +553,19 @@ export default function ITMonitorConfig() {
 
         {/* ── Monitored Hosts tab ── */}
         <TabsContent value="hosts" className="mt-4">
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end gap-2 mb-4">
+            {/* hidden file input for CSV */}
+            <input
+              ref={csvFileRef}
+              type="file"
+              accept=".csv,.txt"
+              className="hidden"
+              data-testid="input-csv-file"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvFile(f); e.target.value = ""; }}
+            />
+            <Button variant="outline" onClick={() => csvFileRef.current?.click()} data-testid="button-import-csv">
+              <RefreshCw className="w-4 h-4 mr-2" /> Import CSV
+            </Button>
             <Button onClick={() => openHostDialog()} data-testid="button-add-host">
               <Plus className="w-4 h-4 mr-2" />
               {it.addHost || "Add Host"}
@@ -1087,6 +1151,62 @@ export default function ITMonitorConfig() {
             <Button variant="outline" onClick={() => setNvrDialog(false)}>Cancel</Button>
             <Button onClick={submitNvr} disabled={createNvrMutation.isPending || updateNvrMutation.isPending} data-testid="button-submit-nvr">
               {createNvrMutation.isPending || updateNvrMutation.isPending ? "Saving..." : editNvr ? "Save Changes" : "Add NVR"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── CSV Import Preview Dialog ── */}
+      <Dialog open={importDialog} onOpenChange={v => { setImportDialog(v); if (!v) setImportRows([]); }}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Import Hosts from CSV</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground mb-2">
+            {importRows.filter(r => r.valid).length} of {importRows.length} rows are valid and will be imported.
+            {importRows.some(r => !r.valid) && <span className="text-destructive ml-2">{importRows.filter(r => !r.valid).length} row(s) have errors and will be skipped.</span>}
+          </div>
+          <div className="overflow-auto flex-1 border rounded-lg">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 sticky top-0">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium">#</th>
+                  <th className="text-left px-3 py-2 font-medium">Name</th>
+                  <th className="text-left px-3 py-2 font-medium">IP Address</th>
+                  <th className="text-left px-3 py-2 font-medium">Type</th>
+                  <th className="text-left px-3 py-2 font-medium">Notes</th>
+                  <th className="text-left px-3 py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {importRows.map((row, i) => (
+                  <tr key={i} className={row.valid ? "hover:bg-muted/20" : "bg-destructive/5"}>
+                    <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
+                    <td className="px-3 py-2 font-medium">{row.name || <span className="text-destructive italic">empty</span>}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{row.ipAddress || <span className="text-destructive italic">empty</span>}</td>
+                    <td className="px-3 py-2">{row.hostType || "camera"}</td>
+                    <td className="px-3 py-2 text-muted-foreground text-xs">{row.notes}</td>
+                    <td className="px-3 py-2">
+                      {row.valid
+                        ? <Badge className="bg-green-600 text-white text-xs">Ready</Badge>
+                        : <Badge variant="destructive" className="text-xs">{row.error}</Badge>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="pt-3 text-xs text-muted-foreground border-t mt-3">
+            <strong>CSV format:</strong> <code>name, ip_address, host_type, notes</code> — host_type must match a Device Type slug (e.g. camera, switch, wireless_ap, printer)
+          </div>
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => { setImportDialog(false); setImportRows([]); }}>Cancel</Button>
+            <Button
+              disabled={importRows.filter(r => r.valid).length === 0 || bulkImportMutation.isPending}
+              onClick={() => bulkImportMutation.mutate(importRows.filter(r => r.valid).map(r => ({ name: r.name, ipAddress: r.ipAddress, hostType: r.hostType || "camera", notes: r.notes || null, isActive: true, sortOrder: 0 })))}
+              data-testid="button-confirm-import"
+            >
+              {bulkImportMutation.isPending ? "Importing..." : `Import ${importRows.filter(r => r.valid).length} Host${importRows.filter(r => r.valid).length !== 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>
