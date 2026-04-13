@@ -7,6 +7,7 @@ import {
   itHostTypes, itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
   glpiSettings,
   hikvisionNvrs, hikvisionGlobalSettings,
+  fortigateSettings, fortigateBandwidth,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -35,6 +36,7 @@ import {
   type GlpiSettings, type InsertGlpiSettings,
   type HikvisionNvr, type InsertHikvisionNvr,
   type HikvisionGlobalSettings, type InsertHikvisionGlobalSettings,
+  type FortigateSettings, type InsertFortigateSettings, type FortigateBandwidth,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq, desc, sql, and } from "drizzle-orm";
@@ -1251,6 +1253,57 @@ export class DatabaseStorage implements IStorage {
         .where(eq(hikvisionGlobalSettings.id, existing[0].id));
     }
   }
+
+  // ── FortiGate bandwidth methods ──────────────────────────────────────────
+  async getFortigateSettings(): Promise<FortigateSettings | undefined> {
+    const rows = await getDb().select().from(fortigateSettings).limit(1);
+    return rows[0];
+  }
+
+  async upsertFortigateSettings(data: InsertFortigateSettings): Promise<FortigateSettings> {
+    const existing = await getDb().select().from(fortigateSettings).limit(1);
+    if (existing.length > 0) {
+      const [row] = await getDb().update(fortigateSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(fortigateSettings.id, existing[0].id))
+        .returning();
+      return row;
+    }
+    const [row] = await getDb().insert(fortigateSettings).values(data).returning();
+    return row;
+  }
+
+  async updateFortigateSyncStatus(lastSyncAt: Date | null, lastError: string | null): Promise<void> {
+    const existing = await getDb().select().from(fortigateSettings).limit(1);
+    if (existing.length > 0) {
+      await getDb().update(fortigateSettings)
+        .set({ lastSyncAt, lastError, updatedAt: new Date() })
+        .where(eq(fortigateSettings.id, existing[0].id));
+    }
+  }
+
+  async insertFortigateBandwidth(rows: { interfaceName: string; txMbps: string; rxMbps: string }[]): Promise<void> {
+    if (rows.length === 0) return;
+    await getDb().insert(fortigateBandwidth).values(rows.map(r => ({
+      interfaceName: r.interfaceName,
+      txMbps: r.txMbps,
+      rxMbps: r.rxMbps,
+      recordedAt: new Date(),
+    })));
+  }
+
+  async getFortigateBandwidth(hours: number = 1): Promise<FortigateBandwidth[]> {
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    return getDb().select().from(fortigateBandwidth)
+      .where(sql`${fortigateBandwidth.recordedAt} >= ${since}`)
+      .orderBy(fortigateBandwidth.recordedAt);
+  }
+
+  async pruneFortigateBandwidth(): Promise<void> {
+    const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    await getDb().delete(fortigateBandwidth)
+      .where(sql`${fortigateBandwidth.recordedAt} < ${cutoff}`);
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -1415,5 +1468,11 @@ export const storage = {
   getHikvisionGlobalSettings: () => getStorage().getHikvisionGlobalSettings(),
   saveHikvisionGlobalSettings: (...args: Parameters<DatabaseStorage['saveHikvisionGlobalSettings']>) => getStorage().saveHikvisionGlobalSettings(...args),
   updateHikvisionGlobalSyncStatus: (...args: Parameters<DatabaseStorage['updateHikvisionGlobalSyncStatus']>) => getStorage().updateHikvisionGlobalSyncStatus(...args),
+  getFortigateSettings: () => getStorage().getFortigateSettings(),
+  upsertFortigateSettings: (...args: Parameters<DatabaseStorage['upsertFortigateSettings']>) => getStorage().upsertFortigateSettings(...args),
+  updateFortigateSyncStatus: (...args: Parameters<DatabaseStorage['updateFortigateSyncStatus']>) => getStorage().updateFortigateSyncStatus(...args),
+  insertFortigateBandwidth: (...args: Parameters<DatabaseStorage['insertFortigateBandwidth']>) => getStorage().insertFortigateBandwidth(...args),
+  getFortigateBandwidth: (...args: Parameters<DatabaseStorage['getFortigateBandwidth']>) => getStorage().getFortigateBandwidth(...args),
+  pruneFortigateBandwidth: () => getStorage().pruneFortigateBandwidth(),
   get sessionStore() { return getStorage().sessionStore; },
 };

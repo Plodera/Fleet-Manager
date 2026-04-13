@@ -110,6 +110,10 @@ import { initDatabase } from "./db";
   const { startHikvisionSync } = await import("./hikvisionSync");
   startHikvisionSync();
 
+  // Start FortiGate bandwidth sync service
+  const { startFortigateSync } = await import("./fortigateSync");
+  startFortigateSync();
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

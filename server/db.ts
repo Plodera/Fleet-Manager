@@ -75,6 +75,28 @@ export async function initDatabase() {
         updated_at            TIMESTAMP DEFAULT NOW()
       )
     `);
+    await _pool.query(`
+      CREATE TABLE IF NOT EXISTS fortigate_settings (
+        id                    SERIAL PRIMARY KEY,
+        host                  TEXT NOT NULL DEFAULT '',
+        api_token             TEXT NOT NULL DEFAULT '',
+        poll_interval_seconds INTEGER NOT NULL DEFAULT 60,
+        enabled               BOOLEAN NOT NULL DEFAULT FALSE,
+        interfaces            TEXT NOT NULL DEFAULT '',
+        last_sync_at          TIMESTAMP,
+        last_error            TEXT,
+        updated_at            TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await _pool.query(`
+      CREATE TABLE IF NOT EXISTS fortigate_bandwidth (
+        id             SERIAL PRIMARY KEY,
+        recorded_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+        interface_name TEXT NOT NULL,
+        tx_mbps        TEXT NOT NULL DEFAULT '0',
+        rx_mbps        TEXT NOT NULL DEFAULT '0'
+      )
+    `);
   } catch (err: any) {
     console.warn('[db] Auto-migration warning:', err.message);
   }

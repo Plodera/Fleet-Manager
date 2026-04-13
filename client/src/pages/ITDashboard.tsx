@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n";
 import { Link } from "wouter";
-import type { ItHostWithStatus, ItKpi, ItKpiValue, ItHostType } from "@shared/schema";
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import type { ItHostWithStatus, ItKpi, ItKpiValue, ItHostType, FortigateBandwidth } from "@shared/schema";
 import {
   Wifi, WifiOff, Camera, Globe, Monitor, Network, ArrowLeft,
   Maximize, Minimize, TrendingUp, Target, Zap, Activity, Gauge,
@@ -461,6 +462,93 @@ function KpiCard({ kpi, values, idx }: { kpi: ItKpi; values: ItKpiValue[]; idx: 
   );
 }
 
+// Colors for up to 8 interfaces in the chart
+const CHART_COLORS = ["#22d3ee", "#4ade80", "#f59e0b", "#a78bfa", "#f87171", "#34d399", "#fb923c", "#818cf8"];
+
+function formatTime(ts: string | Date): string {
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function buildChartData(rows: FortigateBandwidth[]): { time: string; [key: string]: string | number }[] {
+  // Group by timestamp bucket (round to nearest 5 seconds for display)
+  const byTime: Record<string, Record<string, number>> = {};
+  for (const row of rows) {
+    const time = formatTime(row.recordedAt);
+    if (!byTime[time]) byTime[time] = {};
+    // When same interface appears multiple times at same minute, take latest
+    byTime[time][`${row.interfaceName}_tx`] = parseFloat(row.txMbps);
+    byTime[time][`${row.interfaceName}_rx`] = parseFloat(row.rxMbps);
+  }
+  return Object.entries(byTime).map(([time, vals]) => ({ time, ...vals }));
+}
+
+const BandwidthChart = memo(function BandwidthChart({ rows }: { rows: FortigateBandwidth[] }) {
+  if (rows.length === 0) return null;
+
+  const interfaces = Array.from(new Set(rows.map(r => r.interfaceName)));
+  const chartData = buildChartData(rows);
+
+  return (
+    <div className="bg-[#111827] rounded-xl border border-gray-800/60 p-4 it-card-enter" data-testid="section-bandwidth-chart">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="it-dot it-dot-blink bg-cyan-400" />
+        <Activity className="w-3.5 h-3.5 text-gray-500" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">FortiGate Bandwidth (Mbps)</span>
+      </div>
+      <ResponsiveContainer width="100%" height={120}>
+        <LineChart data={chartData} margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
+          <XAxis
+            dataKey="time"
+            tick={{ fill: "#6b7280", fontSize: 9 }}
+            tickLine={false}
+            axisLine={false}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            tick={{ fill: "#6b7280", fontSize: 9 }}
+            tickLine={false}
+            axisLine={false}
+            width={32}
+          />
+          <Tooltip
+            contentStyle={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, fontSize: 11 }}
+            labelStyle={{ color: "#9ca3af" }}
+            itemStyle={{ color: "#e5e7eb" }}
+          />
+          <Legend
+            wrapperStyle={{ fontSize: 10, color: "#9ca3af", paddingTop: 4 }}
+            iconSize={8}
+          />
+          {interfaces.flatMap((iface, i) => [
+            <Line
+              key={`${iface}_tx`}
+              type="monotone"
+              dataKey={`${iface}_tx`}
+              name={`${iface} TX`}
+              stroke={CHART_COLORS[i % CHART_COLORS.length]}
+              strokeWidth={1.5}
+              dot={false}
+              activeDot={{ r: 3 }}
+            />,
+            <Line
+              key={`${iface}_rx`}
+              type="monotone"
+              dataKey={`${iface}_rx`}
+              name={`${iface} RX`}
+              stroke={CHART_COLORS[i % CHART_COLORS.length]}
+              strokeWidth={1.5}
+              strokeDasharray="4 2"
+              dot={false}
+              activeDot={{ r: 3 }}
+            />,
+          ])}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
 export default function ITDashboard() {
   const { t, language } = useLanguage();
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -551,6 +639,16 @@ export default function ITDashboard() {
       return res.json();
     },
     refetchInterval: 300000,
+  });
+
+  const { data: bandwidthRows = [] } = useQuery<FortigateBandwidth[]>({
+    queryKey: ["/api/it/fortigate-bandwidth"],
+    queryFn: async () => {
+      const res = await fetch("/api/it/fortigate-bandwidth?hours=1");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 30000,
   });
 
   const activeHosts = hosts.filter(h => h.isActive);
@@ -674,6 +772,11 @@ export default function ITDashboard() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* FortiGate bandwidth chart — only shown when data exists */}
+        {bandwidthRows.length > 0 && (
+          <BandwidthChart rows={bandwidthRows} />
         )}
 
         {/* Device summary cards + KPIs */}

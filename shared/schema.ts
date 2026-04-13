@@ -883,3 +883,30 @@ export const glpiSettings = pgTable("glpi_settings", {
 export const insertGlpiSettingsSchema = createInsertSchema(glpiSettings).omit({ id: true, lastSyncAt: true, lastError: true, updatedAt: true });
 export type GlpiSettings = typeof glpiSettings.$inferSelect;
 export type InsertGlpiSettings = z.infer<typeof insertGlpiSettingsSchema>;
+
+// FortiGate firewall bandwidth monitoring
+export const fortigateSettings = pgTable("fortigate_settings", {
+  id: serial("id").primaryKey(),
+  host: text("host").notNull().default(""),           // e.g. https://192.168.1.1
+  apiToken: text("api_token").notNull().default(""),  // REST API token (read-only admin)
+  pollIntervalSeconds: integer("poll_interval_seconds").notNull().default(60),
+  enabled: boolean("enabled").notNull().default(false),
+  interfaces: text("interfaces").notNull().default(""),  // comma-separated list, blank = all
+  lastSyncAt: timestamp("last_sync_at"),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFortigateSettingsSchema = createInsertSchema(fortigateSettings).omit({ id: true, lastSyncAt: true, lastError: true, updatedAt: true });
+export type FortigateSettings = typeof fortigateSettings.$inferSelect;
+export type InsertFortigateSettings = z.infer<typeof insertFortigateSettingsSchema>;
+
+export const fortigateBandwidth = pgTable("fortigate_bandwidth", {
+  id: serial("id").primaryKey(),
+  recordedAt: timestamp("recorded_at").notNull().defaultNow(),
+  interfaceName: text("interface_name").notNull(),
+  txMbps: text("tx_mbps").notNull().default("0"),
+  rxMbps: text("rx_mbps").notNull().default("0"),
+});
+
+export type FortigateBandwidth = typeof fortigateBandwidth.$inferSelect;

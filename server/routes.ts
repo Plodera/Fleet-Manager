@@ -2361,6 +2361,72 @@ export async function registerRoutes(
     }
   });
 
+  // ── FortiGate Bandwidth Integration ─────────────────────────────────────
+
+  app.get('/api/it/fortigate-settings', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const settings = await storage.getFortigateSettings();
+      const safe = settings ? { ...settings, apiToken: "" } : { host: "", apiToken: "", pollIntervalSeconds: 60, enabled: false, interfaces: "", lastSyncAt: null, lastError: null };
+      res.json(safe);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch FortiGate settings" });
+    }
+  });
+
+  app.put('/api/it/fortigate-settings', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { host, apiToken, pollIntervalSeconds, enabled, interfaces } = req.body;
+      const existing = await storage.getFortigateSettings();
+      const savedToken = apiToken && apiToken.trim() !== "" ? apiToken : (existing?.apiToken ?? "");
+      const settings = await storage.upsertFortigateSettings({
+        host: host || "",
+        apiToken: savedToken,
+        pollIntervalSeconds: parseInt(pollIntervalSeconds) || 60,
+        enabled: !!enabled,
+        interfaces: interfaces || "",
+      });
+      const { rescheduleFortigateSync } = await import("./fortigateSync");
+      rescheduleFortigateSync();
+      res.json({ ...settings, apiToken: "" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to save FortiGate settings" });
+    }
+  });
+
+  app.post('/api/it/fortigate-sync', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { triggerFortigateSync } = await import("./fortigateSync");
+      const lastError = await triggerFortigateSync();
+      const settings = await storage.getFortigateSettings();
+      if (lastError) {
+        return res.status(502).json({ message: lastError, lastSyncAt: settings?.lastSyncAt, lastError });
+      }
+      res.json({ success: true, lastSyncAt: settings?.lastSyncAt, lastError: null });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Sync failed" });
+    }
+  });
+
+  app.get('/api/it/fortigate-bandwidth', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const hours = Math.min(parseInt(String(req.query.hours || "1")), 2);
+      const rows = await storage.getFortigateBandwidth(hours);
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch bandwidth data" });
+    }
+  });
+
   // Manual sync trigger
   app.post('/api/it/hikvision-sync', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

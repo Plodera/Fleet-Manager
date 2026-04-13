@@ -184,6 +184,9 @@ export default function ITMonitorConfig() {
   const [hikGlobalForm, setHikGlobalForm] = useState({ syncIntervalMinutes: "1", enabled: false });
   const [testingNvrId, setTestingNvrId] = useState<number | null>(null);
 
+  // FortiGate state
+  const [fortigateForm, setFortigateForm] = useState({ host: "", apiToken: "", pollIntervalSeconds: "60", enabled: false, interfaces: "" });
+
   // CSV Import state
   const csvFileRef = useRef<HTMLInputElement>(null);
   const [importDialog, setImportDialog] = useState(false);
@@ -427,6 +430,41 @@ export default function ITMonitorConfig() {
     onError: (err: any) => { refetchNvrs(); toast({ title: err?.message || "Sync failed", variant: "destructive" }); },
   });
 
+  // FortiGate queries and mutations
+  const { data: fortigateSettings, refetch: refetchFortigate } = useQuery<any>({
+    queryKey: ["/api/it/fortigate-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/it/fortigate-settings");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    refetchInterval: activeTab === "fortigate" ? 30000 : false,
+  });
+
+  useEffect(() => {
+    if (fortigateSettings) {
+      setFortigateForm({
+        host: fortigateSettings.host || "",
+        apiToken: "",
+        pollIntervalSeconds: String(fortigateSettings.pollIntervalSeconds ?? 60),
+        enabled: !!fortigateSettings.enabled,
+        interfaces: fortigateSettings.interfaces || "",
+      });
+    }
+  }, [fortigateSettings]);
+
+  const saveFortigateMutation = useMutation({
+    mutationFn: (data: object) => apiRequest("PUT", "/api/it/fortigate-settings", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/fortigate-settings"] }); toast({ title: "FortiGate settings saved" }); },
+    onError: () => toast({ title: "Failed to save FortiGate settings", variant: "destructive" }),
+  });
+
+  const syncFortigateMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/it/fortigate-sync", {}),
+    onSuccess: () => { refetchFortigate(); toast({ title: "FortiGate sync triggered" }); },
+    onError: (err: any) => { refetchFortigate(); toast({ title: err?.message || "FortiGate sync failed", variant: "destructive" }); },
+  });
+
   const testNvrConnection = async (id: number) => {
     setTestingNvrId(id);
     try {
@@ -569,6 +607,7 @@ export default function ITMonitorConfig() {
           <TabsTrigger value="dataentry" data-testid="tab-data-entry">{it.dataEntryTab || "Data Entry"}</TabsTrigger>
           <TabsTrigger value="glpi" data-testid="tab-glpi">GLPI</TabsTrigger>
           <TabsTrigger value="nvr" data-testid="tab-nvr">NVR</TabsTrigger>
+          <TabsTrigger value="fortigate" data-testid="tab-fortigate">FortiGate</TabsTrigger>
         </TabsList>
 
         {/* ── Monitored Hosts tab ── */}
@@ -1127,6 +1166,138 @@ export default function ITMonitorConfig() {
               </CardContent>
             </Card>
 
+          </div>
+        </TabsContent>
+
+        {/* ── FortiGate Bandwidth tab ── */}
+        <TabsContent value="fortigate" className="mt-4">
+          <div className="max-w-xl space-y-6">
+            <Card>
+              <CardContent className="pt-6 space-y-5">
+                <div className="flex items-center gap-3 pb-2 border-b">
+                  <Router className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="font-semibold">FortiGate Bandwidth Monitor</p>
+                    <p className="text-sm text-muted-foreground">Poll interface TX/RX Mbps every N seconds via REST API and display on IT Dashboard</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>FortiGate Host URL</Label>
+                  <Input
+                    value={fortigateForm.host}
+                    onChange={e => setFortigateForm(p => ({ ...p, host: e.target.value }))}
+                    placeholder="https://192.168.1.1"
+                    data-testid="input-fortigate-host"
+                  />
+                  <p className="text-xs text-muted-foreground">HTTPS URL to the FortiGate management interface</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>API Token</Label>
+                  <Input
+                    type="password"
+                    value={fortigateForm.apiToken}
+                    onChange={e => setFortigateForm(p => ({ ...p, apiToken: e.target.value }))}
+                    placeholder={fortigateSettings?.host ? "Leave blank to keep existing token" : "Bearer token from FortiGate"}
+                    data-testid="input-fortigate-token"
+                  />
+                  <p className="text-xs text-muted-foreground">FortiGate → System → Administrators → Create REST API Admin (read-only)</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Poll Interval (seconds)</Label>
+                  <Input
+                    type="number"
+                    min="15"
+                    max="3600"
+                    value={fortigateForm.pollIntervalSeconds}
+                    onChange={e => setFortigateForm(p => ({ ...p, pollIntervalSeconds: e.target.value }))}
+                    className="w-32"
+                    data-testid="input-fortigate-interval"
+                  />
+                  <p className="text-xs text-muted-foreground">Minimum 15 seconds (short intervals improve chart resolution)</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Interface Filter <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input
+                    value={fortigateForm.interfaces}
+                    onChange={e => setFortigateForm(p => ({ ...p, interfaces: e.target.value }))}
+                    placeholder="wan1, wan2, internal"
+                    data-testid="input-fortigate-interfaces"
+                  />
+                  <p className="text-xs text-muted-foreground">Comma-separated interface names to display. Leave blank to show all interfaces.</p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={fortigateForm.enabled}
+                    onCheckedChange={v => setFortigateForm(p => ({ ...p, enabled: v }))}
+                    data-testid="switch-fortigate-enabled"
+                  />
+                  <Label>Enable bandwidth polling</Label>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    onClick={() => saveFortigateMutation.mutate({
+                      host: fortigateForm.host,
+                      apiToken: fortigateForm.apiToken,
+                      pollIntervalSeconds: parseInt(fortigateForm.pollIntervalSeconds) || 60,
+                      enabled: fortigateForm.enabled,
+                      interfaces: fortigateForm.interfaces,
+                    })}
+                    disabled={saveFortigateMutation.isPending}
+                    data-testid="button-save-fortigate"
+                  >
+                    {saveFortigateMutation.isPending ? "Saving..." : "Save Settings"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => syncFortigateMutation.mutate()}
+                    disabled={syncFortigateMutation.isPending || !fortigateSettings?.host}
+                    data-testid="button-sync-fortigate-now"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${syncFortigateMutation.isPending ? "animate-spin" : ""}`} />
+                    {syncFortigateMutation.isPending ? "Polling..." : "Poll Now"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sync Status */}
+            {(fortigateSettings?.lastSyncAt || fortigateSettings?.lastError) && (
+              <Card>
+                <CardContent className="pt-6 space-y-3">
+                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Sync Status</p>
+                  {fortigateSettings?.lastSyncAt && (
+                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      Last polled: {new Date(fortigateSettings.lastSyncAt).toLocaleString()}
+                    </div>
+                  )}
+                  {fortigateSettings?.lastError && (
+                    <div className="flex items-start gap-2 text-sm text-destructive">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span className="font-mono text-xs bg-destructive/10 rounded px-2 py-1 break-all">{fortigateSettings.lastError}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="border-muted/50">
+              <CardContent className="pt-6">
+                <p className="text-sm font-semibold mb-3">How it works</p>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />Reads cumulative TX/RX byte counters from FortiGate REST API</li>
+                  <li className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />Computes Mbps delta between successive polls</li>
+                  <li className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />Chart on IT Dashboard shows last 60 minutes of data per interface</li>
+                  <li className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />Data older than 2 hours is automatically pruned</li>
+                </ul>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
