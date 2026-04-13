@@ -2458,10 +2458,12 @@ export async function registerRoutes(
   });
 
   // Public — used by the IT Dashboard to check whether FortiGate chart should appear
+  // Returns true only when enabled=true AND host AND apiToken are all set
   app.get('/api/it/fortigate/enabled', async (req, res) => {
     try {
       const settings = await storage.getFortigateSettings();
-      res.json({ enabled: !!settings?.enabled });
+      const configured = !!(settings?.enabled && settings?.host && settings?.apiToken);
+      res.json({ enabled: configured });
     } catch {
       res.json({ enabled: false });
     }

@@ -483,7 +483,7 @@ function buildChartData(rows: FortigateBandwidth[]): { time: string; [key: strin
   return Object.entries(byTime).map(([time, vals]) => ({ time, ...vals }));
 }
 
-const BandwidthChart = memo(function BandwidthChart({ rows }: { rows: FortigateBandwidth[] }) {
+const BandwidthChart = memo(function BandwidthChart({ rows, label }: { rows: FortigateBandwidth[]; label: string }) {
   if (rows.length === 0) return null;
 
   const interfaces = Array.from(new Set(rows.map(r => r.interfaceName)));
@@ -494,7 +494,7 @@ const BandwidthChart = memo(function BandwidthChart({ rows }: { rows: FortigateB
       <div className="flex items-center gap-2 mb-3">
         <span className="it-dot it-dot-blink bg-cyan-400" />
         <Activity className="w-3.5 h-3.5 text-gray-500" />
-        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">FortiGate Bandwidth (Mbps)</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</span>
       </div>
       <ResponsiveContainer width="100%" height={120}>
         <LineChart data={chartData} margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
@@ -786,9 +786,9 @@ export default function ITDashboard() {
           </div>
         )}
 
-        {/* FortiGate bandwidth chart — only shown when enabled and data exists */}
+        {/* FortiGate bandwidth chart — only shown when enabled+configured and data exists */}
         {fortigateEnabled && bandwidthRows.length > 0 && (
-          <BandwidthChart rows={bandwidthRows} />
+          <BandwidthChart rows={bandwidthRows} label={it.sectionBandwidth || "FortiGate Bandwidth (Mbps)"} />
         )}
 
         {/* Device summary cards + KPIs */}
