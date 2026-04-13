@@ -1,9 +1,35 @@
 import { storage } from "./storage";
+import https from "https";
+import http from "http";
 
 let syncTimer: ReturnType<typeof setInterval> | null = null;
 
 // Per-interface byte counters from previous poll for delta computation
 const prevCounters: Record<string, { tx: number; rx: number; ts: number }> = {};
+
+// Reusable HTTPS agent that skips certificate verification.
+// FortiGate and other local appliances use self-signed certificates.
+const tlsAgent = new https.Agent({ rejectUnauthorized: false });
+
+/** Thin fetch wrapper using Node https/http modules (bypasses self-signed cert rejection). */
+function fortigateFetch(url: string, headers: Record<string, string>, timeoutMs = 10000): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const lib = parsed.protocol === "https:" ? https : http;
+    const agent = parsed.protocol === "https:" ? tlsAgent : undefined;
+    const req = lib.request(
+      { hostname: parsed.hostname, port: parsed.port || (parsed.protocol === "https:" ? 443 : 80), path: parsed.pathname + parsed.search, method: "GET", headers, agent },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; });
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body: data }));
+      }
+    );
+    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error("Request timed out")); });
+    req.on("error", reject);
+    req.end();
+  });
+}
 
 /**
  * Fetch the interface list from a FortiGate without storing data.
@@ -16,15 +42,14 @@ export async function testFortigateConnection(settings: {
 }): Promise<{ ok: boolean; interfaces: string[]; error?: string }> {
   const base = buildBase(settings.host, settings.port);
   try {
-    const res = await fetch(`${base}/api/v2/monitor/system/interface/`, {
-      headers: { Authorization: `Bearer ${settings.apiToken}` },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      return { ok: false, interfaces: [], error: `HTTP ${res.status}: ${body.slice(0, 200)}` };
+    const { status, body } = await fortigateFetch(
+      `${base}/api/v2/monitor/system/interface/`,
+      { Authorization: `Bearer ${settings.apiToken}` }
+    );
+    if (status < 200 || status >= 300) {
+      return { ok: false, interfaces: [], error: `HTTP ${status}: ${body.slice(0, 200)}` };
     }
-    const data = await res.json();
+    const data = JSON.parse(body);
     const ifaceList: any[] = Array.isArray(data.results) ? data.results : [];
     const interfaces = ifaceList.map((i: any) => i.name || i.id || "").filter(Boolean);
     return { ok: true, interfaces };
@@ -35,10 +60,8 @@ export async function testFortigateConnection(settings: {
 
 function buildBase(host: string, port: number): string {
   const trimmed = host.replace(/\/+$/, "").trim();
-  // Ensure we always have a scheme for URL parsing
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   const url = new URL(withScheme);
-  // Override port only when the input URL has no explicit port and the specified port is non-default
   if (!url.port) {
     if ((url.protocol === "https:" && port !== 443) || (url.protocol === "http:" && port !== 80)) {
       url.port = String(port);
@@ -58,17 +81,16 @@ async function pollFortigate(): Promise<void> {
   const base = buildBase(settings.host, settings.port);
 
   try {
-    const res = await fetch(`${base}/api/v2/monitor/system/interface/`, {
-      headers: { Authorization: `Bearer ${settings.apiToken}` },
-      signal: AbortSignal.timeout(10000),
-    });
+    const { status, body } = await fortigateFetch(
+      `${base}/api/v2/monitor/system/interface/`,
+      { Authorization: `Bearer ${settings.apiToken}` }
+    );
 
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+    if (status < 200 || status >= 300) {
+      throw new Error(`HTTP ${status}: ${body.slice(0, 200)}`);
     }
 
-    const data = await res.json();
+    const data = JSON.parse(body);
     const ifaceList: any[] = Array.isArray(data.results) ? data.results : [];
 
     const now = Date.now();
@@ -87,13 +109,13 @@ async function pollFortigate(): Promise<void> {
 
       if (!prev) continue;
 
-      const elapsed = (now - prev.ts) / 1000; // seconds
+      const elapsed = (now - prev.ts) / 1000;
       if (elapsed <= 0) continue;
 
       const txDelta = txBytes >= prev.tx ? txBytes - prev.tx : txBytes;
       const rxDelta = rxBytes >= prev.rx ? rxBytes - prev.rx : rxBytes;
 
-      // Store as Kbps (kilobits per second)
+      // Store as Kbps; chart converts to Mbps for display
       const txKbps = ((txDelta * 8) / elapsed / 1000).toFixed(2);
       const rxKbps = ((rxDelta * 8) / elapsed / 1000).toFixed(2);
 
