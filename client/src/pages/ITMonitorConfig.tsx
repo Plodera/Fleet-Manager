@@ -286,6 +286,26 @@ export default function ITMonitorConfig() {
     reader.readAsText(file);
   }
 
+  function downloadCsvTemplate() {
+    const rows = [
+      ["name", "ip_address", "host_type", "notes"],
+      ["Camera 01", "192.168.1.101", "camera", "Main entrance"],
+      ["Camera 02", "192.168.1.102", "camera", "Side door"],
+      ["Core Switch", "192.168.1.1", "switch", "Server room"],
+      ["WAP Floor 1", "192.168.1.20", "wireless_ap", ""],
+      ["Printer HR", "192.168.1.50", "printer", "HR Department"],
+      ["ISP Link", "196.249.230.10", "internet_link", "Primary uplink"],
+    ];
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "hosts_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // KPI mutations
   const createKpiMutation = useMutation({
     mutationFn: (data: InsertItKpi) => apiRequest("POST", "/api/it/kpis", data),
@@ -563,6 +583,9 @@ export default function ITMonitorConfig() {
               data-testid="input-csv-file"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvFile(f); e.target.value = ""; }}
             />
+            <Button variant="outline" onClick={downloadCsvTemplate} data-testid="button-download-template">
+              <ExternalLink className="w-4 h-4 mr-2" /> Download Template
+            </Button>
             <Button variant="outline" onClick={() => csvFileRef.current?.click()} data-testid="button-import-csv">
               <RefreshCw className="w-4 h-4 mr-2" /> Import CSV
             </Button>
