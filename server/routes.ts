@@ -2363,33 +2363,39 @@ export async function registerRoutes(
 
   // ── FortiGate Bandwidth Integration ─────────────────────────────────────
 
-  app.get('/api/it/fortigate-settings', async (req, res) => {
+  app.get('/api/it/fortigate/settings', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
     if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
     try {
       const settings = await storage.getFortigateSettings();
-      const safe = settings ? { ...settings, apiToken: "" } : { host: "", apiToken: "", pollIntervalSeconds: 60, enabled: false, interfaces: "", lastSyncAt: null, lastError: null };
+      const safe = settings
+        ? { ...settings, apiToken: "" }
+        : { host: "", port: 443, apiToken: "", pollIntervalMinutes: 1, enabled: false, interfaces: "[]", lastSyncAt: null, lastError: null };
       res.json(safe);
     } catch (err: any) {
       res.status(500).json({ message: "Failed to fetch FortiGate settings" });
     }
   });
 
-  app.put('/api/it/fortigate-settings', async (req, res) => {
+  app.put('/api/it/fortigate/settings', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
     if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
     try {
-      const { host, apiToken, pollIntervalSeconds, enabled, interfaces } = req.body;
+      const { host, port, apiToken, pollIntervalMinutes, enabled, interfaces } = req.body;
       const existing = await storage.getFortigateSettings();
-      const savedToken = apiToken && apiToken.trim() !== "" ? apiToken : (existing?.apiToken ?? "");
+      const savedToken = apiToken && String(apiToken).trim() !== "" ? apiToken : (existing?.apiToken ?? "");
+      const interfacesJson = Array.isArray(interfaces)
+        ? JSON.stringify(interfaces)
+        : (typeof interfaces === "string" ? interfaces : "[]");
       const settings = await storage.upsertFortigateSettings({
         host: host || "",
+        port: parseInt(port) || 443,
         apiToken: savedToken,
-        pollIntervalSeconds: parseInt(pollIntervalSeconds) || 60,
+        pollIntervalMinutes: parseInt(pollIntervalMinutes) || 1,
         enabled: !!enabled,
-        interfaces: interfaces || "",
+        interfaces: interfacesJson,
       });
       const { rescheduleFortigateSync } = await import("./fortigateSync");
       rescheduleFortigateSync();
@@ -2399,7 +2405,31 @@ export async function registerRoutes(
     }
   });
 
-  app.post('/api/it/fortigate-sync', async (req, res) => {
+  app.post('/api/it/fortigate/test', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { host, port, apiToken } = req.body;
+      const existing = await storage.getFortigateSettings();
+      const token = apiToken && String(apiToken).trim() !== "" ? apiToken : (existing?.apiToken ?? "");
+      const { testFortigateConnection } = await import("./fortigateSync");
+      const result = await testFortigateConnection({
+        host: host || existing?.host || "",
+        port: parseInt(port) || existing?.port || 443,
+        apiToken: token,
+      });
+      if (result.ok) {
+        res.json(result);
+      } else {
+        res.status(502).json(result);
+      }
+    } catch (err: any) {
+      res.status(500).json({ ok: false, interfaces: [], error: err.message });
+    }
+  });
+
+  app.post('/api/it/fortigate/sync', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
     if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
@@ -2416,7 +2446,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get('/api/it/fortigate-bandwidth', async (req, res) => {
+  app.get('/api/it/fortigate/bandwidth', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const hours = Math.min(parseInt(String(req.query.hours || "1")), 2);

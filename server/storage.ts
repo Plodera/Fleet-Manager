@@ -1282,27 +1282,27 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async insertFortigateBandwidth(rows: { interfaceName: string; txMbps: string; rxMbps: string }[]): Promise<void> {
+  async insertFortigateBandwidth(rows: { interfaceName: string; txKbps: string; rxKbps: string }[]): Promise<void> {
     if (rows.length === 0) return;
     await getDb().insert(fortigateBandwidth).values(rows.map(r => ({
       interfaceName: r.interfaceName,
-      txMbps: r.txMbps,
-      rxMbps: r.rxMbps,
-      recordedAt: new Date(),
+      txKbps: r.txKbps,
+      rxKbps: r.rxKbps,
+      sampledAt: new Date(),
     })));
   }
 
   async getFortigateBandwidth(hours: number = 1): Promise<FortigateBandwidth[]> {
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
     return getDb().select().from(fortigateBandwidth)
-      .where(sql`${fortigateBandwidth.recordedAt} >= ${since}`)
-      .orderBy(fortigateBandwidth.recordedAt);
+      .where(sql`${fortigateBandwidth.sampledAt} >= ${since}`)
+      .orderBy(fortigateBandwidth.sampledAt);
   }
 
   async pruneFortigateBandwidth(): Promise<void> {
     const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
     await getDb().delete(fortigateBandwidth)
-      .where(sql`${fortigateBandwidth.recordedAt} < ${cutoff}`);
+      .where(sql`${fortigateBandwidth.sampledAt} < ${cutoff}`);
   }
 }
 
