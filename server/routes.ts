@@ -2279,6 +2279,24 @@ export async function registerRoutes(
     }
   });
 
+  // Raw XML diagnostic endpoint — returns first 4 KB of ISAPI response
+  app.get('/api/it/hikvision-nvrs/:id/raw-xml', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { fetchNvrRawXml } = await import("./hikvisionSync");
+      const result = await fetchNvrRawXml(parseInt(req.params.id));
+      if (result.ok) {
+        res.json(result);
+      } else {
+        res.status(502).json(result);
+      }
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   // Global Hikvision Settings
   app.get('/api/it/hikvision-settings', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

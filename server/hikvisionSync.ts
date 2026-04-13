@@ -51,15 +51,35 @@ async function digestFetch(url: string, username: string, password: string): Pro
 
 // ── Parse Hikvision ISAPI XML for channel counts ──────────────────────────────
 function parseCameraChannels(xml: string): { total: number; online: number } {
-  // Count all <InputProxyChannel> elements
+  // Count all <InputProxyChannel> elements (total channels configured)
   const totalMatches = xml.match(/<InputProxyChannel[\s>]/g);
   const total = totalMatches ? totalMatches.length : 0;
 
-  // Count channels where connectionStatus is "online" (case-insensitive)
-  const onlineMatches = xml.match(/<connectionStatus>\s*online\s*<\/connectionStatus>/gi);
+  // Match status values that indicate a camera is online/connected.
+  // Different NVR firmware versions use different field names and capitalisation:
+  //   <connectionStatus>online</connectionStatus>
+  //   <connectionStatus>Connected</connectionStatus>
+  //   <streamStatus>online</streamStatus>
+  //   <streamStatus>connected</streamStatus>
+  //   <onlineStatus>online</onlineStatus>
+  const onlineMatches = xml.match(/<(?:connectionStatus|streamStatus|onlineStatus)>\s*(?:online|connected)\s*<\/(?:connectionStatus|streamStatus|onlineStatus)>/gi);
   const online = onlineMatches ? onlineMatches.length : 0;
 
   return { total, online };
+}
+
+// ── Fetch raw ISAPI XML from a single NVR (for diagnostics) ──────────────────
+export async function fetchNvrRawXml(nvrId: number): Promise<{ ok: boolean; xml?: string; error?: string }> {
+  const nvr = await storage.getHikvisionNvr(nvrId);
+  if (!nvr) return { ok: false, error: "NVR not found" };
+  const url = `http://${nvr.ipAddress}:${nvr.port}/ISAPI/ContentMgmt/InputProxy/channels`;
+  try {
+    const result = await digestFetch(url, nvr.username, nvr.password);
+    if (!result.ok) return { ok: false, error: `HTTP ${result.status}: ${result.text.slice(0, 200)}` };
+    return { ok: true, xml: result.text.slice(0, 4096) };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
 }
 
 // ── Poll one NVR and return camera counts ─────────────────────────────────────
