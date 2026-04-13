@@ -185,12 +185,20 @@ export function rescheduleFortigateSync(): void {
 }
 
 export async function triggerFortigateSync(): Promise<string | null> {
+  // First poll sets the byte-counter baseline; second poll computes the delta.
+  // A short delay between them gives the FortiGate time to accumulate traffic.
+  await pollFortigate();
+  await new Promise(r => setTimeout(r, 3000));
   await pollFortigate();
   const settings = await storage.getFortigateSettings();
   return settings?.lastError ?? null;
 }
 
 export function startFortigateSync(): void {
-  pollFortigate().catch(err => console.error("[fortigateSync] Initial poll error:", err));
+  // Double-poll on startup: first call sets baseline, second produces first chart rows
+  pollFortigate()
+    .then(() => new Promise(r => setTimeout(r, 5000)))
+    .then(() => pollFortigate())
+    .catch(err => console.error("[fortigateSync] Initial poll error:", err));
   reschedule();
 }
