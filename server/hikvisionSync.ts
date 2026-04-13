@@ -102,8 +102,22 @@ function parseChannelStatusXml(xml: string): { total: number; online: number } {
   const blocks = xml.match(/<InputProxyChannelStatus[\s\S]*?<\/InputProxyChannelStatus>/gi) ?? [];
   const total = blocks.length;
   // onlineStatus is the primary field in the status endpoint
-  const onlineRe = /<(?:onlineStatus|connectionStatus|streamStatus)>\s*(?:online|connected)\s*<\/(?:onlineStatus|connectionStatus|streamStatus)>/i;
+  // Known positive patterns across Hikvision firmware variants:
+  //   <onlineStatus>online</onlineStatus>  — most common
+  //   <onlineStatus>Online</onlineStatus>  — some firmware
+  //   <onlineStatus>true</onlineStatus>    — boolean form
+  //   <connectionStatus>connected</connectionStatus>
+  //   <streamStatus>online</streamStatus>
+  //   <status>online</status>              — simpler field name
+  const onlineRe = /<(?:onlineStatus|connectionStatus|streamStatus|status)>\s*(?:online|connected|true)\s*<\/(?:onlineStatus|connectionStatus|streamStatus|status)>/i;
   const online = blocks.filter(b => onlineRe.test(b)).length;
+
+  // Debug: log first status block when all cameras appear offline so admins
+  // can check pm2 logs to identify the exact status field the NVR uses
+  if (total > 0 && online === 0 && blocks[0]) {
+    console.warn("[hikvisionSync] STATUS DEBUG — first InputProxyChannelStatus block:\n", blocks[0].slice(0, 800));
+  }
+
   return { total, online };
 }
 
