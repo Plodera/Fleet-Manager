@@ -6,6 +6,7 @@ import {
   trackers, trackerItems, trackerNotificationRules,
   itHostTypes, itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
   glpiSettings,
+  hikvisionNvrs, hikvisionGlobalSettings,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -32,6 +33,8 @@ import {
   type TrackerItem, type InsertTrackerItem,
   type TrackerNotificationRule, type InsertTrackerNotificationRule,
   type GlpiSettings, type InsertGlpiSettings,
+  type HikvisionNvr, type InsertHikvisionNvr,
+  type HikvisionGlobalSettings, type InsertHikvisionGlobalSettings,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq, desc, sql, and } from "drizzle-orm";
@@ -1193,6 +1196,61 @@ export class DatabaseStorage implements IStorage {
         .where(eq(glpiSettings.id, existing[0].id));
     }
   }
+
+  // ── Hikvision NVR methods ────────────────────────────────────────────────
+  async getHikvisionNvrs(): Promise<HikvisionNvr[]> {
+    return getDb().select().from(hikvisionNvrs).orderBy(hikvisionNvrs.id);
+  }
+
+  async getHikvisionNvr(id: number): Promise<HikvisionNvr | undefined> {
+    const rows = await getDb().select().from(hikvisionNvrs).where(eq(hikvisionNvrs.id, id));
+    return rows[0];
+  }
+
+  async createHikvisionNvr(data: InsertHikvisionNvr): Promise<HikvisionNvr> {
+    const [row] = await getDb().insert(hikvisionNvrs).values(data).returning();
+    return row;
+  }
+
+  async updateHikvisionNvr(id: number, data: Partial<InsertHikvisionNvr>): Promise<HikvisionNvr> {
+    const [row] = await getDb().update(hikvisionNvrs).set(data).where(eq(hikvisionNvrs.id, id)).returning();
+    return row;
+  }
+
+  async deleteHikvisionNvr(id: number): Promise<void> {
+    await getDb().delete(hikvisionNvrs).where(eq(hikvisionNvrs.id, id));
+  }
+
+  async updateHikvisionNvrStatus(id: number, data: { lastCameraTotal?: number | null; lastCameraOnline?: number | null; lastSyncedAt?: Date | null; lastError?: string | null }): Promise<void> {
+    await getDb().update(hikvisionNvrs).set(data).where(eq(hikvisionNvrs.id, id));
+  }
+
+  async getHikvisionGlobalSettings(): Promise<HikvisionGlobalSettings | undefined> {
+    const rows = await getDb().select().from(hikvisionGlobalSettings).limit(1);
+    return rows[0];
+  }
+
+  async saveHikvisionGlobalSettings(data: InsertHikvisionGlobalSettings): Promise<HikvisionGlobalSettings> {
+    const existing = await getDb().select().from(hikvisionGlobalSettings).limit(1);
+    if (existing.length > 0) {
+      const [row] = await getDb().update(hikvisionGlobalSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(hikvisionGlobalSettings.id, existing[0].id))
+        .returning();
+      return row;
+    }
+    const [row] = await getDb().insert(hikvisionGlobalSettings).values(data).returning();
+    return row;
+  }
+
+  async updateHikvisionGlobalSyncStatus(lastSyncAt: Date | null, lastError: string | null): Promise<void> {
+    const existing = await getDb().select().from(hikvisionGlobalSettings).limit(1);
+    if (existing.length > 0) {
+      await getDb().update(hikvisionGlobalSettings)
+        .set({ lastSyncAt, lastError, updatedAt: new Date() })
+        .where(eq(hikvisionGlobalSettings.id, existing[0].id));
+    }
+  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -1348,5 +1406,14 @@ export const storage = {
   getGlpiSettings: () => getStorage().getGlpiSettings(),
   upsertGlpiSettings: (...args: Parameters<DatabaseStorage['upsertGlpiSettings']>) => getStorage().upsertGlpiSettings(...args),
   updateGlpiSyncStatus: (...args: Parameters<DatabaseStorage['updateGlpiSyncStatus']>) => getStorage().updateGlpiSyncStatus(...args),
+  getHikvisionNvrs: () => getStorage().getHikvisionNvrs(),
+  getHikvisionNvr: (...args: Parameters<DatabaseStorage['getHikvisionNvr']>) => getStorage().getHikvisionNvr(...args),
+  createHikvisionNvr: (...args: Parameters<DatabaseStorage['createHikvisionNvr']>) => getStorage().createHikvisionNvr(...args),
+  updateHikvisionNvr: (...args: Parameters<DatabaseStorage['updateHikvisionNvr']>) => getStorage().updateHikvisionNvr(...args),
+  deleteHikvisionNvr: (...args: Parameters<DatabaseStorage['deleteHikvisionNvr']>) => getStorage().deleteHikvisionNvr(...args),
+  updateHikvisionNvrStatus: (...args: Parameters<DatabaseStorage['updateHikvisionNvrStatus']>) => getStorage().updateHikvisionNvrStatus(...args),
+  getHikvisionGlobalSettings: () => getStorage().getHikvisionGlobalSettings(),
+  saveHikvisionGlobalSettings: (...args: Parameters<DatabaseStorage['saveHikvisionGlobalSettings']>) => getStorage().saveHikvisionGlobalSettings(...args),
+  updateHikvisionGlobalSyncStatus: (...args: Parameters<DatabaseStorage['updateHikvisionGlobalSyncStatus']>) => getStorage().updateHikvisionGlobalSyncStatus(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

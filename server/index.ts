@@ -106,6 +106,10 @@ import { initDatabase } from "./db";
   const { startGlpiSync } = await import("./glpiSync");
   startGlpiSync();
 
+  // Start Hikvision NVR sync service
+  const { startHikvisionSync } = await import("./hikvisionSync");
+  startHikvisionSync();
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

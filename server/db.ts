@@ -47,6 +47,34 @@ export async function initDatabase() {
         updated_at            TIMESTAMP DEFAULT NOW()
       )
     `);
+    await _pool.query(`
+      CREATE TABLE IF NOT EXISTS hikvision_nvrs (
+        id                  SERIAL PRIMARY KEY,
+        name                TEXT NOT NULL,
+        ip_address          TEXT NOT NULL,
+        port                INTEGER NOT NULL DEFAULT 80,
+        username            TEXT NOT NULL DEFAULT '',
+        password            TEXT NOT NULL DEFAULT '',
+        is_active           BOOLEAN NOT NULL DEFAULT TRUE,
+        notes               TEXT,
+        last_synced_at      TIMESTAMP,
+        last_error          TEXT,
+        last_camera_total   INTEGER,
+        last_camera_online  INTEGER,
+        created_at          TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await _pool.query(`
+      CREATE TABLE IF NOT EXISTS hikvision_global_settings (
+        id                    SERIAL PRIMARY KEY,
+        sync_interval_minutes INTEGER NOT NULL DEFAULT 1,
+        enabled               BOOLEAN NOT NULL DEFAULT FALSE,
+        dashboard_id          INTEGER,
+        last_sync_at          TIMESTAMP,
+        last_error            TEXT,
+        updated_at            TIMESTAMP DEFAULT NOW()
+      )
+    `);
   } catch (err: any) {
     console.warn('[db] Auto-migration warning:', err.message);
   }

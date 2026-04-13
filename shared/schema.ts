@@ -832,6 +832,41 @@ export type ItHostWithStatus = ItMonitoredHost & {
   } | null;
 };
 
+// Hikvision NVR integration — one row per NVR device
+export const hikvisionNvrs = pgTable("hikvision_nvrs", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  ipAddress: text("ip_address").notNull(),
+  port: integer("port").notNull().default(80),
+  username: text("username").notNull().default(""),
+  password: text("password").notNull().default(""),
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  lastError: text("last_error"),
+  lastCameraTotal: integer("last_camera_total"),
+  lastCameraOnline: integer("last_camera_online"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Hikvision global settings — one row (sync interval, enabled toggle, target dashboard)
+export const hikvisionGlobalSettings = pgTable("hikvision_global_settings", {
+  id: serial("id").primaryKey(),
+  syncIntervalMinutes: integer("sync_interval_minutes").notNull().default(1),
+  enabled: boolean("enabled").notNull().default(false),
+  dashboardId: integer("dashboard_id"),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHikvisionNvrSchema = createInsertSchema(hikvisionNvrs).omit({ id: true, createdAt: true, lastSyncedAt: true, lastError: true, lastCameraTotal: true, lastCameraOnline: true });
+export const insertHikvisionGlobalSettingsSchema = createInsertSchema(hikvisionGlobalSettings).omit({ id: true, lastSyncAt: true, lastError: true, updatedAt: true });
+export type HikvisionNvr = typeof hikvisionNvrs.$inferSelect;
+export type InsertHikvisionNvr = z.infer<typeof insertHikvisionNvrSchema>;
+export type HikvisionGlobalSettings = typeof hikvisionGlobalSettings.$inferSelect;
+export type InsertHikvisionGlobalSettings = z.infer<typeof insertHikvisionGlobalSettingsSchema>;
+
 // GLPI ticketing system integration settings
 export const glpiSettings = pgTable("glpi_settings", {
   id: serial("id").primaryKey(),

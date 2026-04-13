@@ -2190,6 +2190,142 @@ export async function registerRoutes(
     }
   });
 
+  // ── Hikvision NVR Integration ─────────────────────────────────────────────
+
+  // NVR CRUD
+  app.get('/api/it/hikvision-nvrs', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const nvrs = await storage.getHikvisionNvrs();
+      // Exclude passwords from response
+      res.json(nvrs.map(n => ({ ...n, password: undefined })));
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch NVRs" });
+    }
+  });
+
+  app.post('/api/it/hikvision-nvrs', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { name, ipAddress, port, username, password, isActive, notes } = req.body;
+      const nvr = await storage.createHikvisionNvr({
+        name: name || "",
+        ipAddress: ipAddress || "",
+        port: parseInt(port) || 80,
+        username: username || "",
+        password: password || "",
+        isActive: isActive !== false,
+        notes: notes || null,
+      });
+      res.json({ ...nvr, password: undefined });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to create NVR" });
+    }
+  });
+
+  app.put('/api/it/hikvision-nvrs/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const id = parseInt(req.params.id);
+      const { name, ipAddress, port, username, password, isActive, notes } = req.body;
+      const updateData: any = {
+        name, ipAddress,
+        port: parseInt(port) || 80,
+        username,
+        isActive: isActive !== false,
+        notes: notes || null,
+      };
+      // Only update password if a new one was supplied
+      if (password && password.trim() !== "") updateData.password = password;
+      const nvr = await storage.updateHikvisionNvr(id, updateData);
+      res.json({ ...nvr, password: undefined });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to update NVR" });
+    }
+  });
+
+  app.delete('/api/it/hikvision-nvrs/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      await storage.deleteHikvisionNvr(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to delete NVR" });
+    }
+  });
+
+  app.post('/api/it/hikvision-nvrs/:id/test', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { testNvrConnection } = await import("./hikvisionSync");
+      const result = await testNvrConnection(parseInt(req.params.id));
+      if (result.ok) {
+        res.json(result);
+      } else {
+        res.status(502).json(result);
+      }
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Global Hikvision Settings
+  app.get('/api/it/hikvision-settings', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const settings = await storage.getHikvisionGlobalSettings();
+      res.json(settings || { syncIntervalMinutes: 1, enabled: false, dashboardId: null, lastSyncAt: null, lastError: null });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch Hikvision settings" });
+    }
+  });
+
+  app.put('/api/it/hikvision-settings', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { syncIntervalMinutes, enabled, dashboardId } = req.body;
+      const settings = await storage.saveHikvisionGlobalSettings({
+        syncIntervalMinutes: parseInt(syncIntervalMinutes) || 1,
+        enabled: !!enabled,
+        dashboardId: dashboardId ? parseInt(dashboardId) : null,
+      });
+      const { rescheduleHikvisionSync } = await import("./hikvisionSync");
+      rescheduleHikvisionSync();
+      res.json(settings);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to save Hikvision settings" });
+    }
+  });
+
+  // Manual sync trigger
+  app.post('/api/it/hikvision-sync', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { triggerHikvisionSync } = await import("./hikvisionSync");
+      const result = await triggerHikvisionSync();
+      const settings = await storage.getHikvisionGlobalSettings();
+      res.json({ success: true, ...result, lastSyncAt: settings?.lastSyncAt });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Sync failed" });
+    }
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

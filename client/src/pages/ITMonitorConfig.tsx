@@ -176,6 +176,14 @@ export default function ITMonitorConfig() {
   // GLPI state
   const [glpiForm, setGlpiForm] = useState({ url: "", appToken: "", userToken: "", syncIntervalMinutes: "15", enabled: false });
 
+  // Hikvision NVR state
+  const BLANK_NVR = { name: "", ipAddress: "", port: "80", username: "", password: "", isActive: true, notes: "" };
+  const [nvrDialog, setNvrDialog] = useState(false);
+  const [editNvr, setEditNvr] = useState<any>(null);
+  const [nvrForm, setNvrForm] = useState(BLANK_NVR);
+  const [hikGlobalForm, setHikGlobalForm] = useState({ syncIntervalMinutes: "1", enabled: false, dashboardId: "" });
+  const [testingNvrId, setTestingNvrId] = useState<number | null>(null);
+
   // Data entry
   const [dataEntryPeriodType, setDataEntryPeriodType] = useState("daily");
   const [dataEntryDate, setDataEntryDate] = useState(new Date().toISOString().split("T")[0]);
@@ -280,6 +288,109 @@ export default function ITMonitorConfig() {
     onError: (err: any) => { refetchGlpi(); toast({ title: err?.message || "GLPI sync failed", variant: "destructive" }); },
   });
 
+  // Hikvision queries and mutations
+  const { data: hikNvrs = [], refetch: refetchNvrs } = useQuery<any[]>({
+    queryKey: ["/api/it/hikvision-nvrs"],
+    queryFn: async () => {
+      const res = await fetch("/api/it/hikvision-nvrs");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    refetchInterval: activeTab === "nvr" ? 30000 : false,
+  });
+
+  const { data: hikGlobalSettings, refetch: refetchHikSettings } = useQuery<any>({
+    queryKey: ["/api/it/hikvision-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/it/hikvision-settings");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    refetchInterval: activeTab === "nvr" ? 30000 : false,
+  });
+
+  useEffect(() => {
+    if (hikGlobalSettings) {
+      setHikGlobalForm({
+        syncIntervalMinutes: String(hikGlobalSettings.syncIntervalMinutes ?? 1),
+        enabled: !!hikGlobalSettings.enabled,
+        dashboardId: hikGlobalSettings.dashboardId ? String(hikGlobalSettings.dashboardId) : "",
+      });
+    }
+  }, [hikGlobalSettings]);
+
+  const createNvrMutation = useMutation({
+    mutationFn: (data: object) => apiRequest("POST", "/api/it/hikvision-nvrs", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/hikvision-nvrs"] }); setNvrDialog(false); toast({ title: "NVR added" }); },
+    onError: () => toast({ title: "Failed to add NVR", variant: "destructive" }),
+  });
+
+  const updateNvrMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: object }) => apiRequest("PUT", `/api/it/hikvision-nvrs/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/hikvision-nvrs"] }); setNvrDialog(false); toast({ title: "NVR updated" }); },
+    onError: () => toast({ title: "Failed to update NVR", variant: "destructive" }),
+  });
+
+  const deleteNvrMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/it/hikvision-nvrs/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/hikvision-nvrs"] }); setDeleteTarget(null); toast({ title: "NVR deleted" }); },
+    onError: () => toast({ title: "Failed to delete NVR", variant: "destructive" }),
+  });
+
+  const saveHikSettingsMutation = useMutation({
+    mutationFn: (data: object) => apiRequest("PUT", "/api/it/hikvision-settings", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/it/hikvision-settings"] }); toast({ title: "Hikvision settings saved" }); },
+    onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
+  });
+
+  const syncHikMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/it/hikvision-sync", {}),
+    onSuccess: (data: any) => {
+      refetchNvrs();
+      refetchHikSettings();
+      queryClient.invalidateQueries({ queryKey: ["/api/it/kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/it/kpi-values"] });
+      const errs = data?.errors?.length ? ` (${data.errors.length} error(s))` : "";
+      toast({ title: `Synced — ${data?.total ?? 0} total, ${data?.online ?? 0} online${errs}` });
+    },
+    onError: (err: any) => { refetchNvrs(); toast({ title: err?.message || "Sync failed", variant: "destructive" }); },
+  });
+
+  const testNvrConnection = async (id: number) => {
+    setTestingNvrId(id);
+    try {
+      const res = await fetch(`/api/it/hikvision-nvrs/${id}/test`, { method: "POST" });
+      const data = await res.json();
+      if (data.ok) {
+        toast({ title: `Connected — ${data.cameraOnline}/${data.cameraTotal} cameras online` });
+      } else {
+        toast({ title: `Connection failed: ${data.error}`, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Test failed", variant: "destructive" });
+    } finally {
+      setTestingNvrId(null);
+      refetchNvrs();
+    }
+  };
+
+  const openNvrDialog = (nvr?: any) => {
+    if (nvr) {
+      setEditNvr(nvr);
+      setNvrForm({ name: nvr.name, ipAddress: nvr.ipAddress, port: String(nvr.port), username: nvr.username, password: "", isActive: nvr.isActive, notes: nvr.notes || "" });
+    } else {
+      setEditNvr(null);
+      setNvrForm(BLANK_NVR);
+    }
+    setNvrDialog(true);
+  };
+
+  const submitNvr = () => {
+    const data = { ...nvrForm, port: parseInt(nvrForm.port) || 80 };
+    if (editNvr) updateNvrMutation.mutate({ id: editNvr.id, data });
+    else createNvrMutation.mutate(data);
+  };
+
   // Dialog handlers
   const openTypeDialog = (ht?: ItHostType) => {
     if (ht) {
@@ -352,6 +463,7 @@ export default function ITMonitorConfig() {
     if (deleteTarget.type === "host") deleteHostMutation.mutate(deleteTarget.id);
     else if (deleteTarget.type === "kpi") deleteKpiMutation.mutate(deleteTarget.id);
     else if (deleteTarget.type === "hosttype") deleteTypeMutation.mutate(deleteTarget.id);
+    else if (deleteTarget.type === "nvr") deleteNvrMutation.mutate(deleteTarget.id);
   };
 
   const it = t.itMonitor;
@@ -385,6 +497,7 @@ export default function ITMonitorConfig() {
           <TabsTrigger value="kpis" data-testid="tab-kpis">{it.kpisTab || "KPIs"}</TabsTrigger>
           <TabsTrigger value="dataentry" data-testid="tab-data-entry">{it.dataEntryTab || "Data Entry"}</TabsTrigger>
           <TabsTrigger value="glpi" data-testid="tab-glpi">GLPI</TabsTrigger>
+          <TabsTrigger value="nvr" data-testid="tab-nvr">NVR</TabsTrigger>
         </TabsList>
 
         {/* ── Monitored Hosts tab ── */}
@@ -751,7 +864,234 @@ export default function ITMonitorConfig() {
             </Card>
           </div>
         </TabsContent>
+
+        {/* ── Hikvision NVR tab ── */}
+        <TabsContent value="nvr" className="mt-4">
+          <div className="space-y-6">
+
+            {/* NVR list */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4 text-primary" />
+                <span className="font-semibold">Hikvision NVRs</span>
+                <span className="text-sm text-muted-foreground">({hikNvrs.length})</span>
+              </div>
+              <Button size="sm" onClick={() => openNvrDialog()} data-testid="button-add-nvr">
+                <Plus className="w-4 h-4 mr-1" /> Add NVR
+              </Button>
+            </div>
+
+            {hikNvrs.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground border rounded-lg">
+                <Camera className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>No NVRs configured. Add your first Hikvision NVR.</p>
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left px-4 py-2.5 font-medium">Name</th>
+                      <th className="text-left px-4 py-2.5 font-medium">Address</th>
+                      <th className="text-left px-4 py-2.5 font-medium">Camera Status</th>
+                      <th className="text-left px-4 py-2.5 font-medium">Last Sync</th>
+                      <th className="text-right px-4 py-2.5 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {hikNvrs.map((nvr: any) => (
+                      <tr key={nvr.id} className="hover:bg-muted/30" data-testid={`row-nvr-${nvr.id}`}>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${nvr.isActive ? "bg-green-500" : "bg-gray-400"}`} />
+                            <span className="font-medium">{nvr.name}</span>
+                          </div>
+                          {nvr.notes && <p className="text-xs text-muted-foreground ml-4">{nvr.notes}</p>}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                          {nvr.ipAddress}:{nvr.port}
+                        </td>
+                        <td className="px-4 py-3">
+                          {nvr.lastCameraTotal != null ? (
+                            <Badge className={nvr.lastCameraOnline === nvr.lastCameraTotal ? "bg-green-600 text-white" : nvr.lastCameraOnline === 0 ? "bg-red-600 text-white" : "bg-amber-500 text-white"}>
+                              {nvr.lastCameraOnline}/{nvr.lastCameraTotal} online
+                            </Badge>
+                          ) : nvr.lastError ? (
+                            <Badge variant="destructive" className="text-xs max-w-[200px] truncate">{nvr.lastError}</Badge>
+                          ) : (
+                            <Badge variant="secondary">Not synced</Badge>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          {nvr.lastSyncedAt ? new Date(nvr.lastSyncedAt).toLocaleString() : "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button size="sm" variant="ghost" className="h-8 px-2 text-xs"
+                              disabled={testingNvrId === nvr.id}
+                              onClick={() => testNvrConnection(nvr.id)}
+                              data-testid={`button-test-nvr-${nvr.id}`}
+                            >
+                              {testingNvrId === nvr.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
+                              <span className="ml-1">Test</span>
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0"
+                              onClick={() => openNvrDialog(nvr)}
+                              data-testid={`button-edit-nvr-${nvr.id}`}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                              onClick={() => setDeleteTarget({ type: "nvr", id: nvr.id, name: nvr.name })}
+                              data-testid={`button-delete-nvr-${nvr.id}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Global Settings */}
+            <Card>
+              <CardContent className="pt-6 space-y-5">
+                <div className="flex items-center gap-3 pb-2 border-b">
+                  <Server className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="font-semibold">Sync Settings</p>
+                    <p className="text-sm text-muted-foreground">Configure automatic camera count sync into IT Dashboard KPIs</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Sync Interval (minutes)</Label>
+                  <Input
+                    type="number" min="1" max="1440"
+                    value={hikGlobalForm.syncIntervalMinutes}
+                    onChange={e => setHikGlobalForm(p => ({ ...p, syncIntervalMinutes: e.target.value }))}
+                    className="w-32"
+                    data-testid="input-hik-interval"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={hikGlobalForm.enabled}
+                    onCheckedChange={v => setHikGlobalForm(p => ({ ...p, enabled: v }))}
+                    data-testid="switch-hik-enabled"
+                  />
+                  <Label>Enable automatic sync</Label>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    onClick={() => saveHikSettingsMutation.mutate({ ...hikGlobalForm, syncIntervalMinutes: parseInt(hikGlobalForm.syncIntervalMinutes) || 1, dashboardId: hikGlobalForm.dashboardId ? parseInt(hikGlobalForm.dashboardId) : null })}
+                    disabled={saveHikSettingsMutation.isPending}
+                    data-testid="button-save-hik-settings"
+                  >
+                    {saveHikSettingsMutation.isPending ? "Saving..." : "Save Settings"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => syncHikMutation.mutate()}
+                    disabled={syncHikMutation.isPending || hikNvrs.length === 0}
+                    data-testid="button-sync-hik-now"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${syncHikMutation.isPending ? "animate-spin" : ""}`} />
+                    {syncHikMutation.isPending ? "Syncing..." : "Sync All Now"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sync status */}
+            {(hikGlobalSettings?.lastSyncAt || hikGlobalSettings?.lastError) && (
+              <Card>
+                <CardContent className="pt-6 space-y-3">
+                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Sync Status</p>
+                  {hikGlobalSettings?.lastSyncAt && (
+                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      Last synced: {new Date(hikGlobalSettings.lastSyncAt).toLocaleString()}
+                    </div>
+                  )}
+                  {hikGlobalSettings?.lastError && (
+                    <div className="flex items-start gap-2 text-sm text-destructive">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span className="font-mono text-xs bg-destructive/10 rounded px-2 py-1 break-all">{hikGlobalSettings.lastError}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* KPIs info card */}
+            <Card className="border-muted/50">
+              <CardContent className="pt-6">
+                <p className="text-sm font-semibold mb-3">KPIs created automatically</p>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />Total Cameras — sum of all channels across all NVRs</li>
+                  <li className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />Cameras Online — channels reported as connected by NVR</li>
+                  <li className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />Cameras Offline — total minus online</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+          </div>
+        </TabsContent>
+
       </Tabs>
+
+      {/* ── NVR Dialog ── */}
+      <Dialog open={nvrDialog} onOpenChange={setNvrDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editNvr ? "Edit NVR" : "Add Hikvision NVR"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1">
+              <Label>Name *</Label>
+              <Input value={nvrForm.name} onChange={e => setNvrForm(p => ({ ...p, name: e.target.value }))} placeholder="Building A NVR" data-testid="input-nvr-name" />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2 space-y-1">
+                <Label>IP Address *</Label>
+                <Input value={nvrForm.ipAddress} onChange={e => setNvrForm(p => ({ ...p, ipAddress: e.target.value }))} placeholder="192.168.1.100" data-testid="input-nvr-ip" />
+              </div>
+              <div className="space-y-1">
+                <Label>Port</Label>
+                <Input type="number" value={nvrForm.port} onChange={e => setNvrForm(p => ({ ...p, port: e.target.value }))} placeholder="80" data-testid="input-nvr-port" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Username *</Label>
+              <Input value={nvrForm.username} onChange={e => setNvrForm(p => ({ ...p, username: e.target.value }))} placeholder="admin" data-testid="input-nvr-username" />
+            </div>
+            <div className="space-y-1">
+              <Label>{editNvr ? "Password (leave blank to keep current)" : "Password *"}</Label>
+              <Input type="password" value={nvrForm.password} onChange={e => setNvrForm(p => ({ ...p, password: e.target.value }))} placeholder={editNvr ? "••••••••" : "Enter password"} data-testid="input-nvr-password" />
+            </div>
+            <div className="space-y-1">
+              <Label>Notes</Label>
+              <Input value={nvrForm.notes} onChange={e => setNvrForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" data-testid="input-nvr-notes" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={nvrForm.isActive} onCheckedChange={v => setNvrForm(p => ({ ...p, isActive: v }))} data-testid="switch-nvr-active" />
+              <Label>Active</Label>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setNvrDialog(false)}>Cancel</Button>
+            <Button onClick={submitNvr} disabled={createNvrMutation.isPending || updateNvrMutation.isPending} data-testid="button-submit-nvr">
+              {createNvrMutation.isPending || updateNvrMutation.isPending ? "Saving..." : editNvr ? "Save Changes" : "Add NVR"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Device Type Dialog ── */}
       <Dialog open={typeDialog} onOpenChange={setTypeDialog}>
