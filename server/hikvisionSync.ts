@@ -109,7 +109,7 @@ function parseChannelStatusXml(xml: string): { total: number; online: number } {
   //   <connectionStatus>connected</connectionStatus>
   //   <streamStatus>online</streamStatus>
   //   <status>online</status>              — simpler field name
-  const onlineRe = /<(?:onlineStatus|connectionStatus|streamStatus|status)>\s*(?:online|connected|true)\s*<\/(?:onlineStatus|connectionStatus|streamStatus|status)>/i;
+  const onlineRe = /<(?:online|onlineStatus|connectionStatus|streamStatus|status)>\s*(?:true|online|connected)\s*<\/(?:online|onlineStatus|connectionStatus|streamStatus|status)>/i;
   const online = blocks.filter(b => onlineRe.test(b)).length;
 
   // Debug: log first status block when all cameras appear offline so admins

@@ -1,0 +1,65 @@
+aiscoweb@aiscoweb:/opt/fleetcmd$ pm2 logs fleetcmd --lines 30 --nostream
+[TAILING] Tailing last 30 lines for [fleetcmd] process (change the value with --lines option)
+/home/aiscoweb/.pm2/logs/fleetcmd-error.log last 30 lines:
+0|fleetcmd | <streamType>auto</streamType>
+0|fleetcmd | <model>DS-2SE4C425MWG-E/26</model>
+0|fleetcmd | <serialNumber>DS-2SE4C425MWG-E/2620241125AAWRFT2823733</serialNumber>
+0|fleetcmd | <firmwareVersion>V5.8.1 build 240929</firmwareVersion>
+0|fleetcmd | <d
+0|fleetcmd | [hikvisionSync] STATUS DEBUG — first InputProxyChannelStatus block:
+0|fleetcmd |  <InputProxyChannelStatusList version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+0|fleetcmd | <InputProxyChannelStatus>
+0|fleetcmd | <id>1</id>
+0|fleetcmd | <sourceInputPortDescriptor>
+0|fleetcmd | <proxyProtocol>HIKVISION</proxyProtocol>
+0|fleetcmd | <addressingFormatType>ipaddress</addressingFormatType>
+0|fleetcmd | <ipAddress>192.168.13.102</ipAddress>
+0|fleetcmd | <managePortNo>8000</managePortNo>
+0|fleetcmd | <srcInputPort>2</srcInputPort>
+0|fleetcmd | <userName>admin</userName>
+0|fleetcmd | <streamType>auto</streamType>
+0|fleetcmd | <deviceID></deviceID>
+0|fleetcmd | </sourceInputPortDescriptor>
+0|fleetcmd | <online>true</online>
+0|fleetcmd | <streamingProxyChannelIdList>
+0|fleetcmd | <streamingProxyChannelId>101</streamingProxyChannelId>
+0|fleetcmd | <streamingProxyChannelId>102</streamingProxyChannelId>
+0|fleetcmd | </streamingProxyChannelIdList>
+0|fleetcmd | <relatedIOProxy>
+0|fleetcmd | <inputProxyPortIdList>
+0|fleetcmd | <inputProxyPortId>I-101</inputProxyPortId>
+0|fleetcmd | </inputProxyPortIdList>
+0|fleetcmd | <outputProxyPortIdList>
+0|fleetcmd | <outputProxyPor
+
+/home/aiscoweb/.pm2/logs/fleetcmd-out.log last 30 lines:
+0|fleetcmd | 9:58:50 AM [express] GET /api/it/kpis 304 in 21ms :: [{"id":4,"name":"glpi_total","labelEn":"Tickets","labelPt":"Tickets","unit":"tickets","sortOrder":80,"isActive":true},{"id":5,"name":"glpi_new","labelEn":"Incoming Tickets","labelPt":"Tickets Entrada"...
+0|fleetcmd | 9:58:50 AM [express] GET /api/it/hikvision-nvrs 200 in 27ms :: [{"id":1,"name":"MAIN NVR 1","ipAddress":"192.168.12.4","port":80,"username":"admin","isActive":true,"notes":null,"lastSyncedAt":"2026-04-13T08:58:50.150Z","lastError":null,"lastCameraTotal":64,"lastC...
+0|fleetcmd | 9:58:50 AM [express] GET /api/it/kpi-values 304 in 42ms :: [{"id":29,"kpiId":4,"periodType":"daily","periodDate":"2026-04-13","value":"29","createdAt":"2026-04-13T01:03:48.979Z"},{"id":30,"kpiId":5,"periodType":"daily","periodDate":"2026-04-13","value":"3","c...
+0|fleetcmd | [hikvisionSync] Using /channels/status for online count: 0/64
+0|fleetcmd | [hikvisionSync] MAIN NVR 1: 0/64 cameras online
+0|fleetcmd | [hikvisionSync] Sync complete — total=64 online=0 offline=64
+0|fleetcmd | 9:58:50 AM [express] POST /api/it/hikvision-sync 200 in 165ms :: {"success":true,"total":64,"online":0,"offline":64,"errors":[]}
+0|fleetcmd | 9:58:50 AM [express] GET /api/it/hikvision-settings 304 in 20ms :: {"syncIntervalMinutes":1,"enabled":false,"dashboardId":null,"lastSyncAt":null,"lastError":null}
+0|fleetcmd | 9:58:50 AM [express] GET /api/it/hikvision-nvrs 200 in 26ms :: [{"id":1,"name":"MAIN NVR 1","ipAddress":"192.168.12.4","port":80,"username":"admin","isActive":true,"notes":null,"lastSyncedAt":"2026-04-13T08:58:50.544Z","lastError":null,"lastCameraTotal":64,"lastC...
+0|fleetcmd | 9:58:50 AM [express] GET /api/it/kpi-values 304 in 42ms :: [{"id":29,"kpiId":4,"periodType":"daily","periodDate":"2026-04-13","value":"29","createdAt":"2026-04-13T01:03:48.979Z"},{"id":30,"kpiId":5,"periodType":"daily","periodDate":"2026-04-13","value":"3","c...
+0|fleetcmd | 9:58:50 AM [express] GET /api/it/kpis 304 in 47ms :: [{"id":4,"name":"glpi_total","labelEn":"Tickets","labelPt":"Tickets","unit":"tickets","sortOrder":80,"isActive":true},{"id":5,"name":"glpi_new","labelEn":"Incoming Tickets","labelPt":"Tickets Entrada"...
+0|fleetcmd | [hikvisionSync] Using /channels/status for online count: 0/64
+0|fleetcmd | [hikvisionSync] MAIN NVR 1: 0/64 cameras online
+0|fleetcmd | [hikvisionSync] Sync complete — total=64 online=0 offline=64
+0|fleetcmd | 9:58:51 AM [express] POST /api/it/hikvision-sync 200 in 176ms :: {"success":true,"total":64,"online":0,"offline":64,"errors":[]}
+0|fleetcmd | 9:58:51 AM [express] GET /api/it/hikvision-settings 304 in 16ms :: {"syncIntervalMinutes":1,"enabled":false,"dashboardId":null,"lastSyncAt":null,"lastError":null}
+0|fleetcmd | 9:58:51 AM [express] GET /api/it/hikvision-nvrs 200 in 21ms :: [{"id":1,"name":"MAIN NVR 1","ipAddress":"192.168.12.4","port":80,"username":"admin","isActive":true,"notes":null,"lastSyncedAt":"2026-04-13T08:58:50.927Z","lastError":null,"lastCameraTotal":64,"lastC...
+0|fleetcmd | 9:58:51 AM [express] GET /api/it/kpis 304 in 34ms :: [{"id":4,"name":"glpi_total","labelEn":"Tickets","labelPt":"Tickets","unit":"tickets","sortOrder":80,"isActive":true},{"id":5,"name":"glpi_new","labelEn":"Incoming Tickets","labelPt":"Tickets Entrada"...
+0|fleetcmd | 9:58:51 AM [express] GET /api/it/kpi-values 304 in 40ms :: [{"id":29,"kpiId":4,"periodType":"daily","periodDate":"2026-04-13","value":"29","createdAt":"2026-04-13T01:03:48.979Z"},{"id":30,"kpiId":5,"periodType":"daily","periodDate":"2026-04-13","value":"3","c...
+0|fleetcmd | [hikvisionSync] Using /channels/status for online count: 0/64
+0|fleetcmd | [hikvisionSync] MAIN NVR 1: 0/64 cameras online
+0|fleetcmd | [hikvisionSync] Sync complete — total=64 online=0 offline=64
+0|fleetcmd | 9:58:51 AM [express] POST /api/it/hikvision-sync 200 in 186ms :: {"success":true,"total":64,"online":0,"offline":64,"errors":[]}
+0|fleetcmd | 9:58:51 AM [express] GET /api/it/hikvision-settings 304 in 22ms :: {"syncIntervalMinutes":1,"enabled":false,"dashboardId":null,"lastSyncAt":null,"lastError":null}
+0|fleetcmd | 9:58:51 AM [express] GET /api/it/kpis 304 in 39ms :: [{"id":4,"name":"glpi_total","labelEn":"Tickets","labelPt":"Tickets","unit":"tickets","sortOrder":80,"isActive":true},{"id":5,"name":"glpi_new","labelEn":"Incoming Tickets","labelPt":"Tickets Entrada"...
+0|fleetcmd | 9:58:51 AM [express] GET /api/it/hikvision-nvrs 200 in 54ms :: [{"id":1,"name":"MAIN NVR 1","ipAddress":"192.168.12.4","port":80,"username":"admin","isActive":true,"notes":null,"lastSyncedAt":"2026-04-13T08:58:51.321Z","lastError":null,"lastCameraTotal":64,"lastC...
+0|fleetcmd | 9:58:51 AM [express] GET /api/it/kpi-values 304 in 72ms :: [{"id":29,"kpiId":4,"periodType":"daily","periodDate":"2026-04-13","value":"29","createdAt":"2026-04-13T01:03:48.979Z"},{"id":30,"kpiId":5,"periodType":"daily","periodDate":"2026-04-13","value":"3","c...
+0|fleetcmd | [itMonitor] Pinging 4 host(s)...
+0|fleetcmd | 9:59:17 AM [express] GET /api/it/hosts 200 in 16ms :: [{"id":5,"name":"MS Telkom Link - Secondary","ipAddress":"196.249.230.10","hostType":"internet_link","isActive":true,"sortOrder":0,"notes":null,"departmentId":null,"status":{"id":2975,"isOnline":false...
+0|fleetcmd | [itMonitor] Check complete: 2/4 online
