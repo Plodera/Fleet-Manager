@@ -663,8 +663,8 @@ export default function ITDashboard() {
       if (!res.ok) return [];
       return res.json();
     },
-    refetchInterval: 60000,
-    enabled: !!fortigateEnabled,
+    refetchInterval: 30000,
+    staleTime: 0,
   });
 
   const activeHosts = hosts.filter(h => h.isActive);
