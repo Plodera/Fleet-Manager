@@ -470,15 +470,15 @@ function formatTime(ts: string | Date): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function buildChartData(rows: FortigateBandwidth[]): { time: string; [key: string]: string | number | null }[] {
-  // Group by timestamp bucket (round to nearest 5 seconds for display)
+function buildChartData(rows: FortigateBandwidth[]): { time: string; [key: string]: string | number }[] {
+  // Group by time-bucket label for the chart
   const byTime: Record<string, Record<string, number>> = {};
   for (const row of rows) {
-    const time = formatTime((row as any).sampledAt ?? (row as any).recordedAt);
+    const time = formatTime(row.sampledAt);
     if (!byTime[time]) byTime[time] = {};
-    // When same interface appears multiple times at same minute, take latest
-    byTime[time][`${row.interfaceName}_tx`] = parseFloat((row as any).txKbps ?? (row as any).txMbps ?? "0");
-    byTime[time][`${row.interfaceName}_rx`] = parseFloat((row as any).rxKbps ?? (row as any).rxMbps ?? "0");
+    // Convert stored Kbps → Mbps for display; keep latest reading per interface per minute
+    byTime[time][`${row.interfaceName}_tx`] = parseFloat(row.txKbps) / 1000;
+    byTime[time][`${row.interfaceName}_rx`] = parseFloat(row.rxKbps) / 1000;
   }
   return Object.entries(byTime).map(([time, vals]) => ({ time, ...vals }));
 }
@@ -494,7 +494,7 @@ const BandwidthChart = memo(function BandwidthChart({ rows }: { rows: FortigateB
       <div className="flex items-center gap-2 mb-3">
         <span className="it-dot it-dot-blink bg-cyan-400" />
         <Activity className="w-3.5 h-3.5 text-gray-500" />
-        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">FortiGate Bandwidth (Kbps)</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">FortiGate Bandwidth (Mbps)</span>
       </div>
       <ResponsiveContainer width="100%" height={120}>
         <LineChart data={chartData} margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
@@ -644,7 +644,7 @@ export default function ITDashboard() {
   const { data: fortigateEnabled } = useQuery<boolean>({
     queryKey: ["/api/it/fortigate/enabled"],
     queryFn: async () => {
-      const res = await fetch("/api/it/fortigate/settings");
+      const res = await fetch("/api/it/fortigate/enabled");
       if (!res.ok) return false;
       const data = await res.json();
       return !!data.enabled;

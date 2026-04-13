@@ -2446,14 +2446,24 @@ export async function registerRoutes(
     }
   });
 
+  // Public — used by the unauthenticated IT Dashboard TV display
   app.get('/api/it/fortigate/bandwidth', async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const hours = Math.min(parseInt(String(req.query.hours || "1")), 2);
       const rows = await storage.getFortigateBandwidth(hours);
       res.json(rows);
     } catch (err: any) {
       res.status(500).json({ message: "Failed to fetch bandwidth data" });
+    }
+  });
+
+  // Public — used by the IT Dashboard to check whether FortiGate chart should appear
+  app.get('/api/it/fortigate/enabled', async (req, res) => {
+    try {
+      const settings = await storage.getFortigateSettings();
+      res.json({ enabled: !!settings?.enabled });
+    } catch {
+      res.json({ enabled: false });
     }
   });
 
