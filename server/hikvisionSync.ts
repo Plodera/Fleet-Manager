@@ -96,9 +96,10 @@ async function pollNvr(nvrId: number, ipAddress: string, port: number, username:
 }
 
 // ── Main sync function ────────────────────────────────────────────────────────
-async function runHikvisionSync(): Promise<{ total: number; online: number; offline: number; errors: string[] }> {
+// force=true bypasses the enabled check so manual "Sync All Now" always runs
+async function runHikvisionSync(force = false): Promise<{ total: number; online: number; offline: number; errors: string[] }> {
   const globalSettings = await storage.getHikvisionGlobalSettings();
-  if (!globalSettings?.enabled) {
+  if (!force && !globalSettings?.enabled) {
     return { total: 0, online: 0, offline: 0, errors: [] };
   }
 
@@ -187,9 +188,9 @@ async function runHikvisionSync(): Promise<{ total: number; online: number; offl
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/** Trigger a full sync; returns aggregate counts and any per-NVR errors */
+/** Trigger a full sync (manual); always runs regardless of the enabled toggle */
 export async function triggerHikvisionSync(): Promise<{ total: number; online: number; offline: number; errors: string[] }> {
-  return runHikvisionSync();
+  return runHikvisionSync(true);
 }
 
 /** Test a single NVR connection without persisting results */
