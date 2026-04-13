@@ -2451,8 +2451,10 @@ export async function registerRoutes(
     try {
       const hours = Math.min(parseInt(String(req.query.hours || "1")), 2);
       const rows = await storage.getFortigateBandwidth(hours);
+      console.log(`[fortigate/bandwidth] hours=${hours} rows=${rows.length} newest=${rows.at(-1)?.sampledAt ?? 'none'}`);
       res.json(rows);
     } catch (err: any) {
+      console.error('[fortigate/bandwidth] error:', err.message);
       res.status(500).json({ message: "Failed to fetch bandwidth data" });
     }
   });

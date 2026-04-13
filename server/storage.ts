@@ -39,7 +39,7 @@ import {
   type FortigateSettings, type InsertFortigateSettings, type FortigateBandwidth,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lt } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -1295,14 +1295,14 @@ export class DatabaseStorage implements IStorage {
   async getFortigateBandwidth(hours: number = 1): Promise<FortigateBandwidth[]> {
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
     return getDb().select().from(fortigateBandwidth)
-      .where(sql`${fortigateBandwidth.sampledAt} >= ${since}`)
+      .where(gte(fortigateBandwidth.sampledAt, since))
       .orderBy(fortigateBandwidth.sampledAt);
   }
 
   async pruneFortigateBandwidth(): Promise<void> {
     const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
     await getDb().delete(fortigateBandwidth)
-      .where(sql`${fortigateBandwidth.sampledAt} < ${cutoff}`);
+      .where(lt(fortigateBandwidth.sampledAt, cutoff));
   }
 }
 
