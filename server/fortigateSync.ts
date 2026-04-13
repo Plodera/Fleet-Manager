@@ -194,6 +194,31 @@ export async function triggerFortigateSync(): Promise<string | null> {
   return settings?.lastError ?? null;
 }
 
+/** For the debug endpoint — returns the raw first-interface object from FortiGate */
+export async function debugFortigateRaw(): Promise<any> {
+  const settings = await storage.getFortigateSettings();
+  if (!settings?.host || !settings?.apiToken) return { error: "not configured" };
+  const base = buildBase(settings.host, settings.port);
+  try {
+    const { status, body } = await fortigateFetch(
+      `${base}/api/v2/monitor/system/interface/`,
+      { Authorization: `Bearer ${settings.apiToken}` }
+    );
+    const data = JSON.parse(body);
+    const results = data?.results;
+    if (Array.isArray(results)) {
+      return { format: "array", length: results.length, firstEntry: results[0] ?? null };
+    } else if (results && typeof results === "object") {
+      const keys = Object.keys(results);
+      const firstKey = keys[0];
+      return { format: "object", length: keys.length, firstKey, firstEntry: results[firstKey] ?? null };
+    }
+    return { format: "unknown", httpStatus: status, bodySnippet: body.slice(0, 500) };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
 export function startFortigateSync(): void {
   // Double-poll on startup: first call sets baseline, second produces first chart rows
   pollFortigate()

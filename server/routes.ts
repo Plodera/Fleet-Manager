@@ -2469,6 +2469,54 @@ export async function registerRoutes(
     }
   });
 
+  // Admin debug — diagnose why bandwidth chart is empty
+  app.get('/api/it/fortigate/debug', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { getPool } = await import("./db");
+      const pool = getPool();
+
+      // 1) Column names in fortigate_bandwidth
+      const colRes = await pool.query(`
+        SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_name = 'fortigate_bandwidth'
+        ORDER BY ordinal_position
+      `);
+
+      // 2) Total row count
+      const countRes = await pool.query(`SELECT COUNT(*) AS n FROM fortigate_bandwidth`);
+
+      // 3) Most recent 5 rows (raw SQL to bypass ORM column mapping)
+      const rowsRes = await pool.query(`
+        SELECT * FROM fortigate_bandwidth ORDER BY id DESC LIMIT 5
+      `);
+
+      // 4) fortigate_settings (no token)
+      const settingsRes = await pool.query(`
+        SELECT id, host, port, poll_interval_minutes, enabled, interfaces,
+               last_sync_at, last_error, updated_at
+        FROM fortigate_settings LIMIT 1
+      `);
+
+      // 5) Fetch one raw interface object from FortiGate to check field names
+      const { debugFortigateRaw } = await import("./fortigateSync");
+      const rawApiSample = await debugFortigateRaw();
+
+      res.json({
+        columns: colRes.rows,
+        rowCount: countRes.rows[0]?.n,
+        recentRows: rowsRes.rows,
+        settings: settingsRes.rows[0] || null,
+        rawApiSample,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Manual sync trigger
   app.post('/api/it/hikvision-sync', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
