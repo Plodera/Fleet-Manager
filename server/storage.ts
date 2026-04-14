@@ -233,6 +233,7 @@ export interface IStorage {
   upsertSteelProductionSettings(section: string, data: Partial<InsertSteelProductionSettings>): Promise<SteelProductionSettings>;
   getRollingMillReports(limit?: number): Promise<RollingMillReport[]>;
   createRollingMillReport(data: InsertRollingMillReport): Promise<RollingMillReport>;
+  upsertRollingMillReport(data: InsertRollingMillReport): Promise<RollingMillReport>;
   getSmsReports(limit?: number): Promise<SmsReport[]>;
   createSmsReport(data: InsertSmsReport): Promise<SmsReport>;
   getCcmReports(limit?: number): Promise<CcmReport[]>;
@@ -1352,6 +1353,27 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
+  async upsertRollingMillReport(data: InsertRollingMillReport): Promise<RollingMillReport> {
+    // Upsert by (reportDate, shift, isDailyTotal) — update if exists, else insert
+    const existing = await getDb().select().from(rollingMillReports)
+      .where(
+        and(
+          eq(rollingMillReports.reportDate, data.reportDate),
+          eq(rollingMillReports.shift, data.shift ?? ""),
+          eq(rollingMillReports.isDailyTotal, data.isDailyTotal ?? false),
+        )
+      ).limit(1);
+    if (existing.length > 0) {
+      const [updated] = await getDb().update(rollingMillReports)
+        .set({ ...data, receivedAt: new Date() })
+        .where(eq(rollingMillReports.id, existing[0].id))
+        .returning();
+      return updated;
+    }
+    const [row] = await getDb().insert(rollingMillReports).values(data).returning();
+    return row;
+  }
+
   async getSmsReports(limit: number = 50): Promise<SmsReport[]> {
     return getDb().select().from(smsReports)
       .orderBy(desc(smsReports.receivedAt)).limit(limit);
@@ -1545,6 +1567,7 @@ export const storage = {
   upsertSteelProductionSettings: (...args: Parameters<DatabaseStorage['upsertSteelProductionSettings']>) => getStorage().upsertSteelProductionSettings(...args),
   getRollingMillReports: (...args: Parameters<DatabaseStorage['getRollingMillReports']>) => getStorage().getRollingMillReports(...args),
   createRollingMillReport: (...args: Parameters<DatabaseStorage['createRollingMillReport']>) => getStorage().createRollingMillReport(...args),
+  upsertRollingMillReport: (...args: Parameters<DatabaseStorage['upsertRollingMillReport']>) => getStorage().upsertRollingMillReport(...args),
   getSmsReports: (...args: Parameters<DatabaseStorage['getSmsReports']>) => getStorage().getSmsReports(...args),
   createSmsReport: (...args: Parameters<DatabaseStorage['createSmsReport']>) => getStorage().createSmsReport(...args),
   getCcmReports: (...args: Parameters<DatabaseStorage['getCcmReports']>) => getStorage().getCcmReports(...args),

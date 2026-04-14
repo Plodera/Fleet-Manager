@@ -184,6 +184,9 @@ function Router() {
       <Route path="/production">
         <PrivateRoute component={ProductionDashboard} requiredPermission="view_production" />
       </Route>
+      <Route path="/rolling-mill">
+        <PrivateRoute component={ProductionDashboard} requiredPermission="view_production" />
+      </Route>
       
       <Route component={NotFound} />
     </Switch>

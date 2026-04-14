@@ -2667,7 +2667,7 @@ export async function registerRoutes(
 
       const ids: number[] = [];
       for (const block of blocks) {
-        const r = await storage.createRollingMillReport({
+        const r = await storage.upsertRollingMillReport({
           reportDate,
           shift: block.shift,
           isDailyTotal: block.isDailyTotal,
@@ -2889,11 +2889,23 @@ export async function registerRoutes(
       // Rolling Mill — prefer "today's total" blocks for tonnage; fall back to per-shift sum
       const rmToday = rmAll.filter(r => r.reportDate === today);
       const rmMtd = rmAll.filter(r => r.reportDate?.startsWith(monthPrefix));
+      const rmShiftsToday = rmToday.filter(r => !r.isDailyTotal);
+      const rmShiftsMtd = rmMtd.filter(r => !r.isDailyTotal);
       const rmTotalBlocks = rmToday.filter(r => r.isDailyTotal);
+
       const rmTodayTons = rmTotalBlocks.length > 0
         ? parseFloat(rmTotalBlocks[0].tonsProduced || "0")
-        : rmToday.filter(r => !r.isDailyTotal).reduce((s, r) => s + parseFloat(r.tonsProduced || "0"), 0);
-      const rmMtdTons = rmMtd.filter(r => !r.isDailyTotal).reduce((s, r) => s + parseFloat(r.tonsProduced || "0"), 0);
+        : rmShiftsToday.reduce((s, r) => s + parseFloat(r.tonsProduced || "0"), 0);
+      const rmMtdTons = rmShiftsMtd.reduce((s, r) => s + parseFloat(r.tonsProduced || "0"), 0);
+
+      const rmBilletsTakenToday = rmShiftsToday.reduce((s, r) => s + (r.billetsTaken || 0), 0);
+      const rmBilletsTakenMtd = rmShiftsMtd.reduce((s, r) => s + (r.billetsTaken || 0), 0);
+      const rmMissRollToday = rmShiftsToday.reduce((s, r) => s + (r.missRoll || 0), 0);
+      const rmMissRollMtd = rmShiftsMtd.reduce((s, r) => s + (r.missRoll || 0), 0);
+      const rmCobleCutToday = rmShiftsToday.reduce((s, r) => s + (r.cobleCut || 0), 0);
+      const rmCobleCutMtd = rmShiftsMtd.reduce((s, r) => s + (r.cobleCut || 0), 0);
+      const rmBreakdownToday = rmShiftsToday.reduce((s, r) => s + (r.breakdownMinutes || 0), 0);
+      const rmBreakdownMtd = rmShiftsMtd.reduce((s, r) => s + (r.breakdownMinutes || 0), 0);
 
       // SMS
       const smsToday = smsAll.filter(r => r.reportDate === today);
@@ -2911,7 +2923,15 @@ export async function registerRoutes(
         rollingMill: {
           todayTons: rmTodayTons.toFixed(2),
           mtdTons: rmMtdTons.toFixed(2),
-          todayShifts: rmToday.filter(r => !r.isDailyTotal).length,
+          todayShifts: rmShiftsToday.length,
+          todayBilletsTaken: rmBilletsTakenToday,
+          mtdBilletsTaken: rmBilletsTakenMtd,
+          todayMissRoll: rmMissRollToday,
+          mtdMissRoll: rmMissRollMtd,
+          todayCobleCut: rmCobleCutToday,
+          mtdCobleCut: rmCobleCutMtd,
+          todayBreakdownMin: rmBreakdownToday,
+          mtdBreakdownMin: rmBreakdownMtd,
           lastReport: rmAll[0] ?? null,
         },
         sms: {
@@ -2931,6 +2951,84 @@ export async function registerRoutes(
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[production/kpis] Error:", msg);
+      res.status(500).json({ error: msg });
+    }
+  });
+
+  // ─── Rolling Mill route aliases (backward-compatible) ───────────────────────
+  // Mirror /api/production/webhook/rolling-mill under /api/rolling-mill/webhook
+  app.post("/api/rolling-mill/webhook", async (req, res) => {
+    try {
+      const settings = await storage.getSteelProductionSettings();
+      const sec = settings.find(s => s.section === "rolling_mill");
+      const secret = sec?.webhookSecret || "";
+      const authHeader = (req.headers["authorization"] as string) || "";
+      const tokenParam = (req.query?.["token"] as string) || "";
+      if (secret) {
+        const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : tokenParam;
+        if (provided !== secret) return res.status(401).json({ error: "Unauthorized" });
+      }
+      const text = extractText(req.body);
+      const kv = parseKV(text);
+      const reportDate = kv["date"] || kv["report_date"] || new Date().toISOString().split("T")[0];
+      const blocks = parseRollingMillBlocks(text);
+      const ids: number[] = [];
+      for (const block of blocks) {
+        const r = await storage.upsertRollingMillReport({
+          reportDate, shift: block.shift, isDailyTotal: block.isDailyTotal,
+          tonsProduced: block.tonsProduced, billetsTaken: block.billetsTaken,
+          billetsRolled: block.billetsRolled, missRoll: block.missRoll,
+          cobleCut: block.cobleCut, hotOut: block.hotOut,
+          breakdownMinutes: block.breakdownMinutes, rawMessage: text.slice(0, 5000), source: "webhook",
+        });
+        ids.push(r.id);
+      }
+      await storage.upsertSteelProductionSettings("rolling_mill", { lastReceivedAt: new Date(), lastError: null });
+      res.json({ ok: true, ids });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await storage.upsertSteelProductionSettings("rolling_mill", { lastError: msg });
+      res.status(500).json({ error: msg });
+    }
+  });
+
+  app.get("/api/rolling-mill/reports", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).isDriver) return res.status(403).json({ error: "Forbidden" });
+    const limit = Math.min(parseInt((req.query["limit"] as string) || "100", 10), 500);
+    const reports = await storage.getRollingMillReports(limit);
+    res.json(reports);
+  });
+
+  app.get("/api/rolling-mill/kpis", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).isDriver) return res.status(403).json({ error: "Forbidden" });
+    try {
+      const rmAll = await storage.getRollingMillReports(300);
+      const today = new Date().toISOString().split("T")[0];
+      const monthPrefix = today.slice(0, 7);
+      const rmToday = rmAll.filter(r => r.reportDate === today);
+      const rmMtd = rmAll.filter(r => r.reportDate?.startsWith(monthPrefix));
+      const rmShiftsToday = rmToday.filter(r => !r.isDailyTotal);
+      const rmShiftsMtd = rmMtd.filter(r => !r.isDailyTotal);
+      const rmTotalBlocks = rmToday.filter(r => r.isDailyTotal);
+      const todayTons = rmTotalBlocks.length > 0
+        ? parseFloat(rmTotalBlocks[0].tonsProduced || "0")
+        : rmShiftsToday.reduce((s, r) => s + parseFloat(r.tonsProduced || "0"), 0);
+      res.json({
+        todayTons: todayTons.toFixed(2),
+        mtdTons: rmShiftsMtd.reduce((s, r) => s + parseFloat(r.tonsProduced || "0"), 0).toFixed(2),
+        todayShifts: rmShiftsToday.length,
+        todayBilletsTaken: rmShiftsToday.reduce((s, r) => s + (r.billetsTaken || 0), 0),
+        mtdBilletsTaken: rmShiftsMtd.reduce((s, r) => s + (r.billetsTaken || 0), 0),
+        todayMissRoll: rmShiftsToday.reduce((s, r) => s + (r.missRoll || 0), 0),
+        mtdMissRoll: rmShiftsMtd.reduce((s, r) => s + (r.missRoll || 0), 0),
+        todayCobleCut: rmShiftsToday.reduce((s, r) => s + (r.cobleCut || 0), 0),
+        mtdCobleCut: rmShiftsMtd.reduce((s, r) => s + (r.cobleCut || 0), 0),
+        todayBreakdownMin: rmShiftsToday.reduce((s, r) => s + (r.breakdownMinutes || 0), 0),
+        mtdBreakdownMin: rmShiftsMtd.reduce((s, r) => s + (r.breakdownMinutes || 0), 0),
+        lastReport: rmAll[0] ?? null,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       res.status(500).json({ error: msg });
     }
   });

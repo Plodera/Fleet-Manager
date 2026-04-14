@@ -1,41 +1,21 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Factory, Zap, Layers, TrendingUp, Package, Clock, BarChart3, Flame } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
+import { Factory, Zap, Layers, TrendingUp, Package, BarChart3, Flame, Wrench } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { PageHeader } from "@/components/PageHeader";
 
-type Kpis = {
-  rollingMill: {
-    todayTons: string;
-    mtdTons: string;
-    todayShifts: number;
-    lastReport: any;
-  };
-  sms: {
-    todayHeats: number;
-    mtdHeats: number;
-    todayKwh: string;
-    mtdKwh: string;
-    lastReport: any;
-  };
-  ccm: {
-    todayBillets: number;
-    mtdBillets: number;
-    todaySequences: number;
-    lastReport: any;
-  };
-};
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type RollingMillReport = {
   id: number;
   receivedAt: string;
   reportDate: string;
   shift: string;
+  isDailyTotal: boolean;
   tonsProduced: string | null;
   billetsTaken: number | null;
   billetsRolled: number | null;
@@ -79,11 +59,48 @@ type CcmReport = {
   source: string;
 };
 
+type Kpis = {
+  rollingMill: {
+    todayTons: string;
+    mtdTons: string;
+    todayShifts: number;
+    todayBilletsTaken: number;
+    mtdBilletsTaken: number;
+    todayMissRoll: number;
+    mtdMissRoll: number;
+    todayCobleCut: number;
+    mtdCobleCut: number;
+    todayBreakdownMin: number;
+    mtdBreakdownMin: number;
+    lastReport: RollingMillReport | null;
+  };
+  sms: {
+    todayHeats: number;
+    mtdHeats: number;
+    todayKwh: string;
+    mtdKwh: string;
+    lastReport: SmsReport | null;
+  };
+  ccm: {
+    todayBillets: number;
+    mtdBillets: number;
+    todaySequences: number;
+    lastReport: CcmReport | null;
+  };
+};
+
+// ─── Components ───────────────────────────────────────────────────────────────
+
 function KpiCard({
   label, value, unit, subLabel, subValue, icon: Icon, color,
 }: {
-  label: string; value: string | number; unit?: string;
-  subLabel?: string; subValue?: string | number; icon: React.ElementType; color: string;
+  label: string;
+  value: string | number;
+  unit?: string;
+  subLabel?: string;
+  subValue?: string | number;
+  icon: React.ElementType;
+  color: string;
 }) {
   return (
     <Card data-testid={`kpi-card-${label.toLowerCase().replace(/\s+/g, "-")}`}>
@@ -110,13 +127,21 @@ function KpiCard({
   );
 }
 
-function buildTrendData(reports: any[], dateKey: string, valueKey: string, label: string) {
+type TrendEntry = { date: string } & Record<string, number>;
+
+function buildTrendData(
+  reports: RollingMillReport[] | SmsReport[] | CcmReport[],
+  dateKey: keyof (RollingMillReport & SmsReport & CcmReport),
+  valueKey: keyof (RollingMillReport & SmsReport & CcmReport),
+  label: string,
+): TrendEntry[] {
   const byDate: Record<string, number> = {};
   for (const r of reports) {
-    const d = r[dateKey];
+    const d = r[dateKey] as string | undefined;
     if (!d) continue;
-    const v = parseFloat(r[valueKey] || "0") || (r[valueKey] ?? 0);
-    byDate[d] = (byDate[d] || 0) + (typeof v === "number" ? v : parseFloat(v) || 0);
+    const raw = r[valueKey];
+    const v = typeof raw === "number" ? raw : parseFloat((raw as string) || "0") || 0;
+    byDate[d] = (byDate[d] || 0) + v;
   }
   return Object.entries(byDate)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -138,8 +163,11 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function ProductionDashboard() {
   const { t } = useLanguage();
+  const prod = t.production;
 
   const { data: kpis, isLoading: kpisLoading } = useQuery<Kpis>({
     queryKey: ["/api/production/kpis"],
@@ -165,36 +193,135 @@ export default function ProductionDashboard() {
     staleTime: 0,
   });
 
-  const rmTrendData = buildTrendData(rmReports, "reportDate", "tonsProduced", "Tons");
+  // Only use non-total records for trend charts (avoid double-counting daily totals)
+  const rmShiftReports = rmReports.filter(r => !r.isDailyTotal);
+  const rmTrendData = buildTrendData(rmShiftReports, "reportDate", "tonsProduced", "Tons");
   const smsTrendData = buildTrendData(smsReports, "reportDate", "totalKwh", "kWh");
   const ccmTrendData = buildTrendData(ccmReports, "reportDate", "noBillets", "Billets");
-
-  const prod = t.production || {} as any;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={prod.dashboardTitle || "Steel Production Dashboard"}
-        description={prod.dashboardSubtitle || "Real-time KPIs from Rolling Mill, SMS, and CCM"}
+        title={prod.dashboardTitle}
+        description={prod.dashboardSubtitle}
       />
 
-      {/* KPI Row */}
-      {kpisLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i}><CardContent className="pt-5 h-28 animate-pulse bg-muted/40" /></Card>
-          ))}
-        </div>
-      ) : kpis ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <KpiCard label={prod.rmTodayTons || "Today Tons"} value={kpis.rollingMill.todayTons} unit="t" subLabel={prod.mtd || "MTD"} subValue={`${kpis.rollingMill.mtdTons} t`} icon={Layers} color="text-blue-600" />
-          <KpiCard label={prod.rmShifts || "Today Shifts"} value={kpis.rollingMill.todayShifts} subLabel={prod.section || "Section"} subValue={prod.rollingMill || "Rolling Mill"} icon={TrendingUp} color="text-indigo-600" />
-          <KpiCard label={prod.smsTodayHeats || "Today Heats"} value={kpis.sms.todayHeats} unit="" subLabel={prod.mtd || "MTD"} subValue={kpis.sms.mtdHeats} icon={Flame} color="text-orange-500" />
-          <KpiCard label={prod.smsTodayKwh || "Today kWh"} value={parseInt(kpis.sms.todayKwh).toLocaleString()} unit="kWh" subLabel={prod.mtd || "MTD"} subValue={`${parseInt(kpis.sms.mtdKwh).toLocaleString()} kWh`} icon={Zap} color="text-yellow-600" />
-          <KpiCard label={prod.ccmTodayBillets || "Today Billets"} value={kpis.ccm.todayBillets} subLabel={prod.mtd || "MTD"} subValue={kpis.ccm.mtdBillets} icon={Package} color="text-green-600" />
-          <KpiCard label={prod.ccmSequences || "Sequences"} value={kpis.ccm.todaySequences} subLabel={prod.section || "Section"} subValue={prod.ccm || "CCM"} icon={Factory} color="text-teal-600" />
-        </div>
-      ) : null}
+      {/* Rolling Mill KPI Row */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+          <Layers className="w-4 h-4" /> {prod.rollingMill}
+        </h2>
+        {kpisLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i}><CardContent className="pt-5 h-24 animate-pulse bg-muted/40" /></Card>
+            ))}
+          </div>
+        ) : kpis ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <KpiCard
+              label={prod.rmTodayTons}
+              value={kpis.rollingMill.todayTons}
+              unit="t"
+              subLabel={prod.mtd}
+              subValue={`${kpis.rollingMill.mtdTons} t`}
+              icon={Layers}
+              color="text-blue-600"
+            />
+            <KpiCard
+              label={prod.billetsTaken}
+              value={kpis.rollingMill.todayBilletsTaken}
+              subLabel={prod.mtd}
+              subValue={kpis.rollingMill.mtdBilletsTaken}
+              icon={Package}
+              color="text-indigo-600"
+            />
+            <KpiCard
+              label={prod.missRoll}
+              value={kpis.rollingMill.todayMissRoll}
+              subLabel={prod.mtd}
+              subValue={kpis.rollingMill.mtdMissRoll}
+              icon={TrendingUp}
+              color="text-orange-500"
+            />
+            <KpiCard
+              label={prod.cobleCut}
+              value={kpis.rollingMill.todayCobleCut}
+              subLabel={prod.mtd}
+              subValue={kpis.rollingMill.mtdCobleCut}
+              icon={Flame}
+              color="text-red-500"
+            />
+            <KpiCard
+              label={prod.hotOut}
+              value={kpis.rollingMill.todayBreakdownMin}
+              unit="min"
+              subLabel={prod.mtd}
+              subValue={`${kpis.rollingMill.mtdBreakdownMin} min`}
+              icon={Wrench}
+              color="text-yellow-600"
+            />
+            <KpiCard
+              label={prod.rmShifts}
+              value={kpis.rollingMill.todayShifts}
+              subLabel={prod.section}
+              subValue={prod.rollingMill}
+              icon={BarChart3}
+              color="text-teal-600"
+            />
+          </div>
+        ) : null}
+      </div>
+
+      {/* SMS + CCM KPI Row */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+          <Zap className="w-4 h-4" /> {prod.sms} / <Factory className="w-4 h-4 ml-1" /> {prod.ccm}
+        </h2>
+        {kpisLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}><CardContent className="pt-5 h-24 animate-pulse bg-muted/40" /></Card>
+            ))}
+          </div>
+        ) : kpis ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <KpiCard
+              label={prod.smsTodayHeats}
+              value={kpis.sms.todayHeats}
+              subLabel={prod.mtd}
+              subValue={kpis.sms.mtdHeats}
+              icon={Flame}
+              color="text-orange-500"
+            />
+            <KpiCard
+              label={prod.smsTodayKwh}
+              value={parseInt(kpis.sms.todayKwh).toLocaleString()}
+              unit="kWh"
+              subLabel={prod.mtd}
+              subValue={`${parseInt(kpis.sms.mtdKwh).toLocaleString()} kWh`}
+              icon={Zap}
+              color="text-yellow-600"
+            />
+            <KpiCard
+              label={prod.ccmTodayBillets}
+              value={kpis.ccm.todayBillets}
+              subLabel={prod.mtd}
+              subValue={kpis.ccm.mtdBillets}
+              icon={Package}
+              color="text-green-600"
+            />
+            <KpiCard
+              label={prod.ccmSequences}
+              value={kpis.ccm.todaySequences}
+              subLabel={prod.section}
+              subValue={prod.ccm}
+              icon={Factory}
+              color="text-teal-600"
+            />
+          </div>
+        ) : null}
+      </div>
 
       {/* Trend Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -202,17 +329,17 @@ export default function ProductionDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Layers className="w-4 h-4 text-blue-500" />
-              {prod.rollingMill || "Rolling Mill"} — {prod.trendTons || "Daily Tons (30d)"}
+              {prod.rollingMill} — {prod.trendTons}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {rmTrendData.length === 0 ? <EmptyState message={prod.noData || "No data yet"} /> : (
+            {rmTrendData.length === 0 ? <EmptyState message={prod.noData} /> : (
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={rmTrendData} margin={{ top: 0, right: 4, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v: any) => [`${v} t`, "Tons"]} />
+                  <Tooltip formatter={(v: number) => [`${v} t`, "Tons"]} />
                   <Bar dataKey="Tons" fill="#3b82f6" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -224,17 +351,17 @@ export default function ProductionDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Zap className="w-4 h-4 text-yellow-500" />
-              {prod.sms || "SMS"} — {prod.trendKwh || "Daily kWh (30d)"}
+              {prod.sms} — {prod.trendKwh}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {smsTrendData.length === 0 ? <EmptyState message={prod.noData || "No data yet"} /> : (
+            {smsTrendData.length === 0 ? <EmptyState message={prod.noData} /> : (
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={smsTrendData} margin={{ top: 0, right: 4, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v: any) => [`${v} kWh`, "kWh"]} />
+                  <Tooltip formatter={(v: number) => [`${v} kWh`, "kWh"]} />
                   <Bar dataKey="kWh" fill="#f59e0b" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -246,17 +373,17 @@ export default function ProductionDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Factory className="w-4 h-4 text-green-500" />
-              {prod.ccm || "CCM"} — {prod.trendBillets || "Daily Billets (30d)"}
+              {prod.ccm} — {prod.trendBillets}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {ccmTrendData.length === 0 ? <EmptyState message={prod.noData || "No data yet"} /> : (
+            {ccmTrendData.length === 0 ? <EmptyState message={prod.noData} /> : (
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={ccmTrendData} margin={{ top: 0, right: 4, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v: any) => [`${v}`, "Billets"]} />
+                  <Tooltip formatter={(v: number) => [`${v}`, "Billets"]} />
                   <Bar dataKey="Billets" fill="#10b981" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -270,57 +397,60 @@ export default function ProductionDashboard() {
         <TabsList>
           <TabsTrigger value="rolling-mill" data-testid="tab-rolling-mill">
             <Layers className="w-3.5 h-3.5 mr-1.5" />
-            {prod.rollingMill || "Rolling Mill"}
+            {prod.rollingMill}
           </TabsTrigger>
           <TabsTrigger value="sms" data-testid="tab-sms">
             <Zap className="w-3.5 h-3.5 mr-1.5" />
-            {prod.sms || "SMS"}
+            {prod.sms}
           </TabsTrigger>
           <TabsTrigger value="ccm" data-testid="tab-ccm">
             <Factory className="w-3.5 h-3.5 mr-1.5" />
-            {prod.ccm || "CCM"}
+            {prod.ccm}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="rolling-mill">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{prod.recentReports || "Recent Reports"} — {prod.rollingMill || "Rolling Mill"}</CardTitle>
-              <CardDescription className="text-xs">{prod.last50 || "Last 50 received records"}</CardDescription>
+              <CardTitle className="text-sm">{prod.recentReports} — {prod.rollingMill}</CardTitle>
+              <CardDescription className="text-xs">{prod.last50}</CardDescription>
             </CardHeader>
             <CardContent>
               {rmReports.length === 0 ? (
-                <EmptyState message={prod.noReports || "No reports received yet. Configure a Power Automate webhook to start."} />
+                <EmptyState message={prod.noReports} />
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">Date</TableHead>
-                        <TableHead className="text-xs">Shift</TableHead>
-                        <TableHead className="text-xs text-right">Tons</TableHead>
-                        <TableHead className="text-xs text-right">Billets Taken</TableHead>
-                        <TableHead className="text-xs text-right">Rolled</TableHead>
-                        <TableHead className="text-xs text-right">Miss Roll</TableHead>
-                        <TableHead className="text-xs text-right">Coble Cut</TableHead>
-                        <TableHead className="text-xs text-right">Hot Out</TableHead>
-                        <TableHead className="text-xs text-right">B/D (min)</TableHead>
-                        <TableHead className="text-xs">Source</TableHead>
+                        <TableHead className="text-xs">{prod.reportDate}</TableHead>
+                        <TableHead className="text-xs">{prod.shift}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.tonsProduced}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.billetsTaken}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.billetsRolled}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.missRoll}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.cobleCut}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.hotOut}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.breakdownMinutes}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {rmReports.slice(0, 50).map(r => (
-                        <TableRow key={r.id} data-testid={`row-rm-${r.id}`}>
+                        <TableRow key={r.id} data-testid={`row-rm-${r.id}`} className={r.isDailyTotal ? "bg-blue-50 dark:bg-blue-950/30 font-semibold" : ""}>
                           <TableCell className="text-xs font-medium">{formatDate(r.reportDate)}</TableCell>
-                          <TableCell className="text-xs"><Badge variant="outline" className="text-[10px] px-1">{r.shift || "—"}</Badge></TableCell>
-                          <TableCell className="text-xs text-right font-semibold">{r.tonsProduced ?? "—"}</TableCell>
+                          <TableCell className="text-xs">
+                            {r.isDailyTotal
+                              ? <Badge className="text-[10px] px-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">{prod.isDailyTotal}</Badge>
+                              : <Badge variant="outline" className="text-[10px] px-1">{r.shift || "—"}</Badge>
+                            }
+                          </TableCell>
+                          <TableCell className="text-xs text-right">{r.tonsProduced ?? "—"}</TableCell>
                           <TableCell className="text-xs text-right">{r.billetsTaken ?? "—"}</TableCell>
                           <TableCell className="text-xs text-right">{r.billetsRolled ?? "—"}</TableCell>
                           <TableCell className="text-xs text-right">{r.missRoll ?? "—"}</TableCell>
                           <TableCell className="text-xs text-right">{r.cobleCut ?? "—"}</TableCell>
                           <TableCell className="text-xs text-right">{r.hotOut ?? "—"}</TableCell>
                           <TableCell className="text-xs text-right">{r.breakdownMinutes ?? "—"}</TableCell>
-                          <TableCell className="text-xs"><Badge variant="secondary" className="text-[10px]">{r.source}</Badge></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -334,27 +464,27 @@ export default function ProductionDashboard() {
         <TabsContent value="sms">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{prod.recentReports || "Recent Reports"} — {prod.sms || "SMS"}</CardTitle>
-              <CardDescription className="text-xs">{prod.last50 || "Last 50 received records"}</CardDescription>
+              <CardTitle className="text-sm">{prod.recentReports} — {prod.sms}</CardTitle>
+              <CardDescription className="text-xs">{prod.last50}</CardDescription>
             </CardHeader>
             <CardContent>
               {smsReports.length === 0 ? (
-                <EmptyState message={prod.noReports || "No reports received yet."} />
+                <EmptyState message={prod.noReports} />
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">Date</TableHead>
-                        <TableHead className="text-xs">Shift</TableHead>
-                        <TableHead className="text-xs">Heat No.</TableHead>
-                        <TableHead className="text-xs">Start</TableHead>
-                        <TableHead className="text-xs">Taping</TableHead>
-                        <TableHead className="text-xs text-right">Tap-to-Tap</TableHead>
-                        <TableHead className="text-xs text-right">Taping °C</TableHead>
-                        <TableHead className="text-xs text-right">Ladle °C</TableHead>
-                        <TableHead className="text-xs text-right">kWh</TableHead>
-                        <TableHead className="text-xs text-right">F/C C</TableHead>
+                        <TableHead className="text-xs">{prod.reportDate}</TableHead>
+                        <TableHead className="text-xs">{prod.shift}</TableHead>
+                        <TableHead className="text-xs">{prod.heatNo}</TableHead>
+                        <TableHead className="text-xs">{prod.startTime}</TableHead>
+                        <TableHead className="text-xs">{prod.tapingTime}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.tapToTapMinutes}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.tapingTempC}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.ladleTempC}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.totalKwh}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.fcTons}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -383,26 +513,26 @@ export default function ProductionDashboard() {
         <TabsContent value="ccm">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{prod.recentReports || "Recent Reports"} — {prod.ccm || "CCM"}</CardTitle>
-              <CardDescription className="text-xs">{prod.last50 || "Last 50 received records"}</CardDescription>
+              <CardTitle className="text-sm">{prod.recentReports} — {prod.ccm}</CardTitle>
+              <CardDescription className="text-xs">{prod.last50}</CardDescription>
             </CardHeader>
             <CardContent>
               {ccmReports.length === 0 ? (
-                <EmptyState message={prod.noReports || "No reports received yet."} />
+                <EmptyState message={prod.noReports} />
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">Date</TableHead>
-                        <TableHead className="text-xs">Shift</TableHead>
-                        <TableHead className="text-xs">Incharge</TableHead>
-                        <TableHead className="text-xs">Heat No.</TableHead>
-                        <TableHead className="text-xs text-right">Billets</TableHead>
-                        <TableHead className="text-xs text-right">Strands</TableHead>
-                        <TableHead className="text-xs">Ladle</TableHead>
-                        <TableHead className="text-xs">Tundish</TableHead>
-                        <TableHead className="text-xs text-right">Sequence</TableHead>
+                        <TableHead className="text-xs">{prod.reportDate}</TableHead>
+                        <TableHead className="text-xs">{prod.shift}</TableHead>
+                        <TableHead className="text-xs">{prod.incharge}</TableHead>
+                        <TableHead className="text-xs">{prod.heatNo}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.noBillets}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.strandsRun}</TableHead>
+                        <TableHead className="text-xs">{prod.ladleNo}</TableHead>
+                        <TableHead className="text-xs">{prod.tundishNo}</TableHead>
+                        <TableHead className="text-xs text-right">{prod.sequence}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -415,7 +545,7 @@ export default function ProductionDashboard() {
                           <TableCell className="text-xs text-right font-semibold">{r.noBillets ?? "—"}</TableCell>
                           <TableCell className="text-xs text-right">{r.strandsRun ?? "—"}</TableCell>
                           <TableCell className="text-xs">{r.ladleNo || "—"}</TableCell>
-                          <TableCell className="text-xs">{r.tundishNo ? `${r.tundishNo}` : "—"}</TableCell>
+                          <TableCell className="text-xs">{r.tundishNo || "—"}</TableCell>
                           <TableCell className="text-xs text-right">{r.sequence ?? "—"}</TableCell>
                         </TableRow>
                       ))}
