@@ -42,6 +42,14 @@ The system utilizes a modern web stack:
     - **Work Order Reports**: Customizable reports with detailed and summary modes, exportable to Excel, PDF, and Print.
     - **Email Notifications**: SMTP-configured notifications for booking status changes and tracker alerts.
 
+## Steel Production KPI Module
+- **Webhook Receivers**: Three public POST endpoints (`/api/production/webhook/rolling-mill`, `/api/production/webhook/sms`, `/api/production/webhook/ccm`) accept Power Automate payloads with key:value formatted text. Each validates an optional shared secret via `Authorization: Bearer <token>` or `?token=` query param.
+- **Data Parsed**: Rolling Mill (tons, billets taken/rolled, miss roll, coble cut, hot out, breakdown minutes); SMS (heat no, start/taping times, tap-to-tap, temperatures, kWh, F/C C tons, remarks); CCM (incharge, heat no, billets, strands, mould life, ladle, tundish, sequence).
+- **Admin Config** (`/production-config`): Manage per-section webhook secrets and enable/disable state. Displays full webhook URL with copy button and Power Automate setup guide.
+- **Production Dashboard** (`/production`): KPI cards (today/MTD for tons, heats, kWh, billets), 30-day bar charts for each section, and paginated report tables (tabs for Rolling Mill/SMS/CCM).
+- **Database Tables**: `steel_production_settings`, `rolling_mill_reports`, `sms_reports`, `ccm_reports` (created directly via psql since drizzle-kit push is interactive).
+- **Routes**: Admin-only for settings CRUD; authenticated for report lists and KPI summary.
+
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **GLPI Helpdesk**: Integration to pull ticket counts into the IT Dashboard. Requires GLPI base URL, Application Token, and User API Token.
