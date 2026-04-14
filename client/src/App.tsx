@@ -37,9 +37,9 @@ import StatusTracker from "@/pages/StatusTracker";
 import ITMonitorConfig from "@/pages/ITMonitorConfig";
 import ITDashboard from "@/pages/ITDashboard";
 import ProductionConfig from "@/pages/ProductionConfig";
-import ProductionDashboard from "@/pages/ProductionDashboard";
+import SteelProductionTVDashboard from "@/pages/SteelProductionTVDashboard";
 
-function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean }) {
+function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false, noShell = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean, noShell?: boolean }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return <div className="flex h-screen items-center justify-center text-primary">Loading...</div>;
@@ -67,6 +67,8 @@ function PrivateRoute({ component: Component, adminOnly = false, requiredPermiss
       return <Redirect to="/" />;
     }
   }
+
+  if (noShell) return <Component />;
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -177,15 +179,17 @@ function Router() {
       <Route path="/it-monitor-config">
         <PrivateRoute component={ITMonitorConfig} adminOnly />
       </Route>
-      <Route path="/it-dashboard" component={ITDashboard} />
+      <Route path="/it-dashboard">
+        <PrivateRoute component={ITDashboard} requiredPermission="view_it_dashboard" noShell />
+      </Route>
       <Route path="/production-config">
         <PrivateRoute component={ProductionConfig} adminOnly />
       </Route>
       <Route path="/production">
-        <PrivateRoute component={ProductionDashboard} requiredPermission="view_production" />
+        <PrivateRoute component={SteelProductionTVDashboard} requiredPermission="view_production" noShell />
       </Route>
       <Route path="/rolling-mill">
-        <PrivateRoute component={ProductionDashboard} requiredPermission="view_production" />
+        <PrivateRoute component={SteelProductionTVDashboard} requiredPermission="view_production" noShell />
       </Route>
       
       <Route component={NotFound} />

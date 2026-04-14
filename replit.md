@@ -18,7 +18,7 @@ The system utilizes a modern web stack:
     - **PageHeader Component**: A reusable component (`client/src/components/PageHeader.tsx`) for consistent page titles, descriptions, and actions across the application.
     - **Dialog Pattern**: A consistent approach where dialog triggers are in PageHeader actions and dialog bodies are rendered as siblings.
 - **Technical Implementations**:
-    - **Role-Based Access Control (RBAC)**: Granular permissions (13 distinct permissions like `manage_vehicles`, `view_indents`) control access to features and data.
+    - **Role-Based Access Control (RBAC)**: Granular permissions (15 distinct permissions like `manage_vehicles`, `view_indents`, `view_production`, `view_it_dashboard`) control access to features and data.
     - **Bilingual Support**: Comprehensive English and Portuguese translations across all major UI elements and data labels, with language preference saved to `localStorage`.
     - **Dynamic Configuration**:
         - **Equipment Types**: Admin-configurable equipment types and checklist items for inspections, allowing for flexible and extensible inspection processes. Supports bilingual labels and section grouping.
