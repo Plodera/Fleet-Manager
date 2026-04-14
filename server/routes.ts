@@ -2574,17 +2574,20 @@ export async function registerRoutes(
 
   // ─── Steel Production KPI Module ─────────────────────────────────────────────
 
-  // Helper: validate webhook secret from Authorization header or ?token= param
-  function validateWebhookSecret(req: any, secret: string): boolean {
-    if (!secret) return true; // if no secret configured, allow all
-    const authHeader: string = req.headers["authorization"] || "";
-    const tokenParam: string = req.query?.token || "";
-    const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : tokenParam;
-    return provided === secret;
+  // Extract text body from various Power Automate / Teams payload shapes
+  function extractText(body: unknown): string {
+    if (typeof body === "string") return body;
+    if (body && typeof body === "object") {
+      const b = body as Record<string, unknown>;
+      if (typeof b["text"] === "string") return b["text"];
+      if (b["value"] && typeof (b["value"] as Record<string, unknown>)["text"] === "string") {
+        return (b["value"] as Record<string, unknown>)["text"] as string;
+      }
+    }
+    return JSON.stringify(body);
   }
 
-  // Helper: parse key=value pairs from Teams message text
-  // Handles: "Key: value", "Key : value", "key=value"
+  // Parse key=value / "Key: value" pairs from Teams message text
   function parseKV(text: string): Record<string, string> {
     const result: Record<string, string> = {};
     const lines = text.replace(/\r/g, "").split("\n");
@@ -2601,6 +2604,37 @@ export async function registerRoutes(
     return result;
   }
 
+  // Parse Rolling Mill two-block format:
+  // shift block(s) followed by "Today's Total" block
+  // Returns array of parsed records, last one marked isDailyTotal if present
+  function parseRollingMillBlocks(text: string): Array<{
+    shift: string; isDailyTotal: boolean;
+    tonsProduced?: string; billetsTaken?: number; billetsRolled?: number;
+    missRoll?: number; cobleCut?: number; hotOut?: number; breakdownMinutes?: number;
+  }> {
+    const normalized = text.replace(/\r/g, "");
+    // Split by blank lines or clear section breaks
+    const blocks = normalized.split(/\n{2,}|\n(?=shift\s*[:\=]|today)/i).filter(b => b.trim());
+    const results = blocks.map(block => {
+      const kv = parseKV(block);
+      const isDailyTotal = /today|total/i.test(block.split("\n")[0] || "");
+      return {
+        shift: kv["shift"] || kv["shifts"] || "",
+        isDailyTotal,
+        tonsProduced: safeFloat(kv["tons"] || kv["tons_produced"] || kv["total_tons"]),
+        billetsTaken: safeInt(kv["taken"] || kv["billets_taken"]),
+        billetsRolled: safeInt(kv["rolled"] || kv["billets_rolled"]),
+        missRoll: safeInt(kv["miss_roll"] || kv["miss"]),
+        cobleCut: safeInt(kv["coble_cut"] || kv["coble"]),
+        hotOut: safeInt(kv["hot_out"] || kv["hot"]),
+        breakdownMinutes: safeInt(kv["breakdown"] || kv["breakdown_minutes"] || kv["b_d"]),
+      };
+    });
+    return results.length > 0 ? results : [{
+      shift: "", isDailyTotal: false,
+    }];
+  }
+
   function safeInt(v: string | undefined): number | undefined {
     if (!v) return undefined;
     const n = parseInt(v.replace(/[^\d\-]/g, ""), 10);
@@ -2609,84 +2643,75 @@ export async function registerRoutes(
 
   function safeFloat(v: string | undefined): string | undefined {
     if (!v) return undefined;
-    const n = parseFloat(v.replace(/[^\d\.\-]/g, ""));
+    const n = parseFloat(v.replace(/[^\d.\-]/g, ""));
     return isNaN(n) ? undefined : n.toString();
   }
 
-  // POST /api/production/webhook/rolling-mill
+  // POST /api/production/webhook/rolling-mill — public (secret-validated)
   app.post("/api/production/webhook/rolling-mill", async (req, res) => {
     try {
       const settings = await storage.getSteelProductionSettings();
       const sec = settings.find(s => s.section === "rolling_mill");
-      if (sec && sec.webhookSecret && !validateWebhookSecret(req, sec.webhookSecret)) {
-        return res.status(401).json({ error: "Unauthorized" });
+      const secret = sec?.webhookSecret || "";
+      const authHeader = (req.headers["authorization"] as string) || "";
+      const tokenParam = (req.query?.["token"] as string) || "";
+      if (secret) {
+        const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : tokenParam;
+        if (provided !== secret) return res.status(401).json({ error: "Unauthorized" });
       }
 
-      // Accept both plain text (Teams webhook body) and JSON {text: "..."}
-      let text: string = "";
-      if (typeof req.body === "string") {
-        text = req.body;
-      } else if (req.body?.text) {
-        text = req.body.text;
-      } else if (req.body?.value?.text) {
-        text = req.body.value.text; // Adaptive card via Power Automate
-      } else {
-        text = JSON.stringify(req.body);
-      }
-
+      const text = extractText(req.body);
       const kv = parseKV(text);
-      // Try to extract date from multiple possible key names
       const reportDate = kv["date"] || kv["report_date"] || new Date().toISOString().split("T")[0];
-      const shift = kv["shift"] || kv["shifts"] || "";
+      const blocks = parseRollingMillBlocks(text);
 
-      const report = await storage.createRollingMillReport({
-        reportDate,
-        shift,
-        tonsProduced: safeFloat(kv["tons"] || kv["tons_produced"] || kv["today_s_total_tons"] || kv["total_tons"]),
-        billetsTaken: safeInt(kv["taken"] || kv["billets_taken"] || kv["billet_taken"]),
-        billetsRolled: safeInt(kv["rolled"] || kv["billets_rolled"] || kv["billet_rolled"]),
-        missRoll: safeInt(kv["miss_roll"] || kv["miss"]),
-        cobleCut: safeInt(kv["coble_cut"] || kv["coble"]),
-        hotOut: safeInt(kv["hot_out"] || kv["hot"]),
-        breakdownMinutes: safeInt(kv["breakdown"] || kv["breakdown_minutes"] || kv["b_d"]),
-        rawMessage: text.slice(0, 5000),
-        source: "webhook",
-      });
+      const ids: number[] = [];
+      for (const block of blocks) {
+        const r = await storage.createRollingMillReport({
+          reportDate,
+          shift: block.shift,
+          isDailyTotal: block.isDailyTotal,
+          tonsProduced: block.tonsProduced,
+          billetsTaken: block.billetsTaken,
+          billetsRolled: block.billetsRolled,
+          missRoll: block.missRoll,
+          cobleCut: block.cobleCut,
+          hotOut: block.hotOut,
+          breakdownMinutes: block.breakdownMinutes,
+          rawMessage: text.slice(0, 5000),
+          source: "webhook",
+        });
+        ids.push(r.id);
+      }
 
-      // Update lastReceivedAt
-      await storage.upsertSteelProductionSettings("rolling_mill", { lastReceivedAt: new Date() });
-      console.log("[production/rolling-mill] Received report id=", report.id);
-      res.json({ ok: true, id: report.id });
-    } catch (err: any) {
-      console.error("[production/rolling-mill] Error:", err);
-      res.status(500).json({ error: err.message });
+      await storage.upsertSteelProductionSettings("rolling_mill", { lastReceivedAt: new Date(), lastError: null });
+      console.log("[production/rolling-mill] Received", ids.length, "block(s), ids=", ids.join(","));
+      res.json({ ok: true, ids });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[production/rolling-mill] Error:", msg);
+      await storage.upsertSteelProductionSettings("rolling_mill", { lastError: msg });
+      res.status(500).json({ error: msg });
     }
   });
 
-  // POST /api/production/webhook/sms
+  // POST /api/production/webhook/sms — public (secret-validated)
   app.post("/api/production/webhook/sms", async (req, res) => {
     try {
       const settings = await storage.getSteelProductionSettings();
       const sec = settings.find(s => s.section === "sms");
-      if (sec && sec.webhookSecret && !validateWebhookSecret(req, sec.webhookSecret)) {
-        return res.status(401).json({ error: "Unauthorized" });
+      const secret = sec?.webhookSecret || "";
+      const authHeader = (req.headers["authorization"] as string) || "";
+      const tokenParam = (req.query?.["token"] as string) || "";
+      if (secret) {
+        const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : tokenParam;
+        if (provided !== secret) return res.status(401).json({ error: "Unauthorized" });
       }
 
-      let text: string = "";
-      if (typeof req.body === "string") {
-        text = req.body;
-      } else if (req.body?.text) {
-        text = req.body.text;
-      } else if (req.body?.value?.text) {
-        text = req.body.value.text;
-      } else {
-        text = JSON.stringify(req.body);
-      }
-
+      const text = extractText(req.body);
       const kv = parseKV(text);
       const reportDate = kv["date"] || kv["report_date"] || new Date().toISOString().split("T")[0];
 
-      // Build remarks JSON from sub-items
       const remarksJson = JSON.stringify({
         mnKg:      kv["mn_kg"] || kv["mn"],
         tempTips:  kv["temp_tips"] || kv["temp_tip"],
@@ -2706,42 +2731,38 @@ export async function registerRoutes(
         tapToTapMinutes: safeInt(kv["tap_to_tap"] || kv["tap_to_tap_minutes"]),
         tapingTempC: safeInt(kv["taping_temp"] || kv["taping_temp_c"]),
         ladleTempC: safeInt(kv["ladle_temp"] || kv["ladle_temp_c"]),
-        totalKwh: safeFloat(kv["total_kwh"] || kv["kwh"] || kv["kw"]),
+        totalKwh: safeFloat(kv["total_kwh"] || kv["kwh"]),
         fcTons: safeFloat(kv["f_c_c"] || kv["fc_c"] || kv["fc_tons"]),
         remarksJson,
         rawMessage: text.slice(0, 5000),
         source: "webhook",
       });
 
-      await storage.upsertSteelProductionSettings("sms", { lastReceivedAt: new Date() });
+      await storage.upsertSteelProductionSettings("sms", { lastReceivedAt: new Date(), lastError: null });
       console.log("[production/sms] Received report id=", report.id);
       res.json({ ok: true, id: report.id });
-    } catch (err: any) {
-      console.error("[production/sms] Error:", err);
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[production/sms] Error:", msg);
+      await storage.upsertSteelProductionSettings("sms", { lastError: msg });
+      res.status(500).json({ error: msg });
     }
   });
 
-  // POST /api/production/webhook/ccm
+  // POST /api/production/webhook/ccm — public (secret-validated)
   app.post("/api/production/webhook/ccm", async (req, res) => {
     try {
       const settings = await storage.getSteelProductionSettings();
       const sec = settings.find(s => s.section === "ccm");
-      if (sec && sec.webhookSecret && !validateWebhookSecret(req, sec.webhookSecret)) {
-        return res.status(401).json({ error: "Unauthorized" });
+      const secret = sec?.webhookSecret || "";
+      const authHeader = (req.headers["authorization"] as string) || "";
+      const tokenParam = (req.query?.["token"] as string) || "";
+      if (secret) {
+        const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : tokenParam;
+        if (provided !== secret) return res.status(401).json({ error: "Unauthorized" });
       }
 
-      let text: string = "";
-      if (typeof req.body === "string") {
-        text = req.body;
-      } else if (req.body?.text) {
-        text = req.body.text;
-      } else if (req.body?.value?.text) {
-        text = req.body.value.text;
-      } else {
-        text = JSON.stringify(req.body);
-      }
-
+      const text = extractText(req.body);
       const kv = parseKV(text);
       const reportDate = kv["date"] || kv["report_date"] || new Date().toISOString().split("T")[0];
 
@@ -2763,93 +2784,126 @@ export async function registerRoutes(
         source: "webhook",
       });
 
-      await storage.upsertSteelProductionSettings("ccm", { lastReceivedAt: new Date() });
+      await storage.upsertSteelProductionSettings("ccm", { lastReceivedAt: new Date(), lastError: null });
       console.log("[production/ccm] Received report id=", report.id);
       res.json({ ok: true, id: report.id });
-    } catch (err: any) {
-      console.error("[production/ccm] Error:", err);
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[production/ccm] Error:", msg);
+      await storage.upsertSteelProductionSettings("ccm", { lastError: msg });
+      res.status(500).json({ error: msg });
     }
   });
 
-  // GET /api/production/settings — admin
+  // GET /api/production/settings — admin only
   app.get("/api/production/settings", async (req, res) => {
-    if (!req.isAuthenticated() || (req.user as any)?.role !== "admin") {
+    if (!req.isAuthenticated() || (req.user as User).role !== "admin") {
       return res.status(403).json({ error: "Forbidden" });
     }
     const settings = await storage.getSteelProductionSettings();
     res.json(settings);
   });
 
-  // PUT /api/production/settings/:section — admin
+  // PUT /api/production/settings/:section — admin only
   app.put("/api/production/settings/:section", async (req, res) => {
-    if (!req.isAuthenticated() || (req.user as any)?.role !== "admin") {
+    if (!req.isAuthenticated() || (req.user as User).role !== "admin") {
       return res.status(403).json({ error: "Forbidden" });
     }
     const { section } = req.params;
     if (!["rolling_mill", "sms", "ccm"].includes(section)) {
       return res.status(400).json({ error: "Invalid section" });
     }
-    const { webhookSecret, enabled } = req.body;
+    const { webhookSecret, enabled, notes } = req.body;
     const result = await storage.upsertSteelProductionSettings(section, {
-      webhookSecret: webhookSecret ?? undefined,
-      enabled: enabled ?? undefined,
+      ...(webhookSecret !== undefined ? { webhookSecret } : {}),
+      ...(enabled !== undefined ? { enabled } : {}),
+      ...(notes !== undefined ? { notes } : {}),
     });
     res.json(result);
   });
 
-  // GET /api/production/rolling-mill — admin
+  // POST /api/production/rolling-mill — manual entry (admin + non-driver staff)
+  app.post("/api/production/rolling-mill", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).isDriver) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const report = await storage.createRollingMillReport({ ...req.body, source: "manual" });
+    res.status(201).json(report);
+  });
+
+  // POST /api/production/sms-manual — manual entry
+  app.post("/api/production/sms-manual", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).isDriver) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const report = await storage.createSmsReport({ ...req.body, source: "manual" });
+    res.status(201).json(report);
+  });
+
+  // POST /api/production/ccm-manual — manual entry
+  app.post("/api/production/ccm-manual", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).isDriver) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const report = await storage.createCcmReport({ ...req.body, source: "manual" });
+    res.status(201).json(report);
+  });
+
+  // GET /api/production/rolling-mill — auth + non-driver
   app.get("/api/production/rolling-mill", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
-    const limit = parseInt(req.query.limit as string || "100", 10);
+    if (!req.isAuthenticated() || (req.user as User).isDriver) return res.status(403).json({ error: "Forbidden" });
+    const limit = Math.min(parseInt((req.query["limit"] as string) || "100", 10), 500);
     const reports = await storage.getRollingMillReports(limit);
     res.json(reports);
   });
 
-  // GET /api/production/sms — admin
+  // GET /api/production/sms — auth + non-driver
   app.get("/api/production/sms", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
-    const limit = parseInt(req.query.limit as string || "100", 10);
+    if (!req.isAuthenticated() || (req.user as User).isDriver) return res.status(403).json({ error: "Forbidden" });
+    const limit = Math.min(parseInt((req.query["limit"] as string) || "100", 10), 500);
     const reports = await storage.getSmsReports(limit);
     res.json(reports);
   });
 
-  // GET /api/production/ccm — admin
+  // GET /api/production/ccm — auth + non-driver
   app.get("/api/production/ccm", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
-    const limit = parseInt(req.query.limit as string || "100", 10);
+    if (!req.isAuthenticated() || (req.user as User).isDriver) return res.status(403).json({ error: "Forbidden" });
+    const limit = Math.min(parseInt((req.query["limit"] as string) || "100", 10), 500);
     const reports = await storage.getCcmReports(limit);
     res.json(reports);
   });
 
-  // GET /api/production/kpis — summary KPIs for the dashboard
+  // GET /api/production/kpis — auth + non-driver
   app.get("/api/production/kpis", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    if (!req.isAuthenticated() || (req.user as User).isDriver) return res.status(403).json({ error: "Forbidden" });
     try {
-      const [rmReports, smsReports, ccmReports] = await Promise.all([
-        storage.getRollingMillReports(200),
-        storage.getSmsReports(200),
-        storage.getCcmReports(200),
+      const [rmAll, smsAll, ccmAll] = await Promise.all([
+        storage.getRollingMillReports(300),
+        storage.getSmsReports(300),
+        storage.getCcmReports(300),
       ]);
 
       const today = new Date().toISOString().split("T")[0];
       const monthPrefix = today.slice(0, 7);
 
-      // Rolling Mill KPIs
-      const rmToday = rmReports.filter(r => r.reportDate === today);
-      const rmMtd = rmReports.filter(r => r.reportDate?.startsWith(monthPrefix));
-      const rmTodayTons = rmToday.reduce((s, r) => s + parseFloat(r.tonsProduced || "0"), 0);
-      const rmMtdTons = rmMtd.reduce((s, r) => s + parseFloat(r.tonsProduced || "0"), 0);
+      // Rolling Mill — prefer "today's total" blocks for tonnage; fall back to per-shift sum
+      const rmToday = rmAll.filter(r => r.reportDate === today);
+      const rmMtd = rmAll.filter(r => r.reportDate?.startsWith(monthPrefix));
+      const rmTotalBlocks = rmToday.filter(r => r.isDailyTotal);
+      const rmTodayTons = rmTotalBlocks.length > 0
+        ? parseFloat(rmTotalBlocks[0].tonsProduced || "0")
+        : rmToday.filter(r => !r.isDailyTotal).reduce((s, r) => s + parseFloat(r.tonsProduced || "0"), 0);
+      const rmMtdTons = rmMtd.filter(r => !r.isDailyTotal).reduce((s, r) => s + parseFloat(r.tonsProduced || "0"), 0);
 
-      // SMS KPIs — count heats
-      const smsToday = smsReports.filter(r => r.reportDate === today);
-      const smsMtd = smsReports.filter(r => r.reportDate?.startsWith(monthPrefix));
-      const smsTotalKwhToday = smsToday.reduce((s, r) => s + parseFloat(r.totalKwh || "0"), 0);
-      const smsTotalKwhMtd = smsMtd.reduce((s, r) => s + parseFloat(r.totalKwh || "0"), 0);
+      // SMS
+      const smsToday = smsAll.filter(r => r.reportDate === today);
+      const smsMtd = smsAll.filter(r => r.reportDate?.startsWith(monthPrefix));
+      const smsKwhToday = smsToday.reduce((s, r) => s + parseFloat(r.totalKwh || "0"), 0);
+      const smsKwhMtd = smsMtd.reduce((s, r) => s + parseFloat(r.totalKwh || "0"), 0);
 
-      // CCM KPIs — total billets
-      const ccmToday = ccmReports.filter(r => r.reportDate === today);
-      const ccmMtd = ccmReports.filter(r => r.reportDate?.startsWith(monthPrefix));
+      // CCM
+      const ccmToday = ccmAll.filter(r => r.reportDate === today);
+      const ccmMtd = ccmAll.filter(r => r.reportDate?.startsWith(monthPrefix));
       const ccmBilletsToday = ccmToday.reduce((s, r) => s + (r.noBillets || 0), 0);
       const ccmBilletsMtd = ccmMtd.reduce((s, r) => s + (r.noBillets || 0), 0);
 
@@ -2857,26 +2911,27 @@ export async function registerRoutes(
         rollingMill: {
           todayTons: rmTodayTons.toFixed(2),
           mtdTons: rmMtdTons.toFixed(2),
-          todayShifts: rmToday.length,
-          lastReport: rmReports[0] || null,
+          todayShifts: rmToday.filter(r => !r.isDailyTotal).length,
+          lastReport: rmAll[0] ?? null,
         },
         sms: {
           todayHeats: smsToday.length,
           mtdHeats: smsMtd.length,
-          todayKwh: smsTotalKwhToday.toFixed(0),
-          mtdKwh: smsTotalKwhMtd.toFixed(0),
-          lastReport: smsReports[0] || null,
+          todayKwh: smsKwhToday.toFixed(0),
+          mtdKwh: smsKwhMtd.toFixed(0),
+          lastReport: smsAll[0] ?? null,
         },
         ccm: {
           todayBillets: ccmBilletsToday,
           mtdBillets: ccmBilletsMtd,
           todaySequences: ccmToday.length,
-          lastReport: ccmReports[0] || null,
+          lastReport: ccmAll[0] ?? null,
         },
       });
-    } catch (err: any) {
-      console.error("[production/kpis] Error:", err);
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[production/kpis] Error:", msg);
+      res.status(500).json({ error: msg });
     }
   });
 

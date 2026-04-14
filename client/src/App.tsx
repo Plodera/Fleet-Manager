@@ -182,7 +182,7 @@ function Router() {
         <PrivateRoute component={ProductionConfig} adminOnly />
       </Route>
       <Route path="/production">
-        <PrivateRoute component={ProductionDashboard} adminOnly />
+        <PrivateRoute component={ProductionDashboard} requiredPermission="view_production" />
       </Route>
       
       <Route component={NotFound} />

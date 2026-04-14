@@ -17,6 +17,7 @@ export const PERMISSIONS = {
   MANAGE_USERS: 'manage_users',
   MANAGE_VEHICLES: 'manage_vehicles',
   VIEW_TRACKERS: 'view_trackers',
+  VIEW_PRODUCTION: 'view_production',
 } as const;
 
 export const AVAILABLE_PERMISSIONS = [
@@ -34,6 +35,7 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'view_indents', label: 'Indents', labelPt: 'Requisições' },
   { id: 'approve_indents', label: 'Approve Indents', labelPt: 'Aprovar Requisições' },
   { id: 'view_trackers', label: 'Status Tracker', labelPt: 'Rastreador de Estado' },
+  { id: 'view_production', label: 'Steel Production Dashboard', labelPt: 'Painel de Produção de Aço' },
   { id: 'manage_users', label: 'User Management', labelPt: 'Gestão de Utilizadores' },
 ] as const;
 
@@ -920,7 +922,9 @@ export const steelProductionSettings = pgTable("steel_production_settings", {
   section: text("section").notNull().unique(), // "rolling_mill" | "sms" | "ccm"
   webhookSecret: text("webhook_secret").notNull().default(""),
   enabled: boolean("enabled").notNull().default(true),
+  notes: text("notes"),
   lastReceivedAt: timestamp("last_received_at"),
+  lastError: text("last_error"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -934,6 +938,7 @@ export const rollingMillReports = pgTable("rolling_mill_reports", {
   receivedAt: timestamp("received_at").notNull().defaultNow(),
   reportDate: date("report_date").notNull(),
   shift: text("shift").notNull().default(""),            // A / B / C / Day / Night
+  isDailyTotal: boolean("is_daily_total").notNull().default(false), // true = "Today's Total" aggregate block
   tonsProduced: numeric("tons_produced", { precision: 10, scale: 2 }),
   billetsTaken: integer("billets_taken"),
   billetsRolled: integer("billets_rolled"),
