@@ -2666,6 +2666,10 @@ export async function registerRoutes(
         if (provided !== secret) return res.status(401).json({ error: "Unauthorized" });
       }
 
+      if (sec && sec.enabled === false) {
+        return res.status(503).json({ error: "Section disabled" });
+      }
+
       const text = extractText(req.body);
       const kv = parseKV(text);
       const reportDate = kv["date"] || kv["report_date"] || new Date().toISOString().split("T")[0];
@@ -2684,6 +2688,11 @@ export async function registerRoutes(
           cobleCut: block.cobleCut,
           hotOut: block.hotOut,
           breakdownMinutes: block.breakdownMinutes,
+          billetSize: block.billetSize,
+          size: block.size,
+          millSpeed: block.millSpeed,
+          timeFrom: block.timeFrom,
+          timeTo: block.timeTo,
           rawMessage: text.slice(0, 5000),
           source: "webhook",
         });
@@ -2712,6 +2721,9 @@ export async function registerRoutes(
       if (secret) {
         const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : tokenParam;
         if (provided !== secret) return res.status(401).json({ error: "Unauthorized" });
+      }
+      if (sec && sec.enabled === false) {
+        return res.status(503).json({ error: "Section disabled" });
       }
 
       const text = extractText(req.body);
@@ -2766,6 +2778,9 @@ export async function registerRoutes(
       if (secret) {
         const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : tokenParam;
         if (provided !== secret) return res.status(401).json({ error: "Unauthorized" });
+      }
+      if (sec && sec.enabled === false) {
+        return res.status(503).json({ error: "Section disabled" });
       }
 
       const text = extractText(req.body);
@@ -2981,6 +2996,9 @@ export async function registerRoutes(
       if (secret) {
         const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : tokenParam;
         if (provided !== secret) return res.status(401).json({ error: "Unauthorized" });
+      }
+      if (sec && sec.enabled === false) {
+        return res.status(503).json({ error: "Section disabled" });
       }
       const text = extractText(req.body);
       const kv = parseKV(text);
