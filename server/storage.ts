@@ -8,7 +8,6 @@ import {
   glpiSettings,
   hikvisionNvrs, hikvisionGlobalSettings,
   fortigateSettings, fortigateBandwidth,
-  steelProductionSettings, rollingMillReports, smsReports, ccmReports,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -38,10 +37,6 @@ import {
   type HikvisionNvr, type InsertHikvisionNvr,
   type HikvisionGlobalSettings, type InsertHikvisionGlobalSettings,
   type FortigateSettings, type InsertFortigateSettings, type FortigateBandwidth,
-  type SteelProductionSettings, type InsertSteelProductionSettings,
-  type RollingMillReport, type InsertRollingMillReport,
-  type SmsReport, type InsertSmsReport,
-  type CcmReport, type InsertCcmReport,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq, desc, sql, and, gte, lt } from "drizzle-orm";
@@ -228,16 +223,6 @@ export interface IStorage {
   getItKpiValues(periodType: string, periodDate: string): Promise<any[]>;
   upsertItKpiValues(values: any[]): Promise<void>;
 
-  // Steel Production KPI
-  getSteelProductionSettings(): Promise<SteelProductionSettings[]>;
-  upsertSteelProductionSettings(section: string, data: Partial<InsertSteelProductionSettings>): Promise<SteelProductionSettings>;
-  getRollingMillReports(limit?: number): Promise<RollingMillReport[]>;
-  createRollingMillReport(data: InsertRollingMillReport): Promise<RollingMillReport>;
-  upsertRollingMillReport(data: InsertRollingMillReport): Promise<RollingMillReport>;
-  getSmsReports(limit?: number): Promise<SmsReport[]>;
-  createSmsReport(data: InsertSmsReport): Promise<SmsReport>;
-  getCcmReports(limit?: number): Promise<CcmReport[]>;
-  createCcmReport(data: InsertCcmReport): Promise<CcmReport>;
 
   sessionStore: session.Store;
 }
@@ -265,7 +250,7 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const userToInsert = {
       ...insertUser,
-      permissions: insertUser.permissions ? JSON.stringify(insertUser.permissions) : JSON.stringify(["view_dashboard", "view_vehicles", "view_bookings", "view_production"])
+      permissions: insertUser.permissions ? JSON.stringify(insertUser.permissions) : JSON.stringify(["view_dashboard", "view_vehicles", "view_bookings"])
     };
     const [user] = await getDb().insert(users).values(userToInsert as any).returning();
     return user;
@@ -1321,78 +1306,6 @@ export class DatabaseStorage implements IStorage {
       .where(lt(fortigateBandwidth.sampledAt, cutoff));
   }
 
-  // ─── Steel Production KPI ────────────────────────────────────────────────────
-  async getSteelProductionSettings(): Promise<SteelProductionSettings[]> {
-    return getDb().select().from(steelProductionSettings).orderBy(steelProductionSettings.section);
-  }
-
-  async upsertSteelProductionSettings(section: string, data: Partial<InsertSteelProductionSettings>): Promise<SteelProductionSettings> {
-    const existing = await getDb().select().from(steelProductionSettings)
-      .where(eq(steelProductionSettings.section, section)).limit(1);
-    if (existing.length > 0) {
-      const [updated] = await getDb().update(steelProductionSettings)
-        .set({ ...data, updatedAt: new Date() })
-        .where(eq(steelProductionSettings.section, section))
-        .returning();
-      return updated;
-    } else {
-      const [created] = await getDb().insert(steelProductionSettings)
-        .values({ section, webhookSecret: "", enabled: true, ...data })
-        .returning();
-      return created;
-    }
-  }
-
-  async getRollingMillReports(limit: number = 50): Promise<RollingMillReport[]> {
-    return getDb().select().from(rollingMillReports)
-      .orderBy(desc(rollingMillReports.receivedAt)).limit(limit);
-  }
-
-  async createRollingMillReport(data: InsertRollingMillReport): Promise<RollingMillReport> {
-    const [row] = await getDb().insert(rollingMillReports).values(data).returning();
-    return row;
-  }
-
-  async upsertRollingMillReport(data: InsertRollingMillReport): Promise<RollingMillReport> {
-    // Upsert by (reportDate, shift, isDailyTotal) — update if exists, else insert
-    const existing = await getDb().select().from(rollingMillReports)
-      .where(
-        and(
-          eq(rollingMillReports.reportDate, data.reportDate),
-          eq(rollingMillReports.shift, data.shift ?? ""),
-          eq(rollingMillReports.isDailyTotal, data.isDailyTotal ?? false),
-        )
-      ).limit(1);
-    if (existing.length > 0) {
-      const [updated] = await getDb().update(rollingMillReports)
-        .set({ ...data, receivedAt: new Date() })
-        .where(eq(rollingMillReports.id, existing[0].id))
-        .returning();
-      return updated;
-    }
-    const [row] = await getDb().insert(rollingMillReports).values(data).returning();
-    return row;
-  }
-
-  async getSmsReports(limit: number = 50): Promise<SmsReport[]> {
-    return getDb().select().from(smsReports)
-      .orderBy(desc(smsReports.receivedAt)).limit(limit);
-  }
-
-  async createSmsReport(data: InsertSmsReport): Promise<SmsReport> {
-    const [row] = await getDb().insert(smsReports).values(data).returning();
-    return row;
-  }
-
-  async getCcmReports(limit: number = 50): Promise<CcmReport[]> {
-    return getDb().select().from(ccmReports)
-      .orderBy(desc(ccmReports.receivedAt)).limit(limit);
-  }
-
-  async createCcmReport(data: InsertCcmReport): Promise<CcmReport> {
-    const [row] = await getDb().insert(ccmReports).values(data).returning();
-    return row;
-  }
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -1563,14 +1476,5 @@ export const storage = {
   insertFortigateBandwidth: (...args: Parameters<DatabaseStorage['insertFortigateBandwidth']>) => getStorage().insertFortigateBandwidth(...args),
   getFortigateBandwidth: (...args: Parameters<DatabaseStorage['getFortigateBandwidth']>) => getStorage().getFortigateBandwidth(...args),
   pruneFortigateBandwidth: () => getStorage().pruneFortigateBandwidth(),
-  getSteelProductionSettings: () => getStorage().getSteelProductionSettings(),
-  upsertSteelProductionSettings: (...args: Parameters<DatabaseStorage['upsertSteelProductionSettings']>) => getStorage().upsertSteelProductionSettings(...args),
-  getRollingMillReports: (...args: Parameters<DatabaseStorage['getRollingMillReports']>) => getStorage().getRollingMillReports(...args),
-  createRollingMillReport: (...args: Parameters<DatabaseStorage['createRollingMillReport']>) => getStorage().createRollingMillReport(...args),
-  upsertRollingMillReport: (...args: Parameters<DatabaseStorage['upsertRollingMillReport']>) => getStorage().upsertRollingMillReport(...args),
-  getSmsReports: (...args: Parameters<DatabaseStorage['getSmsReports']>) => getStorage().getSmsReports(...args),
-  createSmsReport: (...args: Parameters<DatabaseStorage['createSmsReport']>) => getStorage().createSmsReport(...args),
-  getCcmReports: (...args: Parameters<DatabaseStorage['getCcmReports']>) => getStorage().getCcmReports(...args),
-  createCcmReport: (...args: Parameters<DatabaseStorage['createCcmReport']>) => getStorage().createCcmReport(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

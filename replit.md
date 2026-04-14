@@ -18,7 +18,7 @@ The system utilizes a modern web stack:
     - **PageHeader Component**: A reusable component (`client/src/components/PageHeader.tsx`) for consistent page titles, descriptions, and actions across the application.
     - **Dialog Pattern**: A consistent approach where dialog triggers are in PageHeader actions and dialog bodies are rendered as siblings.
 - **Technical Implementations**:
-    - **Role-Based Access Control (RBAC)**: Granular permissions (15 distinct permissions like `manage_vehicles`, `view_indents`, `view_production`, `view_it_dashboard`) control access to features and data.
+    - **Role-Based Access Control (RBAC)**: Granular permissions (14 distinct permissions like `manage_vehicles`, `view_indents`, `view_it_dashboard`) control access to features and data.
     - **Bilingual Support**: Comprehensive English and Portuguese translations across all major UI elements and data labels, with language preference saved to `localStorage`.
     - **Dynamic Configuration**:
         - **Equipment Types**: Admin-configurable equipment types and checklist items for inspections, allowing for flexible and extensible inspection processes. Supports bilingual labels and section grouping.
@@ -41,14 +41,6 @@ The system utilizes a modern web stack:
     - **Analytics Dashboard**: Overview of key metrics.
     - **Work Order Reports**: Customizable reports with detailed and summary modes, exportable to Excel, PDF, and Print.
     - **Email Notifications**: SMTP-configured notifications for booking status changes and tracker alerts.
-
-## Steel Production KPI Module
-- **Webhook Receivers**: Three public POST endpoints (`/api/production/webhook/rolling-mill`, `/api/production/webhook/sms`, `/api/production/webhook/ccm`) accept Power Automate payloads with key:value formatted text. Each validates an optional shared secret via `Authorization: Bearer <token>` or `?token=` query param.
-- **Data Parsed**: Rolling Mill (tons, billets taken/rolled, miss roll, coble cut, hot out, breakdown minutes); SMS (heat no, start/taping times, tap-to-tap, temperatures, kWh, F/C C tons, remarks); CCM (incharge, heat no, billets, strands, mould life, ladle, tundish, sequence).
-- **Admin Config** (`/production-config`): Manage per-section webhook secrets and enable/disable state. Displays full webhook URL with copy button and Power Automate setup guide.
-- **Production Dashboard** (`/production`): KPI cards (today/MTD for tons, heats, kWh, billets), 30-day bar charts for each section, and paginated report tables (tabs for Rolling Mill/SMS/CCM).
-- **Database Tables**: `steel_production_settings`, `rolling_mill_reports`, `sms_reports`, `ccm_reports` (created directly via psql since drizzle-kit push is interactive).
-- **Routes**: Admin-only for settings CRUD; authenticated for report lists and KPI summary.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.

@@ -25,7 +25,6 @@ import {
   ShieldCheck,
   Network,
   Activity,
-  Factory
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -158,8 +157,6 @@ export function Sidebar() {
         { href: "/tv-dashboard-config", label: t.nav.tvDashboards, icon: Monitor, permission: "admin_only", hideFromDriver: true },
         { href: "/it-monitor-config", label: t.nav.itMonitorConfig, icon: Network, permission: "admin_only", hideFromDriver: true },
         { href: "/it-dashboard", label: t.nav.itDashboard, icon: Activity, permission: "view_it_dashboard", hideFromDriver: true },
-        { href: "/production", label: t.nav.productionDashboard || "Steel Production", icon: Factory, permission: "view_production", hideFromDriver: true },
-        { href: "/production-config", label: t.nav.productionConfig || "Production Config", icon: Factory, permission: "admin_only", hideFromDriver: true },
       ],
     },
     {

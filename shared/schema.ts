@@ -17,7 +17,6 @@ export const PERMISSIONS = {
   MANAGE_USERS: 'manage_users',
   MANAGE_VEHICLES: 'manage_vehicles',
   VIEW_TRACKERS: 'view_trackers',
-  VIEW_PRODUCTION: 'view_production',
   VIEW_IT_DASHBOARD: 'view_it_dashboard',
 } as const;
 
@@ -36,7 +35,6 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'view_indents', label: 'Indents', labelPt: 'Requisições' },
   { id: 'approve_indents', label: 'Approve Indents', labelPt: 'Aprovar Requisições' },
   { id: 'view_trackers', label: 'Status Tracker', labelPt: 'Rastreador de Estado' },
-  { id: 'view_production', label: 'Steel Production Dashboard', labelPt: 'Painel de Produção de Aço' },
   { id: 'view_it_dashboard', label: 'IT Operations Dashboard', labelPt: 'Painel de Operações de TI' },
   { id: 'manage_users', label: 'User Management', labelPt: 'Gestão de Utilizadores' },
 ] as const;
@@ -915,100 +913,3 @@ export const fortigateBandwidth = pgTable("fortigate_bandwidth", {
 });
 
 export type FortigateBandwidth = typeof fortigateBandwidth.$inferSelect;
-
-// ─── Steel Production KPI Module ────────────────────────────────────────────
-
-// Webhook settings — one row per section; stores shared secret for validation
-export const steelProductionSettings = pgTable("steel_production_settings", {
-  id: serial("id").primaryKey(),
-  section: text("section").notNull().unique(), // "rolling_mill" | "sms" | "ccm"
-  webhookSecret: text("webhook_secret").notNull().default(""),
-  enabled: boolean("enabled").notNull().default(true),
-  notes: text("notes"),
-  lastReceivedAt: timestamp("last_received_at"),
-  lastError: text("last_error"),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const insertSteelProductionSettingsSchema = createInsertSchema(steelProductionSettings).omit({ id: true, lastReceivedAt: true, updatedAt: true });
-export type SteelProductionSettings = typeof steelProductionSettings.$inferSelect;
-export type InsertSteelProductionSettings = z.infer<typeof insertSteelProductionSettingsSchema>;
-
-// Rolling Mill shift report
-export const rollingMillReports = pgTable("rolling_mill_reports", {
-  id: serial("id").primaryKey(),
-  receivedAt: timestamp("received_at").notNull().defaultNow(),
-  reportDate: date("report_date").notNull(),
-  shift: text("shift").notNull().default(""),            // A / B / C / Day / Night
-  isDailyTotal: boolean("is_daily_total").notNull().default(false), // true = "Today's Total" aggregate block
-  tonsProduced: numeric("tons_produced", { precision: 10, scale: 2 }),
-  billetsTaken: integer("billets_taken"),
-  billetsRolled: integer("billets_rolled"),
-  missRoll: integer("miss_roll"),
-  cobleCut: integer("coble_cut"),
-  hotOut: integer("hot_out"),
-  breakdownMinutes: integer("breakdown_minutes"),
-  // Extended fields
-  billetSize: text("billet_size"),                      // e.g. "100x100", "130x130"
-  size: text("size"),                                    // product size / section (e.g. "12mm", "10mm")
-  millSpeed: numeric("mill_speed", { precision: 6, scale: 2 }), // meters per second or rpm
-  timeFrom: text("time_from"),                           // shift start time "HH:MM"
-  timeTo: text("time_to"),                               // shift end time "HH:MM"
-  rawMessage: text("raw_message"),
-  source: text("source").notNull().default("webhook"),   // "webhook" | "manual"
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertRollingMillReportSchema = createInsertSchema(rollingMillReports).omit({ id: true, receivedAt: true, createdAt: true });
-export type RollingMillReport = typeof rollingMillReports.$inferSelect;
-export type InsertRollingMillReport = z.infer<typeof insertRollingMillReportSchema>;
-
-// Steel Melting Shop (SMS) heat report
-export const smsReports = pgTable("sms_reports", {
-  id: serial("id").primaryKey(),
-  receivedAt: timestamp("received_at").notNull().defaultNow(),
-  reportDate: date("report_date").notNull(),
-  shift: text("shift").notNull().default(""),
-  heatNo: text("heat_no"),
-  startTime: text("start_time"),
-  tapingTime: text("taping_time"),
-  tapToTapMinutes: integer("tap_to_tap_minutes"),
-  tapingTempC: integer("taping_temp_c"),
-  ladleTempC: integer("ladle_temp_c"),
-  totalKwh: numeric("total_kwh", { precision: 12, scale: 2 }),
-  fcTons: numeric("fc_tons", { precision: 10, scale: 3 }),       // F/C C tons (ferro-chrome?)
-  remarksJson: text("remarks_json"),                              // JSON: { mnKg, tempTips, blasts, castIron, millScale, purging, kw }
-  rawMessage: text("raw_message"),
-  source: text("source").notNull().default("webhook"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertSmsReportSchema = createInsertSchema(smsReports).omit({ id: true, receivedAt: true, createdAt: true });
-export type SmsReport = typeof smsReports.$inferSelect;
-export type InsertSmsReport = z.infer<typeof insertSmsReportSchema>;
-
-// Continuous Casting Machine (CCM) report
-export const ccmReports = pgTable("ccm_reports", {
-  id: serial("id").primaryKey(),
-  receivedAt: timestamp("received_at").notNull().defaultNow(),
-  reportDate: date("report_date").notNull(),
-  shift: text("shift").notNull().default(""),
-  incharge: text("incharge"),
-  heatNo: text("heat_no"),
-  noBillets: integer("no_billets"),
-  strandsRun: integer("strands_run"),
-  mouldLife1: integer("mould_life_1"),
-  mouldLife2: integer("mould_life_2"),
-  ladleNo: text("ladle_no"),
-  ladleOpening: text("ladle_opening"),
-  tundishNo: text("tundish_no"),
-  tundishType: text("tundish_type"),
-  sequence: integer("sequence"),
-  rawMessage: text("raw_message"),
-  source: text("source").notNull().default("webhook"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertCcmReportSchema = createInsertSchema(ccmReports).omit({ id: true, receivedAt: true, createdAt: true });
-export type CcmReport = typeof ccmReports.$inferSelect;
-export type InsertCcmReport = z.infer<typeof insertCcmReportSchema>;

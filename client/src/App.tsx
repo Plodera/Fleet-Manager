@@ -36,8 +36,6 @@ import TVDashboardIndex from "@/pages/TVDashboardIndex";
 import StatusTracker from "@/pages/StatusTracker";
 import ITMonitorConfig from "@/pages/ITMonitorConfig";
 import ITDashboard from "@/pages/ITDashboard";
-import ProductionConfig from "@/pages/ProductionConfig";
-import SteelProductionTVDashboard from "@/pages/SteelProductionTVDashboard";
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false, noShell = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean, noShell?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -181,15 +179,6 @@ function Router() {
       </Route>
       <Route path="/it-dashboard">
         <PrivateRoute component={ITDashboard} requiredPermission="view_it_dashboard" noShell />
-      </Route>
-      <Route path="/production-config">
-        <PrivateRoute component={ProductionConfig} adminOnly />
-      </Route>
-      <Route path="/production">
-        <PrivateRoute component={SteelProductionTVDashboard} requiredPermission="view_production" noShell />
-      </Route>
-      <Route path="/rolling-mill">
-        <PrivateRoute component={SteelProductionTVDashboard} requiredPermission="view_production" noShell />
       </Route>
       
       <Route component={NotFound} />
