@@ -27,10 +27,10 @@ type SteelSettings = {
 type SectionKey = "rolling_mill" | "sms" | "ccm";
 
 // ─── Webhook URL copy button ────────────────────────────────────────────────
-function WebhookUrl({ path, label }: { path: string; label: string }) {
+function WebhookUrl({ path, label, customUrl }: { path: string; label: string; customUrl?: string }) {
   const [copied, setCopied] = useState(false);
   const origin = window.location.origin;
-  const url = `${origin}/api/production/webhook/${path}`;
+  const url = customUrl ? `${origin}${customUrl}` : `${origin}/api/production/webhook/${path}`;
   const handleCopy = () => {
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
@@ -403,6 +403,7 @@ function SectionConfig({
   icon: Icon,
   description,
   webhookPath,
+  webhookCustomUrl,
   setting,
   onSave,
   saving,
@@ -413,6 +414,7 @@ function SectionConfig({
   icon: React.ElementType;
   description: string;
   webhookPath: string;
+  webhookCustomUrl?: string;
   setting: SteelSettings | undefined;
   onSave: (section: string, data: { webhookSecret?: string; enabled?: boolean; notes?: string }) => void;
   saving: boolean;
@@ -456,7 +458,7 @@ function SectionConfig({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <WebhookUrl path={webhookPath} label={p.webhookUrl} />
+        <WebhookUrl path={webhookPath} customUrl={webhookCustomUrl} label={p.webhookUrl} />
 
         <div className="space-y-1.5">
           <Label htmlFor={`secret-${section}`} className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -584,6 +586,7 @@ export default function ProductionConfig() {
           icon={Layers}
           description="Receives shift production reports (tons, billets, breakdown, coble cut, etc.)"
           webhookPath="rolling-mill"
+          webhookCustomUrl="/api/rolling-mill/webhook"
           setting={getSetting("rolling_mill")}
           onSave={handleSave}
           saving={savingSection === "rolling_mill"}

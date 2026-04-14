@@ -2607,15 +2607,18 @@ export async function registerRoutes(
   // Parse Rolling Mill two-block format:
   // shift block(s) followed by "Today's Total" block
   // Returns array of parsed records, last one marked isDailyTotal if present
-  function parseRollingMillBlocks(text: string): Array<{
+  type RmBlock = {
     shift: string; isDailyTotal: boolean;
     tonsProduced?: string; billetsTaken?: number; billetsRolled?: number;
     missRoll?: number; cobleCut?: number; hotOut?: number; breakdownMinutes?: number;
-  }> {
+    billetSize?: string; size?: string; millSpeed?: string; timeFrom?: string; timeTo?: string;
+  };
+
+  function parseRollingMillBlocks(text: string): RmBlock[] {
     const normalized = text.replace(/\r/g, "");
     // Split by blank lines or clear section breaks
     const blocks = normalized.split(/\n{2,}|\n(?=shift\s*[:\=]|today)/i).filter(b => b.trim());
-    const results = blocks.map(block => {
+    const results: RmBlock[] = blocks.map(block => {
       const kv = parseKV(block);
       const isDailyTotal = /today|total/i.test(block.split("\n")[0] || "");
       return {
@@ -2628,11 +2631,14 @@ export async function registerRoutes(
         cobleCut: safeInt(kv["coble_cut"] || kv["coble"]),
         hotOut: safeInt(kv["hot_out"] || kv["hot"]),
         breakdownMinutes: safeInt(kv["breakdown"] || kv["breakdown_minutes"] || kv["b_d"]),
+        billetSize: kv["billet_size"] || kv["billet"] || undefined,
+        size: kv["size"] || kv["product_size"] || kv["section_size"] || undefined,
+        millSpeed: safeFloat(kv["mill_speed"] || kv["speed"] || kv["mpm"]),
+        timeFrom: kv["time_from"] || kv["from"] || undefined,
+        timeTo: kv["time_to"] || kv["to"] || undefined,
       };
     });
-    return results.length > 0 ? results : [{
-      shift: "", isDailyTotal: false,
-    }];
+    return results.length > 0 ? results : [{ shift: "", isDailyTotal: false }];
   }
 
   function safeInt(v: string | undefined): number | undefined {
@@ -2900,10 +2906,14 @@ export async function registerRoutes(
 
       const rmBilletsTakenToday = rmShiftsToday.reduce((s, r) => s + (r.billetsTaken || 0), 0);
       const rmBilletsTakenMtd = rmShiftsMtd.reduce((s, r) => s + (r.billetsTaken || 0), 0);
+      const rmBilletsRolledToday = rmShiftsToday.reduce((s, r) => s + (r.billetsRolled || 0), 0);
+      const rmBilletsRolledMtd = rmShiftsMtd.reduce((s, r) => s + (r.billetsRolled || 0), 0);
       const rmMissRollToday = rmShiftsToday.reduce((s, r) => s + (r.missRoll || 0), 0);
       const rmMissRollMtd = rmShiftsMtd.reduce((s, r) => s + (r.missRoll || 0), 0);
       const rmCobleCutToday = rmShiftsToday.reduce((s, r) => s + (r.cobleCut || 0), 0);
       const rmCobleCutMtd = rmShiftsMtd.reduce((s, r) => s + (r.cobleCut || 0), 0);
+      const rmHotOutToday = rmShiftsToday.reduce((s, r) => s + (r.hotOut || 0), 0);
+      const rmHotOutMtd = rmShiftsMtd.reduce((s, r) => s + (r.hotOut || 0), 0);
       const rmBreakdownToday = rmShiftsToday.reduce((s, r) => s + (r.breakdownMinutes || 0), 0);
       const rmBreakdownMtd = rmShiftsMtd.reduce((s, r) => s + (r.breakdownMinutes || 0), 0);
 
@@ -2926,10 +2936,14 @@ export async function registerRoutes(
           todayShifts: rmShiftsToday.length,
           todayBilletsTaken: rmBilletsTakenToday,
           mtdBilletsTaken: rmBilletsTakenMtd,
+          todayBilletsRolled: rmBilletsRolledToday,
+          mtdBilletsRolled: rmBilletsRolledMtd,
           todayMissRoll: rmMissRollToday,
           mtdMissRoll: rmMissRollMtd,
           todayCobleCut: rmCobleCutToday,
           mtdCobleCut: rmCobleCutMtd,
+          todayHotOut: rmHotOutToday,
+          mtdHotOut: rmHotOutMtd,
           todayBreakdownMin: rmBreakdownToday,
           mtdBreakdownMin: rmBreakdownMtd,
           lastReport: rmAll[0] ?? null,
@@ -2979,7 +2993,10 @@ export async function registerRoutes(
           tonsProduced: block.tonsProduced, billetsTaken: block.billetsTaken,
           billetsRolled: block.billetsRolled, missRoll: block.missRoll,
           cobleCut: block.cobleCut, hotOut: block.hotOut,
-          breakdownMinutes: block.breakdownMinutes, rawMessage: text.slice(0, 5000), source: "webhook",
+          breakdownMinutes: block.breakdownMinutes,
+          billetSize: block.billetSize, size: block.size,
+          millSpeed: block.millSpeed, timeFrom: block.timeFrom, timeTo: block.timeTo,
+          rawMessage: text.slice(0, 5000), source: "webhook",
         });
         ids.push(r.id);
       }
@@ -2990,6 +3007,29 @@ export async function registerRoutes(
       await storage.upsertSteelProductionSettings("rolling_mill", { lastError: msg });
       res.status(500).json({ error: msg });
     }
+  });
+
+  // GET/PUT /api/rolling-mill/settings — admin only (alias to production settings)
+  app.get("/api/rolling-mill/settings", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).role !== "admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const settings = await storage.getSteelProductionSettings();
+    const rmSetting = settings.find(s => s.section === "rolling_mill") ?? null;
+    res.json(rmSetting);
+  });
+
+  app.put("/api/rolling-mill/settings", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).role !== "admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { webhookSecret, enabled, notes } = req.body;
+    const result = await storage.upsertSteelProductionSettings("rolling_mill", {
+      ...(webhookSecret !== undefined ? { webhookSecret } : {}),
+      ...(enabled !== undefined ? { enabled } : {}),
+      ...(notes !== undefined ? { notes } : {}),
+    });
+    res.json(result);
   });
 
   app.get("/api/rolling-mill/reports", async (req, res) => {
@@ -3019,10 +3059,14 @@ export async function registerRoutes(
         todayShifts: rmShiftsToday.length,
         todayBilletsTaken: rmShiftsToday.reduce((s, r) => s + (r.billetsTaken || 0), 0),
         mtdBilletsTaken: rmShiftsMtd.reduce((s, r) => s + (r.billetsTaken || 0), 0),
+        todayBilletsRolled: rmShiftsToday.reduce((s, r) => s + (r.billetsRolled || 0), 0),
+        mtdBilletsRolled: rmShiftsMtd.reduce((s, r) => s + (r.billetsRolled || 0), 0),
         todayMissRoll: rmShiftsToday.reduce((s, r) => s + (r.missRoll || 0), 0),
         mtdMissRoll: rmShiftsMtd.reduce((s, r) => s + (r.missRoll || 0), 0),
         todayCobleCut: rmShiftsToday.reduce((s, r) => s + (r.cobleCut || 0), 0),
         mtdCobleCut: rmShiftsMtd.reduce((s, r) => s + (r.cobleCut || 0), 0),
+        todayHotOut: rmShiftsToday.reduce((s, r) => s + (r.hotOut || 0), 0),
+        mtdHotOut: rmShiftsMtd.reduce((s, r) => s + (r.hotOut || 0), 0),
         todayBreakdownMin: rmShiftsToday.reduce((s, r) => s + (r.breakdownMinutes || 0), 0),
         mtdBreakdownMin: rmShiftsMtd.reduce((s, r) => s + (r.breakdownMinutes || 0), 0),
         lastReport: rmAll[0] ?? null,

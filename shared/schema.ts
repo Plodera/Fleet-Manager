@@ -946,6 +946,12 @@ export const rollingMillReports = pgTable("rolling_mill_reports", {
   cobleCut: integer("coble_cut"),
   hotOut: integer("hot_out"),
   breakdownMinutes: integer("breakdown_minutes"),
+  // Extended fields
+  billetSize: text("billet_size"),                      // e.g. "100x100", "130x130"
+  size: text("size"),                                    // product size / section (e.g. "12mm", "10mm")
+  millSpeed: numeric("mill_speed", { precision: 6, scale: 2 }), // meters per second or rpm
+  timeFrom: text("time_from"),                           // shift start time "HH:MM"
+  timeTo: text("time_to"),                               // shift end time "HH:MM"
   rawMessage: text("raw_message"),
   source: text("source").notNull().default("webhook"),   // "webhook" | "manual"
   createdAt: timestamp("created_at").defaultNow(),

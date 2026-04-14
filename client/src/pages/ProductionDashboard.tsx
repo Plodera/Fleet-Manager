@@ -23,6 +23,11 @@ type RollingMillReport = {
   cobleCut: number | null;
   hotOut: number | null;
   breakdownMinutes: number | null;
+  billetSize: string | null;
+  size: string | null;
+  millSpeed: string | null;
+  timeFrom: string | null;
+  timeTo: string | null;
   source: string;
 };
 
@@ -66,10 +71,14 @@ type Kpis = {
     todayShifts: number;
     todayBilletsTaken: number;
     mtdBilletsTaken: number;
+    todayBilletsRolled: number;
+    mtdBilletsRolled: number;
     todayMissRoll: number;
     mtdMissRoll: number;
     todayCobleCut: number;
     mtdCobleCut: number;
+    todayHotOut: number;
+    mtdHotOut: number;
     todayBreakdownMin: number;
     mtdBreakdownMin: number;
     lastReport: RollingMillReport | null;
@@ -218,7 +227,7 @@ export default function ProductionDashboard() {
             ))}
           </div>
         ) : kpis ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
             <KpiCard
               label={prod.rmTodayTons}
               value={kpis.rollingMill.todayTons}
@@ -237,11 +246,19 @@ export default function ProductionDashboard() {
               color="text-indigo-600"
             />
             <KpiCard
+              label={prod.billetsRolled}
+              value={kpis.rollingMill.todayBilletsRolled}
+              subLabel={prod.mtd}
+              subValue={kpis.rollingMill.mtdBilletsRolled}
+              icon={TrendingUp}
+              color="text-violet-600"
+            />
+            <KpiCard
               label={prod.missRoll}
               value={kpis.rollingMill.todayMissRoll}
               subLabel={prod.mtd}
               subValue={kpis.rollingMill.mtdMissRoll}
-              icon={TrendingUp}
+              icon={Flame}
               color="text-orange-500"
             />
             <KpiCard
@@ -249,25 +266,25 @@ export default function ProductionDashboard() {
               value={kpis.rollingMill.todayCobleCut}
               subLabel={prod.mtd}
               subValue={kpis.rollingMill.mtdCobleCut}
-              icon={Flame}
-              color="text-red-500"
+              icon={Package}
+              color="text-pink-500"
             />
             <KpiCard
               label={prod.hotOut}
+              value={kpis.rollingMill.todayHotOut}
+              subLabel={prod.mtd}
+              subValue={kpis.rollingMill.mtdHotOut}
+              icon={Wrench}
+              color="text-red-500"
+            />
+            <KpiCard
+              label={prod.breakdownMinutes}
               value={kpis.rollingMill.todayBreakdownMin}
               unit="min"
               subLabel={prod.mtd}
               subValue={`${kpis.rollingMill.mtdBreakdownMin} min`}
-              icon={Wrench}
-              color="text-yellow-600"
-            />
-            <KpiCard
-              label={prod.rmShifts}
-              value={kpis.rollingMill.todayShifts}
-              subLabel={prod.section}
-              subValue={prod.rollingMill}
               icon={BarChart3}
-              color="text-teal-600"
+              color="text-yellow-600"
             />
           </div>
         ) : null}
