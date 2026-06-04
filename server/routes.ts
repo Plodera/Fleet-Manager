@@ -621,15 +621,20 @@ export async function registerRoutes(
     if (user.role !== 'admin') return res.status(401).send("Unauthorized");
     try {
       const input = api.users.create.input.parse(req.body);
-      const existingUser = await storage.getUserByUsername(input.username);
-      if (existingUser) return res.status(400).json({ message: "Username already exists" });
+      const existingByUsername = await storage.getUserByUsername(input.username);
+      if (existingByUsername) return res.status(400).json({ message: "Username already exists", field: "username" });
+      if (input.email) {
+        const existingByEmail = await storage.getUserByEmail(input.email);
+        if (existingByEmail) return res.status(400).json({ message: "Email already in use", field: "email" });
+      }
       const newUser = await storage.createUser(input);
       res.status(201).json(newUser);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      throw err;
+      console.error("Create user error:", err);
+      return res.status(500).json({ message: "Failed to create user" });
     }
   });
 

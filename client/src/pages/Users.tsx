@@ -121,6 +121,14 @@ export default function Users() {
       onSuccess: () => {
         setIsDialogOpen(false);
         form.reset();
+      },
+      onError: (err: any) => {
+        const msg: string = err.message || "";
+        if (msg.includes("Username")) {
+          form.setError("username", { message: msg });
+        } else if (msg.includes("Email") || msg.includes("email")) {
+          form.setError("email", { message: msg });
+        }
       }
     });
   };

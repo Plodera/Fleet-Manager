@@ -48,6 +48,7 @@ const PostgresSessionStore = connectPg(session);
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
   getVehicles(): Promise<Vehicle[]>;
@@ -244,6 +245,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await getDb().select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await getDb().select().from(users).where(eq(users.email, email));
     return user;
   }
 
@@ -1321,6 +1327,7 @@ export const storage = {
   get instance() { return getStorage(); },
   getUser: (...args: Parameters<DatabaseStorage['getUser']>) => getStorage().getUser(...args),
   getUserByUsername: (...args: Parameters<DatabaseStorage['getUserByUsername']>) => getStorage().getUserByUsername(...args),
+  getUserByEmail: (...args: Parameters<DatabaseStorage['getUserByEmail']>) => getStorage().getUserByEmail(...args),
   createUser: (...args: Parameters<DatabaseStorage['createUser']>) => getStorage().createUser(...args),
   getVehicles: () => getStorage().getVehicles(),
   getVehicle: (...args: Parameters<DatabaseStorage['getVehicle']>) => getStorage().getVehicle(...args),
