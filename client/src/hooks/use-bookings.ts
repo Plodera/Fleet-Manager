@@ -99,8 +99,9 @@ export function useBookings() {
         body: JSON.stringify({ status: 'in_progress' }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to start trip");
+        let message = "Failed to start trip";
+        try { const err = await res.json(); message = err.message || message; } catch {}
+        throw new Error(message);
       }
       return api.bookings.updateStatus.responses[200].parse(await res.json());
     },
@@ -123,8 +124,9 @@ export function useBookings() {
         body: JSON.stringify({}),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to end trip");
+        let message = "Failed to end trip";
+        try { const err = await res.json(); message = err.message || message; } catch {}
+        throw new Error(message);
       }
       return api.bookings.endTrip.responses[200].parse(await res.json());
     },

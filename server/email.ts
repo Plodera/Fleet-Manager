@@ -9,8 +9,14 @@ interface EmailContent {
 }
 
 export async function sendEmail(emailContent: EmailContent): Promise<boolean> {
-  const settings = await storage.getEmailSettings();
-  
+  let settings;
+  try {
+    settings = await storage.getEmailSettings();
+  } catch (err) {
+    console.error("Failed to fetch email settings:", err);
+    return false;
+  }
+
   if (!settings || !settings.enabled) {
     console.log("=== EMAIL NOTIFICATION (Email disabled - logging only) ===");
     console.log(`To: ${emailContent.to}`);
