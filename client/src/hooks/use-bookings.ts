@@ -63,8 +63,12 @@ export function useBookings() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to update booking status");
+        let message = "Failed to update booking status";
+        try {
+          const err = await res.json();
+          message = err.message || message;
+        } catch {}
+        throw new Error(message);
       }
       return api.bookings.updateStatus.responses[200].parse(await res.json());
     },

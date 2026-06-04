@@ -882,7 +882,7 @@ export default function Bookings() {
                 </div>
               </div>
 
-              {booking.status === 'pending' && (booking.approverId === user?.id || user?.role === 'admin') && (
+              {booking.status === 'pending' && (booking.approverId === user?.id || user?.role === 'admin' || user?.isApprover) && (
                 <div className="flex gap-2 flex-wrap">
                   <Button 
                     size="sm" 
@@ -917,7 +917,7 @@ export default function Bookings() {
                 </div>
               )}
 
-              {booking.status === 'pending' && booking.approverId !== user?.id && user?.role !== 'admin' && (
+              {booking.status === 'pending' && booking.approverId !== user?.id && user?.role !== 'admin' && !user?.isApprover && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
                   <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                   <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">{t.bookings.awaitingApproval}</span>
@@ -1017,7 +1017,7 @@ export default function Bookings() {
                 </div>
               )}
 
-              {booking.status === 'cancelled' && (booking.approverId === user?.id || user?.role === 'admin') && (
+              {booking.status === 'cancelled' && (booking.approverId === user?.id || user?.role === 'admin' || user?.isApprover) && (
                 <div className="flex gap-2 flex-wrap">
                   <Button 
                     size="sm" 
