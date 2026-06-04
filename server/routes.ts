@@ -310,7 +310,8 @@ export async function registerRoutes(
       const updateData: { status: 'pending' | 'approved' | 'rejected' | 'in_progress' | 'completed' | 'cancelled'; cancellationReason?: string | null; driverId?: number | null } = { status: input.status };
       if (input.status === 'cancelled' && input.cancellationReason) {
         updateData.cancellationReason = input.cancellationReason;
-      } else if (input.status !== 'cancelled') {
+      } else if (input.status !== 'cancelled' && existingBooking.status === 'cancelled') {
+        // Only clear cancellation reason when moving OUT of cancelled status
         updateData.cancellationReason = null;
       }
       if (input.status === 'approved' && input.driverId !== undefined) {
