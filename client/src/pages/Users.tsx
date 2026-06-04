@@ -126,6 +126,8 @@ export default function Users() {
         const msg: string = err.message || "";
         if (msg.includes("Username")) {
           form.setError("username", { message: msg });
+        } else if (msg.includes("full name")) {
+          form.setError("fullName", { message: msg });
         } else if (msg.includes("Email") || msg.includes("email")) {
           form.setError("email", { message: msg });
         }

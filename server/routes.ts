@@ -623,6 +623,8 @@ export async function registerRoutes(
       const input = api.users.create.input.parse(req.body);
       const existingByUsername = await storage.getUserByUsername(input.username);
       if (existingByUsername) return res.status(400).json({ message: "Username already exists", field: "username" });
+      const existingByFullName = await storage.getUserByFullName(input.fullName);
+      if (existingByFullName) return res.status(400).json({ message: "A user with this full name already exists", field: "fullName" });
       if (input.email) {
         const existingByEmail = await storage.getUserByEmail(input.email);
         if (existingByEmail) return res.status(400).json({ message: "Email already in use", field: "email" });

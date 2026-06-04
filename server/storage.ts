@@ -49,6 +49,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByFullName(fullName: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
   getVehicles(): Promise<Vehicle[]>;
@@ -250,6 +251,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await getDb().select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async getUserByFullName(fullName: string): Promise<User | undefined> {
+    const [user] = await getDb().select().from(users).where(eq(users.fullName, fullName));
     return user;
   }
 
@@ -1328,6 +1334,7 @@ export const storage = {
   getUser: (...args: Parameters<DatabaseStorage['getUser']>) => getStorage().getUser(...args),
   getUserByUsername: (...args: Parameters<DatabaseStorage['getUserByUsername']>) => getStorage().getUserByUsername(...args),
   getUserByEmail: (...args: Parameters<DatabaseStorage['getUserByEmail']>) => getStorage().getUserByEmail(...args),
+  getUserByFullName: (...args: Parameters<DatabaseStorage['getUserByFullName']>) => getStorage().getUserByFullName(...args),
   createUser: (...args: Parameters<DatabaseStorage['createUser']>) => getStorage().createUser(...args),
   getVehicles: () => getStorage().getVehicles(),
   getVehicle: (...args: Parameters<DatabaseStorage['getVehicle']>) => getStorage().getVehicle(...args),
