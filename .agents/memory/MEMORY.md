@@ -1,0 +1,1 @@
+- [On-prem DB schema sync](onprem-db-sync.md) — on-prem PostgreSQL missing enum values (booking_status); fix with ALTER TYPE ADD VALUE IF NOT EXISTS.

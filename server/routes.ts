@@ -337,8 +337,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       }
       console.error("Booking status update error:", err);
-      const errMsg = err instanceof Error ? err.message : String(err);
-      return res.status(500).json({ message: `Error: ${errMsg}` });
+      return res.status(500).json({ message: "Failed to update booking status. Please try again." });
     }
   });
 
