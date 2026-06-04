@@ -336,8 +336,9 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      console.error("Booking approval error:", err);
-      return res.status(500).json({ message: "Failed to update booking status. Please try again." });
+      console.error("Booking status update error:", err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ message: `Error: ${errMsg}` });
     }
   });
 
