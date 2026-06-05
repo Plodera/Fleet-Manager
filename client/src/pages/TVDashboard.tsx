@@ -275,8 +275,15 @@ function KpiCardContent({
         </div>
       </div>
 
-      <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} />
+      {/* "TODAY" badge + big daily value */}
+      <div className="flex flex-col gap-0.5">
+        <span className="font-bold uppercase tracking-widest" style={{ color: color.topBar, fontSize: "clamp(0.6rem, 0.85vw, 0.8rem)" }}>
+          Today
+        </span>
+        <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} />
+      </div>
 
+      {/* Monthly total */}
       <div className="mt-2 space-y-1.5">
         {progress !== null && (
           <div className="h-0.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
@@ -286,12 +293,12 @@ function KpiCardContent({
             />
           </div>
         )}
-        <div className="flex items-center justify-between">
-          <span className="font-medium" style={{ color: color.text, fontSize: "clamp(0.7rem, 1vw, 0.95rem)" }}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-medium whitespace-nowrap" style={{ color: "rgba(255,255,255,0.35)", fontSize: "clamp(0.65rem, 0.9vw, 0.85rem)" }}>
             {monthlyLabel}
           </span>
-          <span className="font-bold" style={{ color: color.text, fontSize: "clamp(0.7rem, 1vw, 0.95rem)" }}>
-            {monthlyVal} {kpi.unit || ""}
+          <span className="font-bold truncate text-right" style={{ color: color.text, fontSize: "clamp(0.65rem, 0.9vw, 0.85rem)" }}>
+            {monthlyVal !== "-" ? `${monthlyVal}${kpi.unit ? " " + kpi.unit : ""}` : "—"}
           </span>
         </div>
       </div>
