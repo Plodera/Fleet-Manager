@@ -520,8 +520,18 @@ export default function TVDashboard() {
   }, [kpiValues, today]);
 
   const getMonthlyValue = useCallback((kpiId: number) => {
-    const val = kpiValues.find((v: any) => v.kpiId === kpiId && v.periodType === "monthly" && v.periodDate?.startsWith(currentMonth));
-    return val ? val.value : "-";
+    const dailyThisMonth = kpiValues.filter((v: any) =>
+      v.kpiId === kpiId &&
+      v.periodType === "daily" &&
+      v.periodDate?.startsWith(currentMonth)
+    );
+    if (dailyThisMonth.length === 0) return "-";
+    const sum = dailyThisMonth.reduce((acc: number, v: any) => {
+      const num = parseFloat(v.value);
+      return isNaN(num) ? acc : acc + num;
+    }, 0);
+    const hasDecimals = dailyThisMonth.some((v: any) => String(v.value).includes("."));
+    return hasDecimals ? sum.toFixed(2) : String(Math.round(sum));
   }, [kpiValues, currentMonth]);
 
   const switchVideo = useCallback((newIndex: number) => {
