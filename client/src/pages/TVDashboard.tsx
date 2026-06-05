@@ -285,14 +285,6 @@ function KpiCardContent({
 
       {/* Monthly total */}
       <div className="mt-2 space-y-1.5">
-        {progress !== null && (
-          <div className="h-0.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-            <div
-              className="h-full rounded-full transition-all duration-1000"
-              style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${color.topBar}99, ${color.topBar})` }}
-            />
-          </div>
-        )}
         <div className="flex items-center justify-between gap-2">
           <span className="font-medium whitespace-nowrap" style={{ color: "rgba(255,255,255,0.35)", fontSize: "clamp(0.65rem, 0.9vw, 0.85rem)" }}>
             {monthlyLabel}
@@ -300,6 +292,21 @@ function KpiCardContent({
           <span className="font-bold truncate text-right" style={{ color: color.text, fontSize: "clamp(0.65rem, 0.9vw, 0.85rem)" }}>
             {monthlyVal !== "-" ? `${monthlyVal}${kpi.unit ? " " + kpi.unit : ""}` : "—"}
           </span>
+        </div>
+        {/* Animated status bar */}
+        <div
+          className="rounded-full overflow-hidden"
+          style={{ height: "clamp(5px, 0.6vw, 8px)", background: "rgba(255,255,255,0.07)" }}
+        >
+          <div
+            className="h-full rounded-full kpi-bar-shimmer"
+            style={{
+              width: progress !== null ? `${progress}%` : "0%",
+              background: `linear-gradient(90deg, ${color.topBar}88, ${color.topBar}, ${color.topBar}cc)`,
+              boxShadow: `0 0 8px ${color.topBar}88`,
+              transition: "width 1.2s cubic-bezier(0.16,1,0.3,1)",
+            }}
+          />
         </div>
       </div>
     </div>
@@ -478,6 +485,15 @@ const transitionCSS = `
 @keyframes scanline {
   0% { transform: translateY(-100%); }
   100% { transform: translateY(100vh); }
+}
+
+@keyframes barShimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.kpi-bar-shimmer {
+  background-size: 200% auto !important;
+  animation: barShimmer 2.5s linear infinite;
 }
 `;
 
