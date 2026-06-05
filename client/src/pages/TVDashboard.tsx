@@ -116,11 +116,11 @@ function useCountUp(target: number | string, duration: number = 1200) {
 function AnimatedValue({ value, unit, testId }: { value: string | number; unit?: string | null; testId: string }) {
   const display = useCountUp(value);
   return (
-    <div className="flex items-baseline gap-2 leading-none">
-      <span className="font-black text-white leading-none tracking-tight" style={{ fontSize: "clamp(2rem, 4vw, 3.5rem)" }} data-testid={testId}>
+    <div className="flex items-baseline gap-3 leading-none">
+      <span className="font-black text-white leading-none tracking-tight" style={{ fontSize: "clamp(3rem, 5.5vw, 6rem)" }} data-testid={testId}>
         {display}
       </span>
-      {unit && <span className="text-sm font-semibold text-white/40 uppercase tracking-wider">{unit}</span>}
+      {unit && <span className="font-bold text-white/50 uppercase tracking-wider" style={{ fontSize: "clamp(1rem, 1.6vw, 1.5rem)" }}>{unit}</span>}
     </div>
   );
 }
@@ -264,14 +264,14 @@ function KpiCardContent({
       data-testid={`card-kpi-${kpi.id}`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="text-[11px] font-bold uppercase tracking-widest leading-tight" style={{ color: "rgba(255,255,255,0.45)" }}>
+        <span className="font-bold uppercase tracking-widest leading-tight" style={{ color: "rgba(255,255,255,0.5)", fontSize: "clamp(0.7rem, 1.1vw, 1rem)" }}>
           {kpi.labelEn || kpi.name}
         </span>
         <div
-          className="flex-shrink-0 w-7 h-7 rounded-xl flex items-center justify-center kpi-icon-pulse"
-          style={{ background: color.iconBg, boxShadow: `0 0 12px ${color.topBar}44` }}
+          className="flex-shrink-0 rounded-xl flex items-center justify-center kpi-icon-pulse"
+          style={{ width: "clamp(2rem, 3vw, 3rem)", height: "clamp(2rem, 3vw, 3rem)", background: color.iconBg, boxShadow: `0 0 14px ${color.topBar}55` }}
         >
-          <IconComp className={`w-3.5 h-3.5 ${color.icon}`} />
+          <IconComp className={`${color.icon}`} style={{ width: "clamp(1rem, 1.5vw, 1.5rem)", height: "clamp(1rem, 1.5vw, 1.5rem)" }} />
         </div>
       </div>
 
@@ -287,10 +287,10 @@ function KpiCardContent({
           </div>
         )}
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-medium" style={{ color: color.text }}>
+          <span className="font-medium" style={{ color: color.text, fontSize: "clamp(0.7rem, 1vw, 0.95rem)" }}>
             {monthlyLabel}
           </span>
-          <span className="text-[11px] font-bold" style={{ color: color.text }}>
+          <span className="font-bold" style={{ color: color.text, fontSize: "clamp(0.7rem, 1vw, 0.95rem)" }}>
             {monthlyVal} {kpi.unit || ""}
           </span>
         </div>
@@ -742,12 +742,12 @@ export default function TVDashboard() {
 
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-base font-bold text-white leading-tight tracking-tight" data-testid="text-dashboard-name">
+              <h1 className="text-xl font-bold text-white leading-tight tracking-tight" data-testid="text-dashboard-name">
                 {data.name}
               </h1>
               {data.department && (
                 <span
-                  className="text-[11px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-md"
+                  className="text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded-md"
                   style={{ background: "rgba(96,165,250,0.1)", color: "rgba(96,165,250,0.7)" }}
                 >
                   {data.department.name}
