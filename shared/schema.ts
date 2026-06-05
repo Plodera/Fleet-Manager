@@ -584,6 +584,7 @@ export const tvDashboards = pgTable("tv_dashboards", {
   videoSizePercent: integer("video_size_percent").notNull().default(55),
   kpiRotationSeconds: integer("kpi_rotation_seconds").notNull().default(8),
   kpiTransitionStyle: text("kpi_transition_style").notNull().default("fade"),
+  shimmerDurationSeconds: integer("shimmer_duration_seconds").notNull().default(6),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

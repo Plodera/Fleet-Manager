@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
-type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean; showVideo: boolean; videoPosition: string; videoSizePercent: number; kpiRotationSeconds: number; kpiTransitionStyle: string };
+type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean; showVideo: boolean; videoPosition: string; videoSizePercent: number; kpiRotationSeconds: number; kpiTransitionStyle: string; shimmerDurationSeconds: number };
 type KPI = { id: number; dashboardId: number; name: string; labelEn: string; labelPt: string; unit: string | null; sortOrder: number; isActive: boolean };
 type VideoEntry = { id: number; dashboardId: number; title: string; videoType: string; url: string; isActive: boolean; sortOrder: number };
 
@@ -27,7 +27,7 @@ export default function TVDashboardConfig() {
 
   const [dashDialog, setDashDialog] = useState(false);
   const [editDash, setEditDash] = useState<Dashboard | null>(null);
-  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade" });
+  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6" });
 
   const [kpiDialog, setKpiDialog] = useState(false);
   const [editKpi, setEditKpi] = useState<KPI | null>(null);
@@ -167,16 +167,16 @@ export default function TVDashboardConfig() {
   const openDashDialog = (dash?: Dashboard) => {
     if (dash) {
       setEditDash(dash);
-      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade" });
+      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString() });
     } else {
       setEditDash(null);
-      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade" });
+      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6" });
     }
     setDashDialog(true);
   };
 
   const submitDash = () => {
-    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, videoSizePercent: parseInt(dashForm.videoSizePercent) || 55, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8 };
+    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, videoSizePercent: parseInt(dashForm.videoSizePercent) || 55, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8, shimmerDurationSeconds: parseInt(dashForm.shimmerDurationSeconds) || 6 };
     if (editDash) {
       updateDashMutation.mutate({ id: editDash.id, data });
     } else {
@@ -621,6 +621,11 @@ export default function TVDashboardConfig() {
             <div>
               <Label>{t.tvDashboard.kpiRotation}</Label>
               <Input type="number" min="1" value={dashForm.kpiRotationSeconds} onChange={e => setDashForm(p => ({ ...p, kpiRotationSeconds: e.target.value }))} data-testid="input-kpi-rotation-seconds" />
+            </div>
+            <div>
+              <Label>Bar Shimmer Speed (seconds)</Label>
+              <Input type="number" min="1" max="30" value={dashForm.shimmerDurationSeconds} onChange={e => setDashForm(p => ({ ...p, shimmerDurationSeconds: e.target.value }))} data-testid="input-shimmer-duration-seconds" />
+              <p className="text-xs text-muted-foreground mt-1">Higher = slower shimmer (default: 6)</p>
             </div>
             <div>
               <Label>{t.tvDashboard.kpiTransition}</Label>

@@ -232,12 +232,14 @@ function KpiCardContent({
   getDailyValue,
   getMonthlyValue,
   monthlyLabel,
+  shimmerDuration,
 }: {
   kpi: any;
   allKpis: any[];
   getDailyValue: (kpiId: number) => string;
   getMonthlyValue: (kpiId: number) => string;
   monthlyLabel: string;
+  shimmerDuration: number;
 }) {
   const globalIdx = allKpis.indexOf(kpi);
   const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
@@ -302,9 +304,13 @@ function KpiCardContent({
             className="h-full rounded-full kpi-bar-shimmer"
             style={{
               width: progress !== null ? `${progress}%` : "0%",
-              background: `linear-gradient(90deg, ${color.topBar}88, ${color.topBar}, ${color.topBar}cc)`,
+              background: `linear-gradient(90deg, ${color.topBar}88, ${color.topBar}ff, ${color.topBar}cc, ${color.topBar}ff, ${color.topBar}88)`,
               boxShadow: `0 0 8px ${color.topBar}88`,
               transition: "width 1.2s cubic-bezier(0.16,1,0.3,1)",
+              animationName: "barShimmer",
+              animationDuration: `${shimmerDuration}s`,
+              animationTimingFunction: "linear",
+              animationIterationCount: "infinite",
             }}
           />
         </div>
@@ -325,6 +331,7 @@ interface KpiGridProps {
   transitionStyle: string;
   splitSide?: "left" | "right";
   showPagination?: boolean;
+  shimmerDuration: number;
 }
 
 const KpiGrid = memo(function KpiGrid({
@@ -339,6 +346,7 @@ const KpiGrid = memo(function KpiGrid({
   transitionStyle,
   splitSide,
   showPagination = true,
+  shimmerDuration,
 }: KpiGridProps) {
   const pageSize = cols === 3 ? KPI_PAGE_SIZE : cols * 2;
   const [displayPage, setDisplayPage] = useState(currentKpiPage);
@@ -388,6 +396,7 @@ const KpiGrid = memo(function KpiGrid({
             getDailyValue={getDailyValue}
             getMonthlyValue={getMonthlyValue}
             monthlyLabel={monthlyLabel}
+            shimmerDuration={shimmerDuration}
           />
         ))}
         {Array.from({ length: fillCount }).map((_, i) => (
@@ -493,7 +502,6 @@ const transitionCSS = `
 }
 .kpi-bar-shimmer {
   background-size: 200% auto !important;
-  animation: barShimmer 2.5s linear infinite;
 }
 `;
 
@@ -646,6 +654,8 @@ export default function TVDashboard() {
     switchVideo,
   };
 
+  const shimmerDuration = Math.max(1, data?.shimmerDurationSeconds ?? 6);
+
   const kpiGridProps = {
     allKpis: kpis,
     kpiPages,
@@ -655,6 +665,7 @@ export default function TVDashboard() {
     getMonthlyValue,
     monthlyLabel: t.tvDashboard.monthly,
     transitionStyle,
+    shimmerDuration,
   };
 
   const renderLayout = () => {
