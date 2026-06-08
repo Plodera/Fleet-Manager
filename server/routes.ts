@@ -360,9 +360,9 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Booking not found" });
       }
       
-      // Only the assigned driver, approver, or admin can start the trip
+      // Only the assigned driver, any approver, or admin can start the trip
       const isDriver = existingBooking.driverId === currentUser.id;
-      const isApprover = existingBooking.approverId === currentUser.id;
+      const isApprover = existingBooking.approverId === currentUser.id || currentUser.isApprover === true;
       const isAdmin = currentUser.role === 'admin';
       
       if (!isDriver && !isApprover && !isAdmin) {
@@ -416,9 +416,9 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Booking not found" });
       }
       
-      // Only the assigned driver, approver, or admin can end the trip
+      // Only the assigned driver, any approver, or admin can end the trip
       const isDriver = existingBooking.driverId === currentUser.id;
-      const isApprover = existingBooking.approverId === currentUser.id;
+      const isApprover = existingBooking.approverId === currentUser.id || currentUser.isApprover === true;
       const isAdmin = currentUser.role === 'admin';
       
       if (!isDriver && !isApprover && !isAdmin) {
