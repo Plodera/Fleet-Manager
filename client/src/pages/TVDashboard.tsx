@@ -275,7 +275,7 @@ function KpiCardContent({
     <div
       className="rounded-2xl flex flex-col justify-between kpi-card-glow overflow-hidden"
       style={{
-        background: `linear-gradient(135deg, ${color.bgFaint ?? color.bg.replace(/[\d.]+\)$/, "0.04)")} 0%, rgba(255,255,255,0.01) 100%)`,
+        background: "rgba(10,14,20,0.95)",
         border: "1px solid rgba(255,255,255,0.07)",
         borderTop: `2px solid ${color.topBar}`,
         boxShadow: color.glow,
