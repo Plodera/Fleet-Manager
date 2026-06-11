@@ -759,16 +759,21 @@ export default function TVDashboard() {
     const kpiPct = 100 - videoSizePct;
 
     if (isCornerPosition) {
-      const cornerWidth = videoSizePct / 2;
-      return (
-        <div className="flex-1 flex flex-col min-h-0 relative">
-          <KpiGrid {...kpiGridProps} />
-          <div
-            className={`absolute top-2 ${videoPosition === "top-right" ? "right-2" : "left-2"} z-20`}
-            style={{ width: `${cornerWidth}%`, aspectRatio: "16/9", borderRadius: "16px", overflow: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,0.7)" }}
-          >
+      const kpiSection = (
+        <div style={{ flex: `${kpiPct} ${kpiPct} 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <KpiGrid {...kpiGridProps} cols={2} />
+        </div>
+      );
+      const videoColumn = (
+        <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{ width: "100%", aspectRatio: "16/9", flexShrink: 0 }}>
             <VideoPanel {...videoPanelProps} className="h-full" />
           </div>
+        </div>
+      );
+      return (
+        <div className="flex-1 flex flex-row gap-3 min-h-0">
+          {videoPosition === "top-left" ? <>{videoColumn}{kpiSection}</> : <>{kpiSection}{videoColumn}</>}
         </div>
       );
     }
