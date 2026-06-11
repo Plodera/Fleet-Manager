@@ -393,7 +393,7 @@ const KpiGrid = memo(function KpiGrid({
   const exitClass = EXIT_CLASSES[transitionStyle] || EXIT_CLASSES.fade;
 
   const getPageKpis = (pageIdx: number) => {
-    const pageKpis = allKpis.slice(pageIdx * KPI_PAGE_SIZE, (pageIdx + 1) * KPI_PAGE_SIZE);
+    const pageKpis = allKpis.slice(pageIdx * pageSize, (pageIdx + 1) * pageSize);
     if (!splitSide) return pageKpis;
     const half = Math.ceil(pageKpis.length / 2);
     return splitSide === "left" ? pageKpis.slice(0, half) : pageKpis.slice(half);
