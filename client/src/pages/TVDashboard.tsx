@@ -795,9 +795,14 @@ export default function TVDashboard() {
           <KpiGrid {...kpiGridProps} cols={2} />
         </div>
       );
+      const inlineTicker = showTicker && tickerPosition !== "bottom-bar";
       const videoSection = (
-        <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minWidth: 0, minHeight: 0 }}>
-          <VideoPanel {...videoPanelProps} className="h-full" />
+        <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          {inlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} />}
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <VideoPanel {...videoPanelProps} className="h-full" />
+          </div>
+          {inlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} />}
         </div>
       );
       return (
