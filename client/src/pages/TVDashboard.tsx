@@ -284,20 +284,20 @@ function KpiCardContent({
       data-testid={`card-kpi-${kpi.id}`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="font-bold uppercase tracking-widest leading-tight" style={{ color: "rgba(255,255,255,0.5)", fontSize: `calc(${s} * clamp(0.65rem, 1vw, 0.95rem))` }}>
+        <span className="font-bold uppercase tracking-widest leading-tight" style={{ color: "rgba(255,255,255,0.85)", fontSize: `calc(${s} * clamp(0.75rem, 1.2vw, 1.1rem))` }}>
           {kpi.labelEn || kpi.name}
         </span>
         <div
           className="flex-shrink-0 rounded-xl flex items-center justify-center kpi-icon-pulse"
-          style={{ width: `calc(${s} * clamp(1.8rem, 2.5vw, 2.8rem))`, height: `calc(${s} * clamp(1.8rem, 2.5vw, 2.8rem))`, background: color.iconBg, boxShadow: `0 0 14px ${color.topBar}55` }}
+          style={{ width: `calc(${s} * clamp(2rem, 2.8vw, 3rem))`, height: `calc(${s} * clamp(2rem, 2.8vw, 3rem))`, background: color.iconBg, boxShadow: `0 0 14px ${color.topBar}55` }}
         >
-          <IconComp className={`${color.icon}`} style={{ width: `calc(${s} * clamp(0.9rem, 1.3vw, 1.4rem))`, height: `calc(${s} * clamp(0.9rem, 1.3vw, 1.4rem))` }} />
+          <IconComp className={`${color.icon}`} style={{ width: `calc(${s} * clamp(1rem, 1.5vw, 1.5rem))`, height: `calc(${s} * clamp(1rem, 1.5vw, 1.5rem))` }} />
         </div>
       </div>
 
       {/* "TODAY" badge + big daily value */}
       <div className="flex flex-col gap-0.5">
-        <span className="font-bold uppercase tracking-widest" style={{ color: color.topBar, fontSize: `calc(${s} * clamp(0.55rem, 0.8vw, 0.75rem))` }}>
+        <span className="font-bold uppercase tracking-widest" style={{ color: color.topBar, fontSize: `calc(${s} * clamp(0.65rem, 0.95vw, 0.85rem))` }}>
           Today
         </span>
         <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} fontScale={s} />
@@ -306,10 +306,10 @@ function KpiCardContent({
       {/* Monthly total */}
       <div className="mt-2 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-medium whitespace-nowrap" style={{ color: "rgba(255,255,255,0.35)", fontSize: `calc(${s} * clamp(0.6rem, 0.85vw, 0.8rem))` }}>
+          <span className="font-medium whitespace-nowrap" style={{ color: "rgba(255,255,255,0.55)", fontSize: `calc(${s} * clamp(0.65rem, 0.95vw, 0.85rem))` }}>
             {monthlyLabel}
           </span>
-          <span className="font-bold truncate text-right" style={{ color: color.text, fontSize: `calc(${s} * clamp(0.6rem, 0.85vw, 0.8rem))` }}>
+          <span className="font-bold truncate text-right" style={{ color: color.text, fontSize: `calc(${s} * clamp(0.65rem, 0.95vw, 0.85rem))` }}>
             {monthlyVal !== "-" ? `${monthlyVal}${kpi.unit ? " " + kpi.unit : ""}` : "—"}
           </span>
         </div>
