@@ -54,7 +54,7 @@ export default function TVDashboardConfig() {
 
   const [dashDialog, setDashDialog] = useState(false);
   const [editDash, setEditDash] = useState<Dashboard | null>(null);
-  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0" });
+  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off" });
 
   const [kpiDialog, setKpiDialog] = useState(false);
   const [editKpi, setEditKpi] = useState<KPI | null>(null);
@@ -207,10 +207,10 @@ export default function TVDashboardConfig() {
   const openDashDialog = (dash?: Dashboard) => {
     if (dash) {
       setEditDash(dash);
-      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString(), kpisPerPage: (dash.kpisPerPage ?? 6).toString(), kpiFontScale: normFontScale(dash.kpiFontScale ?? 1.0) });
+      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString(), kpisPerPage: (dash.kpisPerPage ?? 6).toString(), kpiFontScale: normFontScale(dash.kpiFontScale ?? 1.0), tickerText: dash.tickerText || "", tickerPosition: dash.tickerPosition || "off" });
     } else {
       setEditDash(null);
-      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0" });
+      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off" });
     }
     setDashDialog(true);
   };
@@ -735,6 +735,32 @@ export default function TVDashboardConfig() {
               </Select>
               <p className="text-xs text-muted-foreground mt-1">{t.tvDashboard.kpiFontScaleHint || "Increase for TVs viewed from a distance."}</p>
             </div>
+            <div>
+              <Label>Scrolling Ticker Position</Label>
+              <Select value={dashForm.tickerPosition} onValueChange={v => setDashForm(p => ({ ...p, tickerPosition: v }))}>
+                <SelectTrigger data-testid="select-ticker-position">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="off">Off (disabled)</SelectItem>
+                  <SelectItem value="below">Below image / video</SelectItem>
+                  <SelectItem value="above">Above image / video</SelectItem>
+                  <SelectItem value="bottom-bar">Full-width bottom bar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {dashForm.tickerPosition !== "off" && (
+              <div>
+                <Label>Ticker Text</Label>
+                <Input
+                  value={dashForm.tickerText}
+                  onChange={e => setDashForm(p => ({ ...p, tickerText: e.target.value }))}
+                  placeholder="Enter scrolling message..."
+                  data-testid="input-ticker-text"
+                />
+                <p className="text-xs text-muted-foreground mt-1">This text will scroll across the screen on the TV dashboard.</p>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Switch checked={dashForm.isActive} onCheckedChange={v => setDashForm(p => ({ ...p, isActive: v }))} data-testid="switch-dashboard-active" />
               <Label>{t.tvDashboard.active}</Label>

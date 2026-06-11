@@ -599,6 +599,8 @@ export const tvDashboards = pgTable("tv_dashboards", {
   shimmerDurationSeconds: integer("shimmer_duration_seconds").notNull().default(6),
   kpisPerPage: integer("kpis_per_page").notNull().default(6),
   kpiFontScale: real("kpi_font_scale").notNull().default(1.0),
+  tickerText: text("ticker_text").notNull().default(""),
+  tickerPosition: text("ticker_position").notNull().default("off"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

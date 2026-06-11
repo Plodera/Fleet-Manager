@@ -186,13 +186,15 @@ const VideoPanel = memo(function VideoPanel({
               data-testid="video-player-youtube"
             />
           ) : currentVideo && currentVideo.videoType === "image" ? (
-            <img
-              key={currentVideo.id}
-              src={currentVideo.url}
-              className="w-full h-full object-contain"
-              alt={currentVideo.title}
-              data-testid="video-player-image"
-            />
+            <div className="w-full h-full flex items-center justify-center" style={{ padding: "12px 12px" }}>
+              <img
+                key={currentVideo.id}
+                src={currentVideo.url}
+                className="max-w-full max-h-full object-contain rounded-xl"
+                alt={currentVideo.title}
+                data-testid="video-player-image"
+              />
+            </div>
           ) : currentVideo ? (
             <video
               key={currentVideo.id}
@@ -525,7 +527,41 @@ const transitionCSS = `
 .kpi-bar-shimmer {
   background-size: 200% auto !important;
 }
+
+@keyframes tickerScroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+.ticker-scroll {
+  display: inline-block;
+  white-space: nowrap;
+  animation: tickerScroll 28s linear infinite;
+}
 `;
+
+function TickerBar({ text }: { text: string }) {
+  return (
+    <div
+      className="shrink-0 overflow-hidden"
+      style={{
+        background: "rgba(0,0,0,0.7)",
+        borderTop: "1px solid rgba(255,255,255,0.08)",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
+        height: "36px",
+        display: "flex",
+        alignItems: "center",
+      }}
+      data-testid="ticker-bar"
+    >
+      <span
+        className="ticker-scroll text-white/80 font-semibold tracking-wide"
+        style={{ fontSize: "0.95rem", letterSpacing: "0.04em" }}
+      >
+        {text}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{text}
+      </span>
+    </div>
+  );
+}
 
 export default function TVDashboard() {
   const [, params] = useRoute("/tv-dashboard/:id");
@@ -664,6 +700,9 @@ export default function TVDashboard() {
   const hasKpis = kpis.length > 0;
   const validPositions = ["bottom", "top", "left", "right", "center", "top-right", "top-left"];
   const videoPosition = validPositions.includes(data?.videoPosition) ? data.videoPosition : "bottom";
+  const tickerText = data?.tickerText || "";
+  const tickerPosition = data?.tickerPosition || "off";
+  const showTicker = tickerPosition !== "off" && tickerText.trim().length > 0;
   const isCornerPosition = videoPosition === "top-right" || videoPosition === "top-left";
   const isSidePosition = videoPosition === "left" || videoPosition === "right";
   const isCenterPosition = videoPosition === "center";
@@ -706,7 +745,16 @@ export default function TVDashboard() {
     }
 
     if (!hasVideo) return <KpiGrid {...kpiGridProps} />;
-    if (!hasKpis) return <VideoPanel {...videoPanelProps} className="flex-1" />;
+    if (!hasKpis) {
+      const ticker = showTicker && tickerPosition !== "bottom-bar";
+      return (
+        <div className="flex-1 flex flex-col min-h-0">
+          {ticker && tickerPosition === "above" && <TickerBar text={tickerText} />}
+          <VideoPanel {...videoPanelProps} className="flex-1 min-h-0" />
+          {ticker && tickerPosition === "below" && <TickerBar text={tickerText} />}
+        </div>
+      );
+    }
 
     const kpiPct = 100 - videoSizePct;
 
@@ -764,9 +812,19 @@ export default function TVDashboard() {
         <KpiGrid {...kpiGridProps} />
       </div>
     );
-    const videoSection = (
+    const videoPanel = (
       <VideoPanel {...videoPanelProps} className="" style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minHeight: 0 }} />
     );
+    const inlineTicker = showTicker && tickerPosition !== "bottom-bar";
+    const videoSection = inlineTicker ? (
+      <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {tickerPosition === "above" && <TickerBar text={tickerText} />}
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <VideoPanel {...videoPanelProps} className="h-full" />
+        </div>
+        {tickerPosition === "below" && <TickerBar text={tickerText} />}
+      </div>
+    ) : videoPanel;
 
     if (videoPosition === "top") return <>{videoSection}{kpiSection}</>;
     return <>{kpiSection}{videoSection}</>;
@@ -851,6 +909,9 @@ export default function TVDashboard() {
       <main className="relative z-10 flex-1 flex flex-col min-h-0 p-3 gap-3">
         {renderLayout()}
       </main>
+
+      {/* Full-width bottom bar ticker */}
+      {showTicker && tickerPosition === "bottom-bar" && <TickerBar text={tickerText} />}
     </div>
   );
 }
