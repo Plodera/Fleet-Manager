@@ -186,15 +186,13 @@ const VideoPanel = memo(function VideoPanel({
               data-testid="video-player-youtube"
             />
           ) : currentVideo && currentVideo.videoType === "image" ? (
-            <div className="w-full h-full flex items-center justify-center" style={{ padding: "12px 12px" }}>
-              <img
-                key={currentVideo.id}
-                src={currentVideo.url}
-                className="max-w-full max-h-full object-contain rounded-xl"
-                alt={currentVideo.title}
-                data-testid="video-player-image"
-              />
-            </div>
+            <img
+              key={currentVideo.id}
+              src={currentVideo.url}
+              className="w-full h-full object-contain"
+              alt={currentVideo.title}
+              data-testid="video-player-image"
+            />
           ) : currentVideo ? (
             <video
               key={currentVideo.id}
@@ -759,16 +757,19 @@ export default function TVDashboard() {
     const kpiPct = 100 - videoSizePct;
 
     if (isCornerPosition) {
+      const inlineTicker = showTicker && tickerPosition !== "bottom-bar";
       const kpiSection = (
         <div style={{ flex: `${kpiPct} ${kpiPct} 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
           <KpiGrid {...kpiGridProps} cols={2} />
         </div>
       );
       const videoColumn = (
-        <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+          {inlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} />}
           <div style={{ width: "100%", aspectRatio: "16/9", flexShrink: 0 }}>
             <VideoPanel {...videoPanelProps} className="h-full" />
           </div>
+          {inlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} />}
         </div>
       );
       return (
