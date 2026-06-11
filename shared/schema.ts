@@ -20,6 +20,10 @@ export const PERMISSIONS = {
   VIEW_IT_DASHBOARD: 'view_it_dashboard',
   VIEW_TV_DASHBOARD: 'view_tv_dashboard',
   VIEW_IT_MONITOR: 'view_it_monitor',
+  MANAGE_TV_DASHBOARDS: 'manage_tv_dashboards',
+  MANAGE_TV_KPIS: 'manage_tv_kpis',
+  TV_DATA_ENTRY: 'tv_data_entry',
+  MANAGE_TV_VIDEOS: 'manage_tv_videos',
 } as const;
 
 export const AVAILABLE_PERMISSIONS = [
@@ -40,6 +44,10 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'view_it_dashboard', label: 'IT Operations Dashboard', labelPt: 'Painel de Operações de TI' },
   { id: 'view_tv_dashboard', label: 'TV Dashboards', labelPt: 'Painéis de TV' },
   { id: 'view_it_monitor', label: 'IT Monitor', labelPt: 'Monitor IT' },
+  { id: 'manage_tv_dashboards', label: 'TV Config: Dashboards', labelPt: 'Config TV: Painéis' },
+  { id: 'manage_tv_kpis', label: 'TV Config: KPIs', labelPt: 'Config TV: KPIs' },
+  { id: 'tv_data_entry', label: 'TV Config: Data Entry', labelPt: 'Config TV: Entrada de Dados' },
+  { id: 'manage_tv_videos', label: 'TV Config: Videos', labelPt: 'Config TV: Vídeos' },
   { id: 'manage_users', label: 'User Management', labelPt: 'Gestão de Utilizadores' },
 ] as const;
 

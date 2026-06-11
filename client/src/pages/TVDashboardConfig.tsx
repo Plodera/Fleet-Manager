@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n";
+import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
@@ -22,8 +23,34 @@ type VideoEntry = { id: number; dashboardId: number; title: string; videoType: s
 export default function TVDashboardConfig() {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [selectedDashboardId, setSelectedDashboardId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("dashboards");
+
+  const userPermissions: string[] = (() => {
+    if (!user?.permissions) return [];
+    if (Array.isArray(user.permissions)) return user.permissions;
+    try { return JSON.parse(user.permissions as string); } catch { return []; }
+  })();
+  const isAdmin = user?.role === "admin";
+  const canDashboards = isAdmin || userPermissions.includes("manage_tv_dashboards");
+  const canKpis      = isAdmin || userPermissions.includes("manage_tv_kpis");
+  const canDataEntry = isAdmin || userPermissions.includes("tv_data_entry");
+  const canVideos    = isAdmin || userPermissions.includes("manage_tv_videos");
+
+  const TAB_ORDER = ["dashboards","kpis","dataentry","videos"];
+  const allowedTabs = TAB_ORDER.filter(tab =>
+    (tab === "dashboards" && canDashboards) ||
+    (tab === "kpis"       && canKpis)       ||
+    (tab === "dataentry"  && canDataEntry)  ||
+    (tab === "videos"     && canVideos)
+  );
+
+  useEffect(() => {
+    if (allowedTabs.length > 0 && !allowedTabs.includes(activeTab)) {
+      setActiveTab(allowedTabs[0]);
+    }
+  }, [allowedTabs.join(","), activeTab]);
 
   const [dashDialog, setDashDialog] = useState(false);
   const [editDash, setEditDash] = useState<Dashboard | null>(null);
@@ -284,10 +311,10 @@ export default function TVDashboardConfig() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
         <TabsList>
-          <TabsTrigger value="dashboards" data-testid="tab-dashboards">{t.tvDashboard.dashboardsTab}</TabsTrigger>
-          <TabsTrigger value="kpis" data-testid="tab-kpis">{t.tvDashboard.kpisTab}</TabsTrigger>
-          <TabsTrigger value="dataentry" data-testid="tab-data-entry">{t.tvDashboard.dataEntryTab}</TabsTrigger>
-          <TabsTrigger value="videos" data-testid="tab-videos">{t.tvDashboard.videosTab}</TabsTrigger>
+          {canDashboards && <TabsTrigger value="dashboards" data-testid="tab-dashboards">{t.tvDashboard.dashboardsTab}</TabsTrigger>}
+          {canKpis       && <TabsTrigger value="kpis"       data-testid="tab-kpis">{t.tvDashboard.kpisTab}</TabsTrigger>}
+          {canDataEntry  && <TabsTrigger value="dataentry"  data-testid="tab-data-entry">{t.tvDashboard.dataEntryTab}</TabsTrigger>}
+          {canVideos     && <TabsTrigger value="videos"     data-testid="tab-videos">{t.tvDashboard.videosTab}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="dashboards" className="mt-4">

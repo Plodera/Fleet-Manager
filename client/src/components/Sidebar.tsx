@@ -44,6 +44,7 @@ interface NavLink {
   label: string;
   icon: any;
   permission: string;
+  anyPermissions?: string[];
   hideFromDriver: boolean;
 }
 
@@ -119,6 +120,10 @@ export function Sidebar() {
     if (link.permission === "driver_only") return isDriver;
     if (link.permission === "admin_only") return user?.role === "admin";
     if (isDriver && link.hideFromDriver) return false;
+    if (link.anyPermissions) {
+      if (user?.role === "admin") return true;
+      return link.anyPermissions.some(p => userPermissions.includes(p));
+    }
     return hasPermission(link.permission);
   };
 
@@ -154,7 +159,7 @@ export function Sidebar() {
     {
       label: t.nav.sectionDashboards,
       links: [
-        { href: "/tv-dashboard-config", label: t.nav.tvDashboardsConfig, icon: Monitor, permission: "admin_only", hideFromDriver: true },
+        { href: "/tv-dashboard-config", label: t.nav.tvDashboardsConfig, icon: Monitor, permission: "manage_tv_dashboards", anyPermissions: ["manage_tv_dashboards","manage_tv_kpis","tv_data_entry","manage_tv_videos"], hideFromDriver: true },
         { href: "/tv-dashboard", label: t.nav.tvDashboards, icon: Monitor, permission: "view_tv_dashboard", hideFromDriver: true },
         { href: "/it-monitor-config", label: t.nav.itMonitorConfig, icon: Network, permission: "view_it_monitor", hideFromDriver: true },
         { href: "/it-dashboard", label: t.nav.itDashboard, icon: Activity, permission: "view_it_dashboard", hideFromDriver: true },

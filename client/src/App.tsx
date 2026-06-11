@@ -37,33 +37,32 @@ import StatusTracker from "@/pages/StatusTracker";
 import ITMonitorConfig from "@/pages/ITMonitorConfig";
 import ITDashboard from "@/pages/ITDashboard";
 
-function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, driverOnly = false, noShell = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, driverOnly?: boolean, noShell?: boolean }) {
+function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, anyPermission, driverOnly = false, noShell = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, anyPermission?: string[], driverOnly?: boolean, noShell?: boolean }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return <div className="flex h-screen items-center justify-center text-primary">Loading...</div>;
   if (!user) return <Redirect to="/auth" />;
   if (adminOnly && user.role !== 'admin') return <Redirect to="/" />;
-  
+
   // Driver-only route check
   if (driverOnly && !user.isDriver) {
     return <Redirect to="/" />;
   }
-  
-  // Check required permission (admins bypass permission checks)
+
+  const userPermissions: string[] = (() => {
+    if (!user.permissions) return [];
+    if (Array.isArray(user.permissions)) return user.permissions;
+    try { return JSON.parse(user.permissions as string); } catch { return []; }
+  })();
+
+  // Check single required permission (admins bypass)
   if (requiredPermission && user.role !== 'admin') {
-    const userPermissions: string[] = (() => {
-      if (!user.permissions) return [];
-      if (Array.isArray(user.permissions)) return user.permissions;
-      try {
-        return JSON.parse(user.permissions as string);
-      } catch {
-        return [];
-      }
-    })();
-    
-    if (!userPermissions.includes(requiredPermission)) {
-      return <Redirect to="/" />;
-    }
+    if (!userPermissions.includes(requiredPermission)) return <Redirect to="/" />;
+  }
+
+  // Check any-of permission list (admins bypass)
+  if (anyPermission && user.role !== 'admin') {
+    if (!anyPermission.some(p => userPermissions.includes(p))) return <Redirect to="/" />;
   }
 
   if (noShell) return <Component />;
@@ -170,7 +169,7 @@ function Router() {
         <PrivateRoute component={StatusTracker} requiredPermission="view_trackers" />
       </Route>
       <Route path="/tv-dashboard-config">
-        <PrivateRoute component={TVDashboardConfig} adminOnly />
+        <PrivateRoute component={TVDashboardConfig} anyPermission={["manage_tv_dashboards","manage_tv_kpis","tv_data_entry","manage_tv_videos"]} />
       </Route>
       <Route path="/tv-dashboard/:id">
         <PrivateRoute component={TVDashboard} requiredPermission="view_tv_dashboard" noShell />
