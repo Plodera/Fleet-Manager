@@ -174,6 +174,7 @@ export default function TVDashboardConfig() {
       setVideoDialog(false);
       toast({ title: "Video added" });
     },
+    onError: (err: any) => { toast({ title: "Save failed", description: err.message, variant: "destructive" }); },
   });
 
   const updateVideoMutation = useMutation({
@@ -183,6 +184,7 @@ export default function TVDashboardConfig() {
       setVideoDialog(false);
       toast({ title: "Video updated" });
     },
+    onError: (err: any) => { toast({ title: "Save failed", description: err.message, variant: "destructive" }); },
   });
 
   const deleteVideoMutation = useMutation({
@@ -192,6 +194,7 @@ export default function TVDashboardConfig() {
       setDeleteTarget(null);
       toast({ title: "Video deleted" });
     },
+    onError: (err: any) => { toast({ title: "Delete failed", description: err.message, variant: "destructive" }); },
   });
 
   const normFontScale = (v: number) => {

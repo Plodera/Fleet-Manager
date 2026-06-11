@@ -786,7 +786,7 @@ export const api = {
       path: '/api/tv-dashboards/:dashboardId/videos',
       input: z.object({
         title: z.string().min(1),
-        videoType: z.enum(["youtube", "upload"]).optional().default("youtube"),
+        videoType: z.enum(["youtube", "upload", "image"]).optional().default("youtube"),
         url: z.string().min(1),
         isActive: z.boolean().optional().default(true),
         sortOrder: z.coerce.number().optional().default(0),
@@ -798,7 +798,7 @@ export const api = {
       path: '/api/tv-videos/:id',
       input: z.object({
         title: z.string().min(1).optional(),
-        videoType: z.enum(["youtube", "upload"]).optional(),
+        videoType: z.enum(["youtube", "upload", "image"]).optional(),
         url: z.string().min(1).optional(),
         isActive: z.boolean().optional(),
         sortOrder: z.coerce.number().optional(),
