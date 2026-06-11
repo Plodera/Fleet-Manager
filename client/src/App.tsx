@@ -172,10 +172,14 @@ function Router() {
       <Route path="/tv-dashboard-config">
         <PrivateRoute component={TVDashboardConfig} adminOnly />
       </Route>
-      <Route path="/tv-dashboard/:id" component={TVDashboard} />
-      <Route path="/tv-dashboard" component={TVDashboardIndex} />
+      <Route path="/tv-dashboard/:id">
+        <PrivateRoute component={TVDashboard} requiredPermission="view_tv_dashboard" noShell />
+      </Route>
+      <Route path="/tv-dashboard">
+        <PrivateRoute component={TVDashboardIndex} requiredPermission="view_tv_dashboard" />
+      </Route>
       <Route path="/it-monitor-config">
-        <PrivateRoute component={ITMonitorConfig} adminOnly />
+        <PrivateRoute component={ITMonitorConfig} requiredPermission="view_it_monitor" />
       </Route>
       <Route path="/it-dashboard">
         <PrivateRoute component={ITDashboard} requiredPermission="view_it_dashboard" noShell />

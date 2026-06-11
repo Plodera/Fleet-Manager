@@ -18,6 +18,8 @@ export const PERMISSIONS = {
   MANAGE_VEHICLES: 'manage_vehicles',
   VIEW_TRACKERS: 'view_trackers',
   VIEW_IT_DASHBOARD: 'view_it_dashboard',
+  VIEW_TV_DASHBOARD: 'view_tv_dashboard',
+  VIEW_IT_MONITOR: 'view_it_monitor',
 } as const;
 
 export const AVAILABLE_PERMISSIONS = [
@@ -36,6 +38,8 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'approve_indents', label: 'Approve Indents', labelPt: 'Aprovar Requisições' },
   { id: 'view_trackers', label: 'Status Tracker', labelPt: 'Rastreador de Estado' },
   { id: 'view_it_dashboard', label: 'IT Operations Dashboard', labelPt: 'Painel de Operações de TI' },
+  { id: 'view_tv_dashboard', label: 'TV Dashboards', labelPt: 'Painéis de TV' },
+  { id: 'view_it_monitor', label: 'IT Monitor', labelPt: 'Monitor IT' },
   { id: 'manage_users', label: 'User Management', labelPt: 'Gestão de Utilizadores' },
 ] as const;
 

@@ -154,8 +154,9 @@ export function Sidebar() {
     {
       label: t.nav.sectionDashboards,
       links: [
-        { href: "/tv-dashboard-config", label: t.nav.tvDashboards, icon: Monitor, permission: "admin_only", hideFromDriver: true },
-        { href: "/it-monitor-config", label: t.nav.itMonitorConfig, icon: Network, permission: "admin_only", hideFromDriver: true },
+        { href: "/tv-dashboard-config", label: t.nav.tvDashboardsConfig, icon: Monitor, permission: "admin_only", hideFromDriver: true },
+        { href: "/tv-dashboard", label: t.nav.tvDashboards, icon: Monitor, permission: "view_tv_dashboard", hideFromDriver: true },
+        { href: "/it-monitor-config", label: t.nav.itMonitorConfig, icon: Network, permission: "view_it_monitor", hideFromDriver: true },
         { href: "/it-dashboard", label: t.nav.itDashboard, icon: Activity, permission: "view_it_dashboard", hideFromDriver: true },
       ],
     },
