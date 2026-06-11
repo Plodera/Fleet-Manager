@@ -1,0 +1,61 @@
+aiscoweb@aiscoweb:/opt/fleetcmd$ cd /opt/fleetcmd
+sed -i 's|http://package-firewall.replit.local/npm|https://registry.npmjs.org|g' package-lock.json
+npm install && npm run build && pm2 restart fleetcmd
+
+added 10 packages, and audited 597 packages in 4s
+
+71 packages are looking for funding
+  run `npm fund` for details
+
+37 vulnerabilities (26 moderate, 9 high, 2 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues possible (including breaking changes), run:
+  npm audit fix --force
+
+Some issues need review, and may require choosing
+a different dependency.
+
+Run `npm audit` for details.
+
+> rest-express@1.0.0 build
+> tsx script/build.ts
+
+building client...
+vite v7.3.0 building client environment for production...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 3039 modules transformed.
+../dist/public/index.html                                     2.07 kB │ gzip:   0.81 kB
+../dist/public/assets/index-BXy7GhVW.css                     93.93 kB │ gzip:  15.34 kB
+../dist/public/assets/purify.es-C0_7NiBM.js                  22.58 kB │ gzip:   8.67 kB
+../dist/public/assets/jspdf.plugin.autotable-CBbcTuFj.js     30.91 kB │ gzip:   9.86 kB
+../dist/public/assets/index.es-DNKVv2wD.js                  158.62 kB │ gzip:  52.95 kB
+../dist/public/assets/html2canvas.esm-DXEQVQnt.js           201.04 kB │ gzip:  47.43 kB
+../dist/public/assets/jspdf.es.min-Dy1dvUXs.js              385.86 kB │ gzip: 126.14 kB
+../dist/public/assets/xlsx-CNerDvZX.js                      429.19 kB │ gzip: 142.94 kB
+../dist/public/assets/index-D6GJAmKQ.js                   1,505.71 kB │ gzip: 391.55 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 14.70s
+building server...
+
+  dist/index.cjs  1.6mb ⚠️
+
+⚡ Done in 215ms
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [fleetcmd](ids: [ 0 ])
+[PM2] [fleetcmd](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ aams               │ fork     │ 647… │ errored   │ 0%       │ 0b       │
+│ 0  │ fleetcmd           │ fork     │ 20   │ online    │ 0%       │ 19.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+aiscoweb@aiscoweb:/opt/fleetcmd$ 
