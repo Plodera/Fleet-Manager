@@ -297,8 +297,8 @@ function KpiCardContent({
 
       {/* "TODAY" badge + big daily value */}
       <div className="flex flex-col gap-0.5">
-        <span className="font-bold uppercase tracking-widest" style={{ color: color.topBar, fontSize: `calc(${s} * clamp(0.65rem, 0.95vw, 0.85rem))` }}>
-          Today
+        <span className="font-black uppercase tracking-widest" style={{ color: color.topBar, fontSize: `calc(${s} * clamp(0.65rem, 0.95vw, 0.85rem))` }}>
+          TODAY
         </span>
         <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} fontScale={s} />
       </div>
