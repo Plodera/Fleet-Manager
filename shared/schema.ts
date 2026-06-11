@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, numeric, date, pgEnum, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, numeric, date, pgEnum, jsonb, uniqueIndex, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -597,6 +597,8 @@ export const tvDashboards = pgTable("tv_dashboards", {
   kpiRotationSeconds: integer("kpi_rotation_seconds").notNull().default(8),
   kpiTransitionStyle: text("kpi_transition_style").notNull().default("fade"),
   shimmerDurationSeconds: integer("shimmer_duration_seconds").notNull().default(6),
+  kpisPerPage: integer("kpis_per_page").notNull().default(6),
+  kpiFontScale: real("kpi_font_scale").notNull().default(1.0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
-type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean; showVideo: boolean; videoPosition: string; videoSizePercent: number; kpiRotationSeconds: number; kpiTransitionStyle: string; shimmerDurationSeconds: number };
+type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean; showVideo: boolean; videoPosition: string; videoSizePercent: number; kpiRotationSeconds: number; kpiTransitionStyle: string; shimmerDurationSeconds: number; kpisPerPage: number; kpiFontScale: number };
 type KPI = { id: number; dashboardId: number; name: string; labelEn: string; labelPt: string; unit: string | null; sortOrder: number; isActive: boolean };
 type VideoEntry = { id: number; dashboardId: number; title: string; videoType: string; url: string; isActive: boolean; sortOrder: number };
 
@@ -54,7 +54,7 @@ export default function TVDashboardConfig() {
 
   const [dashDialog, setDashDialog] = useState(false);
   const [editDash, setEditDash] = useState<Dashboard | null>(null);
-  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6" });
+  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0" });
 
   const [kpiDialog, setKpiDialog] = useState(false);
   const [editKpi, setEditKpi] = useState<KPI | null>(null);
@@ -197,16 +197,16 @@ export default function TVDashboardConfig() {
   const openDashDialog = (dash?: Dashboard) => {
     if (dash) {
       setEditDash(dash);
-      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString() });
+      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString(), kpisPerPage: (dash.kpisPerPage ?? 6).toString(), kpiFontScale: (dash.kpiFontScale ?? 1.0).toString() });
     } else {
       setEditDash(null);
-      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6" });
+      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0" });
     }
     setDashDialog(true);
   };
 
   const submitDash = () => {
-    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, videoSizePercent: parseInt(dashForm.videoSizePercent) || 55, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8, shimmerDurationSeconds: parseInt(dashForm.shimmerDurationSeconds) || 6 };
+    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, videoSizePercent: parseInt(dashForm.videoSizePercent) || 55, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8, shimmerDurationSeconds: parseInt(dashForm.shimmerDurationSeconds) || 6, kpisPerPage: parseInt(dashForm.kpisPerPage) || 6, kpiFontScale: parseFloat(dashForm.kpiFontScale) || 1.0 };
     if (editDash) {
       updateDashMutation.mutate({ id: editDash.id, data });
     } else {
@@ -693,6 +693,37 @@ export default function TVDashboardConfig() {
                   <SelectItem value="zoom">{t.tvDashboard.transitionZoom}</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label>{t.tvDashboard.kpisPerPage || "Cards per page"}</Label>
+              <Select value={dashForm.kpisPerPage} onValueChange={v => setDashForm(p => ({ ...p, kpisPerPage: v }))}>
+                <SelectTrigger data-testid="select-kpis-per-page">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 card (1×1)</SelectItem>
+                  <SelectItem value="2">2 cards (2×1)</SelectItem>
+                  <SelectItem value="3">3 cards (3×1)</SelectItem>
+                  <SelectItem value="4">4 cards (2×2)</SelectItem>
+                  <SelectItem value="6">6 cards (3×2) — default</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">{t.tvDashboard.kpisPerPageHint || "Number of KPI cards visible at once. Fewer cards = larger cards."}</p>
+            </div>
+            <div>
+              <Label>{t.tvDashboard.kpiFontScale || "Text size"}</Label>
+              <Select value={dashForm.kpiFontScale} onValueChange={v => setDashForm(p => ({ ...p, kpiFontScale: v }))}>
+                <SelectTrigger data-testid="select-kpi-font-scale">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1.0">{t.tvDashboard.fontScaleNormal || "Normal (default)"}</SelectItem>
+                  <SelectItem value="1.3">{t.tvDashboard.fontScaleLarge || "Large"}</SelectItem>
+                  <SelectItem value="1.6">{t.tvDashboard.fontScaleXLarge || "Extra Large"}</SelectItem>
+                  <SelectItem value="2.0">{t.tvDashboard.fontScaleMax || "Maximum"}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">{t.tvDashboard.kpiFontScaleHint || "Increase for TVs viewed from a distance."}</p>
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={dashForm.isActive} onCheckedChange={v => setDashForm(p => ({ ...p, isActive: v }))} data-testid="switch-dashboard-active" />

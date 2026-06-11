@@ -8,7 +8,13 @@ import {
   Gauge, Flame, Droplets, Box, Layers, Settings2
 } from "lucide-react";
 
-const KPI_PAGE_SIZE = 6;
+function getGridDims(pageSize: number): { cols: number; rows: number } {
+  if (pageSize <= 1) return { cols: 1, rows: 1 };
+  if (pageSize <= 2) return { cols: 2, rows: 1 };
+  if (pageSize <= 3) return { cols: 3, rows: 1 };
+  if (pageSize <= 4) return { cols: 2, rows: 2 };
+  return { cols: 3, rows: 2 };
+}
 
 function extractYouTubeId(url: string): string | null {
   const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
@@ -113,14 +119,15 @@ function useCountUp(target: number | string, duration: number = 1200) {
   return display;
 }
 
-function AnimatedValue({ value, unit, testId }: { value: string | number; unit?: string | null; testId: string }) {
+function AnimatedValue({ value, unit, testId, fontScale = 1 }: { value: string | number; unit?: string | null; testId: string; fontScale?: number }) {
   const display = useCountUp(value);
+  const s = fontScale;
   return (
     <div className="flex items-baseline gap-3 leading-none">
-      <span className="font-black text-white leading-none tracking-tight" style={{ fontSize: "clamp(3rem, 5.5vw, 6rem)" }} data-testid={testId}>
+      <span className="font-black text-white leading-none tracking-tight" style={{ fontSize: `calc(${s} * clamp(2.5rem, 4.5vw, 5rem))` }} data-testid={testId}>
         {display}
       </span>
-      {unit && <span className="font-bold text-white/50 uppercase tracking-wider" style={{ fontSize: "clamp(1rem, 1.6vw, 1.5rem)" }}>{unit}</span>}
+      {unit && <span className="font-bold text-white/50 uppercase tracking-wider" style={{ fontSize: `calc(${s} * clamp(0.85rem, 1.3vw, 1.2rem))` }}>{unit}</span>}
     </div>
   );
 }
@@ -241,6 +248,7 @@ function KpiCardContent({
   getMonthlyValue,
   monthlyLabel,
   shimmerDuration,
+  fontScale = 1,
 }: {
   kpi: any;
   allKpis: any[];
@@ -248,6 +256,7 @@ function KpiCardContent({
   getMonthlyValue: (kpiId: number) => string;
   monthlyLabel: string;
   shimmerDuration: number;
+  fontScale?: number;
 }) {
   const globalIdx = allKpis.indexOf(kpi);
   const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
@@ -261,6 +270,7 @@ function KpiCardContent({
     ? Math.min(100, Math.round((dailyNum / monthlyNum) * 100))
     : null;
 
+  const s = fontScale;
   return (
     <div
       className="rounded-2xl flex flex-col justify-between kpi-card-glow overflow-hidden"
@@ -269,37 +279,37 @@ function KpiCardContent({
         border: "1px solid rgba(255,255,255,0.07)",
         borderTop: `2px solid ${color.topBar}`,
         boxShadow: color.glow,
-        padding: "clamp(10px, 1.5vw, 18px)",
+        padding: `calc(${s} * clamp(8px, 1.2vw, 16px))`,
       }}
       data-testid={`card-kpi-${kpi.id}`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="font-bold uppercase tracking-widest leading-tight" style={{ color: "rgba(255,255,255,0.5)", fontSize: "clamp(0.7rem, 1.1vw, 1rem)" }}>
+        <span className="font-bold uppercase tracking-widest leading-tight" style={{ color: "rgba(255,255,255,0.5)", fontSize: `calc(${s} * clamp(0.65rem, 1vw, 0.95rem))` }}>
           {kpi.labelEn || kpi.name}
         </span>
         <div
           className="flex-shrink-0 rounded-xl flex items-center justify-center kpi-icon-pulse"
-          style={{ width: "clamp(2rem, 3vw, 3rem)", height: "clamp(2rem, 3vw, 3rem)", background: color.iconBg, boxShadow: `0 0 14px ${color.topBar}55` }}
+          style={{ width: `calc(${s} * clamp(1.8rem, 2.5vw, 2.8rem))`, height: `calc(${s} * clamp(1.8rem, 2.5vw, 2.8rem))`, background: color.iconBg, boxShadow: `0 0 14px ${color.topBar}55` }}
         >
-          <IconComp className={`${color.icon}`} style={{ width: "clamp(1rem, 1.5vw, 1.5rem)", height: "clamp(1rem, 1.5vw, 1.5rem)" }} />
+          <IconComp className={`${color.icon}`} style={{ width: `calc(${s} * clamp(0.9rem, 1.3vw, 1.4rem))`, height: `calc(${s} * clamp(0.9rem, 1.3vw, 1.4rem))` }} />
         </div>
       </div>
 
       {/* "TODAY" badge + big daily value */}
       <div className="flex flex-col gap-0.5">
-        <span className="font-bold uppercase tracking-widest" style={{ color: color.topBar, fontSize: "clamp(0.6rem, 0.85vw, 0.8rem)" }}>
+        <span className="font-bold uppercase tracking-widest" style={{ color: color.topBar, fontSize: `calc(${s} * clamp(0.55rem, 0.8vw, 0.75rem))` }}>
           Today
         </span>
-        <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} />
+        <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} fontScale={s} />
       </div>
 
       {/* Monthly total */}
       <div className="mt-2 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-medium whitespace-nowrap" style={{ color: "rgba(255,255,255,0.35)", fontSize: "clamp(0.65rem, 0.9vw, 0.85rem)" }}>
+          <span className="font-medium whitespace-nowrap" style={{ color: "rgba(255,255,255,0.35)", fontSize: `calc(${s} * clamp(0.6rem, 0.85vw, 0.8rem))` }}>
             {monthlyLabel}
           </span>
-          <span className="font-bold truncate text-right" style={{ color: color.text, fontSize: "clamp(0.65rem, 0.9vw, 0.85rem)" }}>
+          <span className="font-bold truncate text-right" style={{ color: color.text, fontSize: `calc(${s} * clamp(0.6rem, 0.85vw, 0.8rem))` }}>
             {monthlyVal !== "-" ? `${monthlyVal}${kpi.unit ? " " + kpi.unit : ""}` : "—"}
           </span>
         </div>
@@ -340,6 +350,8 @@ interface KpiGridProps {
   splitSide?: "left" | "right";
   showPagination?: boolean;
   shimmerDuration: number;
+  pageSize?: number;
+  fontScale?: number;
 }
 
 const KpiGrid = memo(function KpiGrid({
@@ -350,13 +362,18 @@ const KpiGrid = memo(function KpiGrid({
   getDailyValue,
   getMonthlyValue,
   monthlyLabel,
-  cols = 3,
+  cols: colsProp,
   transitionStyle,
   splitSide,
   showPagination = true,
   shimmerDuration,
+  pageSize: pageSizeProp = 6,
+  fontScale = 1,
 }: KpiGridProps) {
-  const pageSize = cols === 3 ? KPI_PAGE_SIZE : cols * 2;
+  const pageSize = colsProp !== undefined ? colsProp * 2 : pageSizeProp;
+  const { cols, rows } = colsProp !== undefined
+    ? { cols: colsProp, rows: 2 }
+    : getGridDims(pageSizeProp);
   const [displayPage, setDisplayPage] = useState(currentKpiPage);
   const [exitPage, setExitPage] = useState<number | null>(null);
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -390,7 +407,7 @@ const KpiGrid = memo(function KpiGrid({
         className={`grid gap-3 ${animClass}`}
         style={{
           gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(2, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
           position: "absolute",
           inset: 0,
         }}
@@ -405,6 +422,7 @@ const KpiGrid = memo(function KpiGrid({
             getMonthlyValue={getMonthlyValue}
             monthlyLabel={monthlyLabel}
             shimmerDuration={shimmerDuration}
+            fontScale={fontScale}
           />
         ))}
         {Array.from({ length: fillCount }).map((_, i) => (
@@ -541,7 +559,9 @@ export default function TVDashboard() {
   const videos = useMemo(() => (data?.videos || []).filter((v: any) => v.isActive), [data?.videos]);
   const kpis = data?.kpis || [];
   const kpiValues = data?.kpiValues || [];
-  const kpiPages = Math.ceil(kpis.length / KPI_PAGE_SIZE);
+  const kpisPerPage = data?.kpisPerPage ?? 6;
+  const fontScale = data?.kpiFontScale ?? 1.0;
+  const kpiPages = Math.ceil(kpis.length / kpisPerPage);
 
   const today = new Date().toISOString().split("T")[0];
   const currentMonth = today.substring(0, 7);
@@ -674,6 +694,8 @@ export default function TVDashboard() {
     monthlyLabel: t.tvDashboard.monthly,
     transitionStyle,
     shimmerDuration,
+    pageSize: kpisPerPage,
+    fontScale,
   };
 
   const renderLayout = () => {
