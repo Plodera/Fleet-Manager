@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Upload, X, Image, Film } from "lucide-react";
+import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Upload, X, Image, Film, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
