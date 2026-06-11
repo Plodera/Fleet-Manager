@@ -275,7 +275,7 @@ function KpiCardContent({
     <div
       className="rounded-2xl flex flex-col justify-between kpi-card-glow overflow-hidden"
       style={{
-        background: `linear-gradient(135deg, ${color.bg} 0%, rgba(255,255,255,0.03) 100%)`,
+        background: `linear-gradient(135deg, ${color.bgFaint ?? color.bg.replace(/[\d.]+\)$/, "0.04)")} 0%, rgba(255,255,255,0.01) 100%)`,
         border: "1px solid rgba(255,255,255,0.07)",
         borderTop: `2px solid ${color.topBar}`,
         boxShadow: color.glow,
@@ -289,7 +289,7 @@ function KpiCardContent({
         </span>
         <div
           className="flex-shrink-0 rounded-xl flex items-center justify-center kpi-icon-pulse"
-          style={{ width: `calc(${s} * clamp(2rem, 2.8vw, 3rem))`, height: `calc(${s} * clamp(2rem, 2.8vw, 3rem))`, background: color.iconBg, boxShadow: `0 0 14px ${color.topBar}55` }}
+          style={{ width: `calc(${s} * clamp(2rem, 2.8vw, 3rem))`, height: `calc(${s} * clamp(2rem, 2.8vw, 3rem))`, background: color.iconBg, boxShadow: `0 0 6px ${color.topBar}33` }}
         >
           <IconComp className={`${color.icon}`} style={{ width: `calc(${s} * clamp(1rem, 1.5vw, 1.5rem))`, height: `calc(${s} * clamp(1rem, 1.5vw, 1.5rem))` }} />
         </div>
@@ -499,11 +499,7 @@ const transitionCSS = `
 .kpi-zoom-in { animation: kpiZoomIn 0.4s cubic-bezier(0.16,1,0.3,1) both; }
 .kpi-zoom-out { animation: kpiZoomOut 0.4s cubic-bezier(0.16,1,0.3,1) both; }
 
-@keyframes cardGlow {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.05); }
-}
-.kpi-card-glow { animation: cardGlow 5s ease-in-out infinite; }
+.kpi-card-glow {}
 
 @keyframes iconPulse {
   0%, 100% { transform: scale(1); opacity: 1; }
