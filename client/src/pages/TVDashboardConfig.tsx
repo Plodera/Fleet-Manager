@@ -601,12 +601,12 @@ export default function TVDashboardConfig() {
       </Tabs>
 
       <Dialog open={dashDialog} onOpenChange={setDashDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editDash ? t.tvDashboard.editDashboard : t.tvDashboard.addDashboard}</DialogTitle>
             <DialogDescription></DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1 pr-1">
             <div>
               <Label>{t.tvDashboard.dashboardName}</Label>
               <Input value={dashForm.name} onChange={e => setDashForm(p => ({ ...p, name: e.target.value }))} data-testid="input-dashboard-name" />
