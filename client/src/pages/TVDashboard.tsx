@@ -767,7 +767,7 @@ export default function TVDashboard() {
             className={`absolute top-2 ${videoPosition === "top-right" ? "right-2" : "left-2"} z-20`}
             style={{ width: `${cornerWidth}%`, aspectRatio: "16/9", borderRadius: "16px", overflow: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,0.7)" }}
           >
-            <VideoPanel {...videoPanelProps} />
+            <VideoPanel {...videoPanelProps} className="h-full" />
           </div>
         </div>
       );
