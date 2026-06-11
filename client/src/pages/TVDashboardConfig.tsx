@@ -254,8 +254,9 @@ export default function TVDashboardConfig() {
       formData.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Upload failed");
+        let message = `Upload failed (${res.status})`;
+        try { const err = await res.json(); message = err.message || message; } catch {}
+        throw new Error(message);
       }
       const data = await res.json();
       setVideoForm(p => ({ ...p, url: data.url }));
