@@ -1,0 +1,54 @@
+aiscoweb@aiscoweb:~$ cd /opt/fleetcmd && git pull && npm run build && pm2 restart fleetcmd
+Already up to date.
+
+> rest-express@1.0.0 build
+> tsx script/build.ts
+
+building client...
+vite v7.3.0 building client environment for production...
+transforming (7) ../node_modules/react/cjs/react.production.min.jsBrowserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 3039 modules transformed.
+../dist/public/index.html                                     2.07 kB │ gzip:   0.81 kB
+../dist/public/assets/index-BXy7GhVW.css                     93.93 kB │ gzip:  15.34 kB
+../dist/public/assets/purify.es-C0_7NiBM.js                  22.58 kB │ gzip:   8.67 kB
+../dist/public/assets/jspdf.plugin.autotable-CBbcTuFj.js     30.91 kB │ gzip:   9.86 kB
+../dist/public/assets/index.es-DNKVv2wD.js                  158.62 kB │ gzip:  52.95 kB
+../dist/public/assets/html2canvas.esm-DXEQVQnt.js           201.04 kB │ gzip:  47.43 kB
+../dist/public/assets/jspdf.es.min-Dy1dvUXs.js              385.86 kB │ gzip: 126.14 kB
+../dist/public/assets/xlsx-CNerDvZX.js                      429.19 kB │ gzip: 142.94 kB
+../dist/public/assets/index-D6GJAmKQ.js                   1,505.71 kB │ gzip: 391.55 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 14.71s
+building server...
+✘ [ERROR] Could not resolve "multer"
+
+    server/routes.ts:12:19:
+      12 │ import multer from "multer";
+         ╵                    ~~~~~~~~
+
+  You can mark the path "multer" as external to exclude it from the bundle,
+  which will remove this error and leave the unresolved path in the bundle.
+
+1 error
+Error: Build failed with 1 error:
+server/routes.ts:12:19: ERROR: Could not resolve "multer"
+    at failureErrorWithLog (/opt/fleetcmd/node_modules/esbuild/lib/main.js:1467:15)
+    at /opt/fleetcmd/node_modules/esbuild/lib/main.js:926:25
+    at /opt/fleetcmd/node_modules/esbuild/lib/main.js:878:52
+    at buildResponseToResult (/opt/fleetcmd/node_modules/esbuild/lib/main.js:924:7)
+    at /opt/fleetcmd/node_modules/esbuild/lib/main.js:951:16
+    at responseCallbacks.<computed> (/opt/fleetcmd/node_modules/esbuild/lib/main.js:603:9)
+    at handleIncomingPacket (/opt/fleetcmd/node_modules/esbuild/lib/main.js:658:12)
+    at Socket.readFromStdout (/opt/fleetcmd/node_modules/esbuild/lib/main.js:581:7)
+    at Socket.emit (node:events:524:28)
+    at addChunk (node:internal/streams/readable:561:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+aiscoweb@aiscoweb:/opt/fleetcmd$ 
