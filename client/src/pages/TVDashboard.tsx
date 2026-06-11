@@ -178,6 +178,14 @@ const VideoPanel = memo(function VideoPanel({
               allowFullScreen
               data-testid="video-player-youtube"
             />
+          ) : currentVideo && currentVideo.videoType === "image" ? (
+            <img
+              key={currentVideo.id}
+              src={currentVideo.url}
+              className="w-full h-full object-contain"
+              alt={currentVideo.title}
+              data-testid="video-player-image"
+            />
           ) : currentVideo ? (
             <video
               key={currentVideo.id}

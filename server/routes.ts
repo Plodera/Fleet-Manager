@@ -9,6 +9,9 @@ import { promisify } from "util";
 import { sendBookingNotification, sendBookingStatusUpdate, sendTripStatusToApprover } from "./email";
 import { scheduleTrackerNotifications, runChecksForTracker } from "./trackerNotifications";
 import type { User } from "@shared/schema";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const scryptAsync = promisify(scrypt);
 
@@ -37,6 +40,25 @@ function hasPermission(user: User, permission: string): boolean {
     return false;
   }
 }
+
+// Multer setup for file uploads
+const uploadsDir = path.resolve(process.cwd(), "public", "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${Date.now()}-${randomBytes(6).toString("hex")}${ext}`);
+    },
+  }),
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = /video\/|image\//;
+    cb(null, allowed.test(file.mimetype));
+  },
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1795,6 +1817,17 @@ export async function registerRoutes(
       await storage.upsertTvKpiValues(withUser);
       res.json({ success: true });
     } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  // File upload endpoint (videos and images)
+  app.post('/api/upload', (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    upload.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ message: err.message });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const url = `/uploads/${req.file.filename}`;
+      res.json({ url, filename: req.file.filename, originalName: req.file.originalname, size: req.file.size });
+    });
   });
 
   // TV Dashboard Videos

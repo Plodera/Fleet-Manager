@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Eye } from "lucide-react";
+import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Upload, X, Image, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +63,9 @@ export default function TVDashboardConfig() {
   const [videoDialog, setVideoDialog] = useState(false);
   const [editVideo, setEditVideo] = useState<VideoEntry | null>(null);
   const [videoForm, setVideoForm] = useState({ title: "", videoType: "youtube", url: "", sortOrder: "0", isActive: true });
+  const [uploading, setUploading] = useState(false);
+  const [uploadedName, setUploadedName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: number; name: string } | null>(null);
 
@@ -235,11 +238,33 @@ export default function TVDashboardConfig() {
     if (video) {
       setEditVideo(video);
       setVideoForm({ title: video.title, videoType: video.videoType, url: video.url, sortOrder: video.sortOrder.toString(), isActive: video.isActive });
+      setUploadedName(video.videoType !== "youtube" && video.url ? video.url.split("/").pop() || null : null);
     } else {
       setEditVideo(null);
       setVideoForm({ title: "", videoType: "youtube", url: "", sortOrder: "0", isActive: true });
+      setUploadedName(null);
     }
     setVideoDialog(true);
+  };
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
+      const data = await res.json();
+      setVideoForm(p => ({ ...p, url: data.url }));
+      setUploadedName(file.name);
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const submitVideo = () => {
@@ -547,7 +572,7 @@ export default function TVDashboardConfig() {
                       {videos.map(v => (
                         <tr key={v.id} className="border-t hover:bg-muted/30" data-testid={`row-video-${v.id}`}>
                           <td className="p-3 font-medium">{v.title}</td>
-                          <td className="p-3 text-sm text-muted-foreground">{v.videoType === "youtube" ? t.tvDashboard.youtube : t.tvDashboard.upload}</td>
+                          <td className="p-3 text-sm text-muted-foreground">{v.videoType === "youtube" ? t.tvDashboard.youtube : v.videoType === "image" ? t.tvDashboard.imageType : t.tvDashboard.upload}</td>
                           <td className="p-3 text-sm text-muted-foreground truncate max-w-[200px]">{v.url}</td>
                           <td className="p-3 text-center text-sm">{v.sortOrder}</td>
                           <td className="p-3 text-center">
@@ -721,7 +746,7 @@ export default function TVDashboardConfig() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={videoDialog} onOpenChange={setVideoDialog}>
+      <Dialog open={videoDialog} onOpenChange={open => { setVideoDialog(open); if (!open) setUploadedName(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editVideo ? t.tvDashboard.editVideo : t.tvDashboard.addVideo}</DialogTitle>
@@ -734,25 +759,66 @@ export default function TVDashboardConfig() {
             </div>
             <div>
               <Label>{t.tvDashboard.videoType}</Label>
-              <Select value={videoForm.videoType} onValueChange={v => setVideoForm(p => ({ ...p, videoType: v }))}>
+              <Select value={videoForm.videoType} onValueChange={v => { setVideoForm(p => ({ ...p, videoType: v, url: "" })); setUploadedName(null); }}>
                 <SelectTrigger data-testid="select-video-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="youtube">{t.tvDashboard.youtube}</SelectItem>
-                  <SelectItem value="upload">{t.tvDashboard.upload}</SelectItem>
+                  <SelectItem value="youtube"><span className="flex items-center gap-2"><Film className="w-4 h-4" />{t.tvDashboard.youtube}</span></SelectItem>
+                  <SelectItem value="upload"><span className="flex items-center gap-2"><Upload className="w-4 h-4" />{t.tvDashboard.upload}</span></SelectItem>
+                  <SelectItem value="image"><span className="flex items-center gap-2"><Image className="w-4 h-4" />{t.tvDashboard.imageType || "Image / Photo"}</span></SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>{t.tvDashboard.videoUrl}</Label>
-              <Input
-                value={videoForm.url}
-                onChange={e => setVideoForm(p => ({ ...p, url: e.target.value }))}
-                placeholder={videoForm.videoType === "youtube" ? t.tvDashboard.youtubeUrlPlaceholder : t.tvDashboard.uploadUrlPlaceholder}
-                data-testid="input-video-url"
-              />
-            </div>
+
+            {videoForm.videoType === "youtube" ? (
+              <div>
+                <Label>{t.tvDashboard.videoUrl}</Label>
+                <Input
+                  value={videoForm.url}
+                  onChange={e => setVideoForm(p => ({ ...p, url: e.target.value }))}
+                  placeholder={t.tvDashboard.youtubeUrlPlaceholder}
+                  data-testid="input-video-url"
+                />
+              </div>
+            ) : (
+              <div>
+                <Label>{videoForm.videoType === "image" ? (t.tvDashboard.imageType || "Image / Photo") : t.tvDashboard.upload}</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={videoForm.videoType === "image" ? "image/*" : "video/*"}
+                  className="hidden"
+                  data-testid="input-file-upload"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
+                />
+                <div
+                  className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary/60 hover:bg-muted/30 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                  data-testid="dropzone-upload"
+                >
+                  {uploading ? (
+                    <p className="text-sm text-muted-foreground animate-pulse">Uploading...</p>
+                  ) : uploadedName || videoForm.url ? (
+                    <div className="flex items-center justify-center gap-2">
+                      {videoForm.videoType === "image" ? <Image className="w-5 h-5 text-primary" /> : <Film className="w-5 h-5 text-primary" />}
+                      <span className="text-sm font-medium truncate max-w-[200px]">{uploadedName || videoForm.url.split("/").pop()}</span>
+                      <button type="button" onClick={e => { e.stopPropagation(); setVideoForm(p => ({ ...p, url: "" })); setUploadedName(null); }} className="ml-1 text-muted-foreground hover:text-destructive">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        {videoForm.videoType === "image" ? "Click to select a photo (JPG, PNG, GIF…)" : "Click to select a video (MP4, WebM…)"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div>
               <Label>{t.tvDashboard.sortOrder}</Label>
               <Input type="number" value={videoForm.sortOrder} onChange={e => setVideoForm(p => ({ ...p, sortOrder: e.target.value }))} data-testid="input-video-sort-order" />
@@ -763,7 +829,7 @@ export default function TVDashboardConfig() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={submitVideo} disabled={createVideoMutation.isPending || updateVideoMutation.isPending} data-testid="button-submit-video">
+            <Button onClick={submitVideo} disabled={createVideoMutation.isPending || updateVideoMutation.isPending || uploading} data-testid="button-submit-video">
               {(createVideoMutation.isPending || updateVideoMutation.isPending) ? t.tvDashboard.creating : t.buttons?.save || "Save"}
             </Button>
           </DialogFooter>
