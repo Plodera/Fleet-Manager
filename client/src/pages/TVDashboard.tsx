@@ -1039,12 +1039,12 @@ export default function TVDashboard() {
       </header>
 
       {/* Main content */}
-      <main className="relative z-10 flex-1 flex flex-col min-h-0 px-10 py-3 gap-3">
+      <main className="relative z-10 flex-1 flex flex-col min-h-0 px-10 pt-3 pb-12 gap-3">
         {renderLayout()}
       </main>
 
       {/* Full-width bottom bar ticker */}
-      {showTicker && tickerPosition === "bottom-bar" && <TickerBar text={tickerText} />}
+      {showTicker && tickerPosition === "bottom-bar" && <div className="pb-12"><TickerBar text={tickerText} /></div>}
     </div>
   );
 }
