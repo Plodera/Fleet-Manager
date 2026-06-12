@@ -527,8 +527,8 @@ const transitionCSS = `
 }
 
 @keyframes tickerScroll {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
 }
 .ticker-scroll {
   display: inline-block;
@@ -547,8 +547,8 @@ const transitionCSS = `
 }
 
 @keyframes bannerMarquee {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
 }
 .banner-marquee {
   display: inline-block;
@@ -566,8 +566,8 @@ const transitionCSS = `
 `;
 
 function TickerBar({ text, speed = 5 }: { text: string; speed?: number }) {
-  // speed 1–10: factor = 0.6/speed → at speed 5 = 0.12s/char (same as before); min 5s
-  const factor = 0.6 / Math.max(1, Math.min(10, speed));
+  // speed 1–10: factor = 0.375/speed → at speed 5 = 0.075s/char (~15s per 200 chars); min 5s
+  const factor = 0.375 / Math.max(1, Math.min(10, speed));
   const duration = Math.max(5, Math.round(text.length * factor)) + "s";
   return (
     <div
@@ -641,8 +641,8 @@ function BannerPanel({ text, style, fontSize, speed = 5 }: { text: string; style
   };
 
   if (style === "marquee") {
-    // speed 1–10: factor = 0.75/speed → at speed 5 = 0.15s/char; min 5s
-    const marqueeFactor = 0.75 / Math.max(1, Math.min(10, speed));
+    // speed 1–10: factor = 0.45/speed → at speed 5 = 0.09s/char (~18s per 200 chars); min 5s
+    const marqueeFactor = 0.45 / Math.max(1, Math.min(10, speed));
     const marqueeDuration = Math.max(5, Math.round(text.length * marqueeFactor)) + "s";
     return (
       <div className="flex-1 flex items-center" style={{ ...containerBase, padding: "8px 0", minHeight: 0, flexShrink: 0 }} data-testid="banner-panel">
