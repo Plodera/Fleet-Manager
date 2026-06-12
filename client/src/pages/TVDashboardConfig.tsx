@@ -54,7 +54,7 @@ export default function TVDashboardConfig() {
 
   const [dashDialog, setDashDialog] = useState(false);
   const [editDash, setEditDash] = useState<Dashboard | null>(null);
-  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off" });
+  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36" });
 
   const [kpiDialog, setKpiDialog] = useState(false);
   const [editKpi, setEditKpi] = useState<KPI | null>(null);
@@ -207,16 +207,16 @@ export default function TVDashboardConfig() {
   const openDashDialog = (dash?: Dashboard) => {
     if (dash) {
       setEditDash(dash);
-      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString(), kpisPerPage: (dash.kpisPerPage ?? 6).toString(), kpiFontScale: normFontScale(dash.kpiFontScale ?? 1.0), tickerText: dash.tickerText || "", tickerPosition: dash.tickerPosition || "off" });
+      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString(), kpisPerPage: (dash.kpisPerPage ?? 6).toString(), kpiFontScale: normFontScale(dash.kpiFontScale ?? 1.0), tickerText: dash.tickerText || "", tickerPosition: dash.tickerPosition || "off", bannerText: dash.bannerText || "", bannerStyle: dash.bannerStyle || "off", bannerFontSize: (dash.bannerFontSize ?? 36).toString() });
     } else {
       setEditDash(null);
-      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off" });
+      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36" });
     }
     setDashDialog(true);
   };
 
   const submitDash = () => {
-    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, videoSizePercent: parseInt(dashForm.videoSizePercent) || 55, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8, shimmerDurationSeconds: parseInt(dashForm.shimmerDurationSeconds) || 6, kpisPerPage: parseInt(dashForm.kpisPerPage) || 6, kpiFontScale: parseFloat(dashForm.kpiFontScale) || 1.0 };
+    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, videoSizePercent: parseInt(dashForm.videoSizePercent) || 55, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8, shimmerDurationSeconds: parseInt(dashForm.shimmerDurationSeconds) || 6, kpisPerPage: parseInt(dashForm.kpisPerPage) || 6, kpiFontScale: parseFloat(dashForm.kpiFontScale) || 1.0, bannerFontSize: parseInt(dashForm.bannerFontSize) || 36 };
     if (editDash) {
       updateDashMutation.mutate({ id: editDash.id, data });
     } else {
@@ -761,6 +761,57 @@ export default function TVDashboardConfig() {
                 <p className="text-xs text-muted-foreground mt-1">This text will scroll across the screen on the TV dashboard.</p>
               </div>
             )}
+            <div className="border-t border-border pt-3">
+              <p className="text-sm font-semibold mb-2">Banner Panel (below video in corner layout)</p>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <Label>Banner Animation Style</Label>
+                  <Select value={dashForm.bannerStyle} onValueChange={v => setDashForm(p => ({ ...p, bannerStyle: v }))}>
+                    <SelectTrigger data-testid="select-banner-style">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="off">Off (disabled)</SelectItem>
+                      <SelectItem value="slide-fade">Slide-up Fade — fades in from below, holds, fades out</SelectItem>
+                      <SelectItem value="marquee">Scrolling Marquee — moves across continuously</SelectItem>
+                      <SelectItem value="pulse">Pulsing Glow — stationary with neon pulse effect</SelectItem>
+                      <SelectItem value="typewriter">Typewriter — types letter by letter then resets</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {dashForm.bannerStyle !== "off" && (
+                  <>
+                    <div>
+                      <Label>Banner Text</Label>
+                      <Input
+                        value={dashForm.bannerText}
+                        onChange={e => setDashForm(p => ({ ...p, bannerText: e.target.value }))}
+                        placeholder="Enter banner message..."
+                        data-testid="input-banner-text"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Displayed in the space below the video (corner layouts only).</p>
+                    </div>
+                    <div>
+                      <Label>Font Size (px): {dashForm.bannerFontSize}</Label>
+                      <input
+                        type="range"
+                        min={16}
+                        max={120}
+                        step={2}
+                        value={dashForm.bannerFontSize}
+                        onChange={e => setDashForm(p => ({ ...p, bannerFontSize: e.target.value }))}
+                        className="w-full mt-1"
+                        data-testid="range-banner-font-size"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>16px (small)</span>
+                        <span>120px (huge)</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <Switch checked={dashForm.isActive} onCheckedChange={v => setDashForm(p => ({ ...p, isActive: v }))} data-testid="switch-dashboard-active" />
               <Label>{t.tvDashboard.active}</Label>

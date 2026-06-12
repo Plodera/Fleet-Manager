@@ -601,6 +601,9 @@ export const tvDashboards = pgTable("tv_dashboards", {
   kpiFontScale: real("kpi_font_scale").notNull().default(1.0),
   tickerText: text("ticker_text").notNull().default(""),
   tickerPosition: text("ticker_position").notNull().default("off"),
+  bannerText: text("banner_text").notNull().default(""),
+  bannerStyle: text("banner_style").notNull().default("off"),
+  bannerFontSize: integer("banner_font_size").notNull().default(36),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

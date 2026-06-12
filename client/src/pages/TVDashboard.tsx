@@ -535,6 +535,34 @@ const transitionCSS = `
   white-space: nowrap;
   animation: tickerScroll 28s linear infinite;
 }
+
+@keyframes bannerSlideFadeIn {
+  0% { opacity: 0; transform: translateY(30px); }
+  15% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+.banner-slide-fade {
+  animation: bannerSlideFadeIn 5s ease-in-out infinite;
+}
+
+@keyframes bannerMarquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+.banner-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: bannerMarquee 20s linear infinite;
+}
+
+@keyframes bannerPulse {
+  0%, 100% { opacity: 1; text-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
+  50% { opacity: 0.6; text-shadow: 0 0 5px currentColor; }
+}
+.banner-pulse {
+  animation: bannerPulse 2.5s ease-in-out infinite;
+}
 `;
 
 function TickerBar({ text }: { text: string }) {
@@ -557,6 +585,67 @@ function TickerBar({ text }: { text: string }) {
       >
         {text}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{text}
       </span>
+    </div>
+  );
+}
+
+function BannerPanel({ text, style, fontSize }: { text: string; style: string; fontSize: number }) {
+  const [twState, setTwState] = useState({ displayed: "", charIndex: 0, phase: "typing" as "typing" | "holding" | "erasing" });
+
+  useEffect(() => {
+    if (style !== "typewriter") return;
+    let timeout: ReturnType<typeof setTimeout>;
+    const { charIndex, phase } = twState;
+    if (phase === "typing") {
+      if (charIndex < text.length) {
+        timeout = setTimeout(() => setTwState(s => ({ ...s, charIndex: s.charIndex + 1, displayed: text.slice(0, s.charIndex + 1) })), 80);
+      } else {
+        timeout = setTimeout(() => setTwState(s => ({ ...s, phase: "holding" })), 2000);
+      }
+    } else if (phase === "holding") {
+      timeout = setTimeout(() => setTwState(s => ({ ...s, phase: "erasing" })), 1500);
+    } else {
+      if (charIndex > 0) {
+        timeout = setTimeout(() => setTwState(s => ({ ...s, charIndex: s.charIndex - 1, displayed: text.slice(0, s.charIndex - 1) })), 40);
+      } else {
+        timeout = setTimeout(() => setTwState({ displayed: "", charIndex: 0, phase: "typing" }), 500);
+      }
+    }
+    return () => clearTimeout(timeout);
+  }, [twState, text, style]);
+
+  const baseStyle: React.CSSProperties = {
+    fontSize: `${fontSize}px`,
+    fontWeight: 700,
+    color: "#fff",
+    lineHeight: 1.2,
+    letterSpacing: "0.02em",
+  };
+
+  if (style === "marquee") {
+    return (
+      <div className="flex-1 flex items-center overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", borderRadius: "12px", padding: "8px 0", minHeight: 0 }} data-testid="banner-panel">
+        <span className="banner-marquee" style={baseStyle}>{text}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{text}</span>
+      </div>
+    );
+  }
+  if (style === "pulse") {
+    return (
+      <div className="flex-1 flex items-center justify-center overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", borderRadius: "12px", padding: "12px", minHeight: 0, textAlign: "center" }} data-testid="banner-panel">
+        <span className="banner-pulse" style={{ ...baseStyle, color: "#00e5ff" }}>{text}</span>
+      </div>
+    );
+  }
+  if (style === "typewriter") {
+    return (
+      <div className="flex-1 flex items-center overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", borderRadius: "12px", padding: "12px", minHeight: 0 }} data-testid="banner-panel">
+        <span style={baseStyle}>{twState.displayed}<span style={{ opacity: Math.floor(Date.now() / 500) % 2 === 0 ? 1 : 0 }}>|</span></span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex-1 flex items-center justify-center overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", borderRadius: "12px", padding: "12px", minHeight: 0, textAlign: "center" }} data-testid="banner-panel">
+      <span className="banner-slide-fade" style={baseStyle}>{text}</span>
     </div>
   );
 }
@@ -701,6 +790,10 @@ export default function TVDashboard() {
   const tickerText = data?.tickerText || "";
   const tickerPosition = data?.tickerPosition || "off";
   const showTicker = tickerPosition !== "off" && tickerText.trim().length > 0;
+  const bannerText = data?.bannerText || "";
+  const bannerStyle = data?.bannerStyle || "off";
+  const bannerFontSize = data?.bannerFontSize ?? 36;
+  const showBanner = bannerStyle !== "off" && bannerText.trim().length > 0;
   const isCornerPosition = videoPosition === "top-right" || videoPosition === "top-left";
   const isSidePosition = videoPosition === "left" || videoPosition === "right";
   const isCenterPosition = videoPosition === "center";
@@ -770,6 +863,7 @@ export default function TVDashboard() {
             <VideoPanel {...videoPanelProps} className="h-full" />
           </div>
           {inlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} />}
+          {showBanner && <BannerPanel text={bannerText} style={bannerStyle} fontSize={bannerFontSize} />}
         </div>
       );
       return (
