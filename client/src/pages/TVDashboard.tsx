@@ -538,12 +538,12 @@ const transitionCSS = `
 
 @keyframes bannerSlideFadeIn {
   0% { opacity: 0; transform: translateY(30px); }
-  15% { opacity: 1; transform: translateY(0); }
-  75% { opacity: 1; transform: translateY(0); }
+  8% { opacity: 1; transform: translateY(0); }
+  88% { opacity: 1; transform: translateY(0); }
   100% { opacity: 0; transform: translateY(-20px); }
 }
 .banner-slide-fade {
-  animation: bannerSlideFadeIn 5s ease-in-out infinite;
+  animation: bannerSlideFadeIn 12s ease-in-out infinite;
 }
 
 @keyframes bannerMarquee {
@@ -983,7 +983,7 @@ export default function TVDashboard() {
 
       {/* Header */}
       <header
-        className="relative z-10 flex items-center justify-between px-5 py-2.5 shrink-0"
+        className="relative z-10 flex items-center justify-between px-10 py-3 shrink-0"
         style={{
           background: "rgba(255,255,255,0.03)",
           backdropFilter: "blur(12px)",
@@ -1039,7 +1039,7 @@ export default function TVDashboard() {
       </header>
 
       {/* Main content */}
-      <main className="relative z-10 flex-1 flex flex-col min-h-0 p-3 gap-3">
+      <main className="relative z-10 flex-1 flex flex-col min-h-0 px-10 py-3 gap-3">
         {renderLayout()}
       </main>
 
