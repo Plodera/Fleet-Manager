@@ -269,7 +269,8 @@ export default function TVDashboardConfig() {
         throw new Error(message);
       }
       const data = await res.json();
-      setVideoForm(p => ({ ...p, url: data.url }));
+      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+      setVideoForm(p => ({ ...p, url: data.url, title: p.title || nameWithoutExt }));
       setUploadedName(file.name);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -279,7 +280,8 @@ export default function TVDashboardConfig() {
   };
 
   const submitVideo = () => {
-    const data = { ...videoForm, sortOrder: parseInt(videoForm.sortOrder) || 0 };
+    const titleFallback = videoForm.title.trim() || uploadedName?.replace(/\.[^/.]+$/, "") || "Untitled";
+    const data = { ...videoForm, title: titleFallback, sortOrder: parseInt(videoForm.sortOrder) || 0 };
     if (editVideo) {
       updateVideoMutation.mutate({ id: editVideo.id, data });
     } else {
@@ -874,7 +876,7 @@ export default function TVDashboardConfig() {
           <div className="space-y-4">
             <div>
               <Label>{t.tvDashboard.videoTitle}</Label>
-              <Input value={videoForm.title} onChange={e => setVideoForm(p => ({ ...p, title: e.target.value }))} data-testid="input-video-title" />
+              <Input value={videoForm.title} onChange={e => setVideoForm(p => ({ ...p, title: e.target.value }))} placeholder="Auto-filled from filename if left blank" data-testid="input-video-title" />
             </div>
             <div>
               <Label>{t.tvDashboard.videoType}</Label>
