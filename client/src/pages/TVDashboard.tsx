@@ -533,7 +533,7 @@ const transitionCSS = `
 .ticker-scroll {
   display: inline-block;
   white-space: nowrap;
-  animation: tickerScroll 28s linear infinite;
+  animation: tickerScroll var(--ticker-duration, 28s) linear infinite;
 }
 
 @keyframes bannerSlideFadeIn {
@@ -553,7 +553,7 @@ const transitionCSS = `
 .banner-marquee {
   display: inline-block;
   white-space: nowrap;
-  animation: bannerMarquee 20s linear infinite;
+  animation: bannerMarquee var(--banner-marquee-duration, 20s) linear infinite;
 }
 
 @keyframes bannerPulse {
@@ -566,6 +566,8 @@ const transitionCSS = `
 `;
 
 function TickerBar({ text }: { text: string }) {
+  // ~0.12s per character keeps speed constant regardless of text length; min 20s
+  const duration = Math.max(20, Math.round(text.length * 0.12)) + "s";
   return (
     <div
       className="shrink-0 overflow-hidden"
@@ -581,7 +583,7 @@ function TickerBar({ text }: { text: string }) {
     >
       <span
         className="ticker-scroll text-white/80 font-semibold tracking-wide"
-        style={{ fontSize: "0.95rem", letterSpacing: "0.04em" }}
+        style={{ fontSize: "0.95rem", letterSpacing: "0.04em", ["--ticker-duration" as string]: duration }}
       >
         {text}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{text}
       </span>
@@ -638,9 +640,11 @@ function BannerPanel({ text, style, fontSize }: { text: string; style: string; f
   };
 
   if (style === "marquee") {
+    // ~0.15s per character keeps scroll speed constant regardless of text length; min 15s
+    const marqueeDuration = Math.max(15, Math.round(text.length * 0.15)) + "s";
     return (
       <div className="flex-1 flex items-center" style={{ ...containerBase, padding: "8px 0", minHeight: 0, flexShrink: 0 }} data-testid="banner-panel">
-        <span className="banner-marquee" style={{ ...textBase, color: "#fff", whiteSpace: "nowrap", display: "inline-block" }}>
+        <span className="banner-marquee" style={{ ...textBase, color: "#fff", whiteSpace: "nowrap", display: "inline-block", ["--banner-marquee-duration" as string]: marqueeDuration }}>
           {text}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{text}
         </span>
       </div>
