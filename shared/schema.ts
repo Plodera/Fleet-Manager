@@ -604,6 +604,7 @@ export const tvDashboards = pgTable("tv_dashboards", {
   bannerText: text("banner_text").notNull().default(""),
   bannerStyle: text("banner_style").notNull().default("off"),
   bannerFontSize: integer("banner_font_size").notNull().default(36),
+  bannerScrollSpeed: integer("banner_scroll_speed").notNull().default(5),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

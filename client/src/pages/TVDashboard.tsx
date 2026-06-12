@@ -565,9 +565,10 @@ const transitionCSS = `
 }
 `;
 
-function TickerBar({ text }: { text: string }) {
-  // ~0.12s per character keeps speed constant regardless of text length; min 20s
-  const duration = Math.max(20, Math.round(text.length * 0.12)) + "s";
+function TickerBar({ text, speed = 5 }: { text: string; speed?: number }) {
+  // speed 1–10: factor = 0.6/speed → at speed 5 = 0.12s/char (same as before); min 5s
+  const factor = 0.6 / Math.max(1, Math.min(10, speed));
+  const duration = Math.max(5, Math.round(text.length * factor)) + "s";
   return (
     <div
       className="shrink-0 overflow-hidden"
@@ -591,7 +592,7 @@ function TickerBar({ text }: { text: string }) {
   );
 }
 
-function BannerPanel({ text, style, fontSize }: { text: string; style: string; fontSize: number }) {
+function BannerPanel({ text, style, fontSize, speed = 5 }: { text: string; style: string; fontSize: number; speed?: number }) {
   const [twState, setTwState] = useState({ displayed: "", charIndex: 0, phase: "typing" as "typing" | "holding" | "erasing" });
   const [cursorOn, setCursorOn] = useState(true);
 
@@ -640,8 +641,9 @@ function BannerPanel({ text, style, fontSize }: { text: string; style: string; f
   };
 
   if (style === "marquee") {
-    // ~0.15s per character keeps scroll speed constant regardless of text length; min 15s
-    const marqueeDuration = Math.max(15, Math.round(text.length * 0.15)) + "s";
+    // speed 1–10: factor = 0.75/speed → at speed 5 = 0.15s/char; min 5s
+    const marqueeFactor = 0.75 / Math.max(1, Math.min(10, speed));
+    const marqueeDuration = Math.max(5, Math.round(text.length * marqueeFactor)) + "s";
     return (
       <div className="flex-1 flex items-center" style={{ ...containerBase, padding: "8px 0", minHeight: 0, flexShrink: 0 }} data-testid="banner-panel">
         <span className="banner-marquee" style={{ ...textBase, color: "#fff", whiteSpace: "nowrap", display: "inline-block", ["--banner-marquee-duration" as string]: marqueeDuration }}>
@@ -825,6 +827,7 @@ export default function TVDashboard() {
   const bannerText = data?.bannerText || "";
   const bannerStyle = data?.bannerStyle || "off";
   const bannerFontSize = data?.bannerFontSize ?? 36;
+  const bannerScrollSpeed = data?.bannerScrollSpeed ?? 5;
   const showBanner = bannerStyle !== "off" && bannerText.trim().length > 0;
   const isCornerPosition = videoPosition === "top-right" || videoPosition === "top-left";
   const isSidePosition = videoPosition === "left" || videoPosition === "right";
@@ -872,9 +875,9 @@ export default function TVDashboard() {
       const ticker = showTicker && tickerPosition !== "bottom-bar";
       return (
         <div className="flex-1 flex flex-col min-h-0">
-          {ticker && tickerPosition === "above" && <TickerBar text={tickerText} />}
+          {ticker && tickerPosition === "above" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
           <VideoPanel {...videoPanelProps} className="flex-1 min-h-0" />
-          {ticker && tickerPosition === "below" && <TickerBar text={tickerText} />}
+          {ticker && tickerPosition === "below" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
         </div>
       );
     }
@@ -890,12 +893,12 @@ export default function TVDashboard() {
       );
       const videoColumn = (
         <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
-          {inlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} />}
+          {inlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
           <div style={{ width: "100%", aspectRatio: "16/9", flexShrink: 0 }}>
             <VideoPanel {...videoPanelProps} className="h-full" />
           </div>
-          {inlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} />}
-          {showBanner && <BannerPanel text={bannerText} style={bannerStyle} fontSize={bannerFontSize} />}
+          {inlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
+          {showBanner && <BannerPanel text={bannerText} style={bannerStyle} fontSize={bannerFontSize} speed={bannerScrollSpeed} />}
         </div>
       );
       return (
@@ -930,11 +933,11 @@ export default function TVDashboard() {
       const inlineTicker = showTicker && tickerPosition !== "bottom-bar";
       const videoSection = (
         <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
-          {inlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} />}
+          {inlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
           <div style={{ flex: 1, minHeight: 0 }}>
             <VideoPanel {...videoPanelProps} className="h-full" />
           </div>
-          {inlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} />}
+          {inlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
         </div>
       );
       return (
@@ -955,11 +958,11 @@ export default function TVDashboard() {
     const inlineTicker = showTicker && tickerPosition !== "bottom-bar";
     const videoSection = inlineTicker ? (
       <div style={{ flex: `${videoSizePct} ${videoSizePct} 0`, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {tickerPosition === "above" && <TickerBar text={tickerText} />}
+        {tickerPosition === "above" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
         <div style={{ flex: 1, minHeight: 0 }}>
           <VideoPanel {...videoPanelProps} className="h-full" />
         </div>
-        {tickerPosition === "below" && <TickerBar text={tickerText} />}
+        {tickerPosition === "below" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
       </div>
     ) : videoPanel;
 
@@ -1048,7 +1051,7 @@ export default function TVDashboard() {
       </main>
 
       {/* Full-width bottom bar ticker */}
-      {showTicker && tickerPosition === "bottom-bar" && <div className="pb-12"><TickerBar text={tickerText} /></div>}
+      {showTicker && tickerPosition === "bottom-bar" && <div className="pb-12"><TickerBar text={tickerText} speed={bannerScrollSpeed} /></div>}
     </div>
   );
 }

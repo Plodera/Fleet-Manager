@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
-type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean; showVideo: boolean; videoPosition: string; videoSizePercent: number; kpiRotationSeconds: number; kpiTransitionStyle: string; shimmerDurationSeconds: number; kpisPerPage: number; kpiFontScale: number; tickerText: string; tickerPosition: string; bannerText: string; bannerStyle: string; bannerFontSize: number; department?: { name: string } };
+type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean; showVideo: boolean; videoPosition: string; videoSizePercent: number; kpiRotationSeconds: number; kpiTransitionStyle: string; shimmerDurationSeconds: number; kpisPerPage: number; kpiFontScale: number; tickerText: string; tickerPosition: string; bannerText: string; bannerStyle: string; bannerFontSize: number; bannerScrollSpeed: number; department?: { name: string } };
 type KPI = { id: number; dashboardId: number; name: string; labelEn: string; labelPt: string; unit: string | null; sortOrder: number; isActive: boolean };
 type VideoEntry = { id: number; dashboardId: number; title: string; videoType: string; url: string; isActive: boolean; sortOrder: number };
 
@@ -54,7 +54,7 @@ export default function TVDashboardConfig() {
 
   const [dashDialog, setDashDialog] = useState(false);
   const [editDash, setEditDash] = useState<Dashboard | null>(null);
-  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36" });
+  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36", bannerScrollSpeed: "5" });
 
   const [kpiDialog, setKpiDialog] = useState(false);
   const [editKpi, setEditKpi] = useState<KPI | null>(null);
@@ -207,16 +207,16 @@ export default function TVDashboardConfig() {
   const openDashDialog = (dash?: Dashboard) => {
     if (dash) {
       setEditDash(dash);
-      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString(), kpisPerPage: (dash.kpisPerPage ?? 6).toString(), kpiFontScale: normFontScale(dash.kpiFontScale ?? 1.0), tickerText: dash.tickerText || "", tickerPosition: dash.tickerPosition || "off", bannerText: dash.bannerText || "", bannerStyle: dash.bannerStyle || "off", bannerFontSize: (dash.bannerFontSize ?? 36).toString() });
+      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString(), kpisPerPage: (dash.kpisPerPage ?? 6).toString(), kpiFontScale: normFontScale(dash.kpiFontScale ?? 1.0), tickerText: dash.tickerText || "", tickerPosition: dash.tickerPosition || "off", bannerText: dash.bannerText || "", bannerStyle: dash.bannerStyle || "off", bannerFontSize: (dash.bannerFontSize ?? 36).toString(), bannerScrollSpeed: (dash.bannerScrollSpeed ?? 5).toString() });
     } else {
       setEditDash(null);
-      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36" });
+      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36", bannerScrollSpeed: "5" });
     }
     setDashDialog(true);
   };
 
   const submitDash = () => {
-    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, videoSizePercent: parseInt(dashForm.videoSizePercent) || 55, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8, shimmerDurationSeconds: parseInt(dashForm.shimmerDurationSeconds) || 6, kpisPerPage: parseInt(dashForm.kpisPerPage) || 6, kpiFontScale: parseFloat(dashForm.kpiFontScale) || 1.0, bannerFontSize: parseInt(dashForm.bannerFontSize) || 36 };
+    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, videoSizePercent: parseInt(dashForm.videoSizePercent) || 55, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8, shimmerDurationSeconds: parseInt(dashForm.shimmerDurationSeconds) || 6, kpisPerPage: parseInt(dashForm.kpisPerPage) || 6, kpiFontScale: parseFloat(dashForm.kpiFontScale) || 1.0, bannerFontSize: parseInt(dashForm.bannerFontSize) || 36, bannerScrollSpeed: parseInt(dashForm.bannerScrollSpeed) || 5 };
     if (editDash) {
       updateDashMutation.mutate({ id: editDash.id, data });
     } else {
@@ -810,6 +810,28 @@ export default function TVDashboardConfig() {
                         <span>120px (huge)</span>
                       </div>
                     </div>
+                    {(dashForm.bannerStyle === "marquee" || dashForm.tickerPosition !== "off") && (
+                      <div>
+                        <Label>
+                          Scroll Speed: {["", "1 – Very Slow", "2 – Slow", "3 – Moderate", "4 – Medium", "5 – Normal", "6 – Slightly Fast", "7 – Fast", "8 – Faster", "9 – Very Fast", "10 – Maximum"][parseInt(dashForm.bannerScrollSpeed) || 5]}
+                        </Label>
+                        <input
+                          type="range"
+                          min={1}
+                          max={10}
+                          step={1}
+                          value={dashForm.bannerScrollSpeed}
+                          onChange={e => setDashForm(p => ({ ...p, bannerScrollSpeed: e.target.value }))}
+                          className="w-full mt-1"
+                          data-testid="range-banner-scroll-speed"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>1 (very slow)</span>
+                          <span>10 (maximum)</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Controls scroll speed for both the banner marquee and the ticker bar.</p>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
