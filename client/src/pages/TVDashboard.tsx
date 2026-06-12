@@ -591,6 +591,7 @@ function TickerBar({ text }: { text: string }) {
 
 function BannerPanel({ text, style, fontSize }: { text: string; style: string; fontSize: number }) {
   const [twState, setTwState] = useState({ displayed: "", charIndex: 0, phase: "typing" as "typing" | "holding" | "erasing" });
+  const [cursorOn, setCursorOn] = useState(true);
 
   useEffect(() => {
     if (style !== "typewriter") return;
@@ -614,38 +615,65 @@ function BannerPanel({ text, style, fontSize }: { text: string; style: string; f
     return () => clearTimeout(timeout);
   }, [twState, text, style]);
 
-  const baseStyle: React.CSSProperties = {
+  useEffect(() => {
+    if (style !== "typewriter") return;
+    const iv = setInterval(() => setCursorOn(v => !v), 500);
+    return () => clearInterval(iv);
+  }, [style]);
+
+  const containerBase: React.CSSProperties = {
+    background: "rgba(0,0,0,0.6)",
+    borderRadius: "12px",
+    overflow: "hidden",
+    boxSizing: "border-box",
+  };
+
+  const textBase: React.CSSProperties = {
     fontSize: `${fontSize}px`,
     fontWeight: 700,
-    color: "#fff",
-    lineHeight: 1.2,
+    lineHeight: 1.25,
     letterSpacing: "0.02em",
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
   };
 
   if (style === "marquee") {
     return (
-      <div className="flex-1 flex items-center overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", borderRadius: "12px", padding: "8px 0", minHeight: 0 }} data-testid="banner-panel">
-        <span className="banner-marquee" style={baseStyle}>{text}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{text}</span>
+      <div className="flex-1 flex items-center" style={{ ...containerBase, padding: "8px 0", minHeight: 0, flexShrink: 0 }} data-testid="banner-panel">
+        <span className="banner-marquee" style={{ ...textBase, color: "#fff", whiteSpace: "nowrap", display: "inline-block" }}>
+          {text}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{text}
+        </span>
       </div>
     );
   }
+
   if (style === "pulse") {
     return (
-      <div className="flex-1 flex items-center justify-center overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", borderRadius: "12px", padding: "12px", minHeight: 0, textAlign: "center" }} data-testid="banner-panel">
-        <span className="banner-pulse" style={{ ...baseStyle, color: "#00e5ff" }}>{text}</span>
+      <div className="flex-1 flex items-center justify-center" style={{ ...containerBase, padding: "16px", minHeight: 0, flexShrink: 0, textAlign: "center" }} data-testid="banner-panel">
+        <span className="banner-pulse" style={{ ...textBase, color: "#00e5ff", display: "block", width: "100%" }}>
+          {text}
+        </span>
       </div>
     );
   }
+
   if (style === "typewriter") {
     return (
-      <div className="flex-1 flex items-center overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", borderRadius: "12px", padding: "12px", minHeight: 0 }} data-testid="banner-panel">
-        <span style={baseStyle}>{twState.displayed}<span style={{ opacity: Math.floor(Date.now() / 500) % 2 === 0 ? 1 : 0 }}>|</span></span>
+      <div className="flex-1 flex items-start" style={{ ...containerBase, padding: "16px", minHeight: 0, flexShrink: 0 }} data-testid="banner-panel">
+        <span style={{ ...textBase, color: "#fff", display: "block", width: "100%" }}>
+          {twState.displayed}
+          <span style={{ opacity: cursorOn ? 1 : 0, color: "#00e5ff" }}>|</span>
+        </span>
       </div>
     );
   }
+
+  /* slide-fade */
   return (
-    <div className="flex-1 flex items-center justify-center overflow-hidden" style={{ background: "rgba(0,0,0,0.5)", borderRadius: "12px", padding: "12px", minHeight: 0, textAlign: "center" }} data-testid="banner-panel">
-      <span className="banner-slide-fade" style={baseStyle}>{text}</span>
+    <div className="flex-1 flex items-center justify-center" style={{ ...containerBase, padding: "16px", minHeight: 0, flexShrink: 0, textAlign: "center" }} data-testid="banner-panel">
+      <span className="banner-slide-fade" style={{ ...textBase, color: "#fff", display: "block", width: "100%" }}>
+        {text}
+      </span>
     </div>
   );
 }
