@@ -20,7 +20,8 @@ async function digestFetch(url: string, username: string, password: string): Pro
 
   const wwwAuth = challenge.headers.get("WWW-Authenticate") || "";
   const getParam = (key: string) => {
-    const m = wwwAuth.match(new RegExp(`${key}="([^"]*)"`));
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const m = wwwAuth.match(new RegExp(`${escapedKey}="([^"]*)"`));
     return m ? m[1] : "";
   };
 

@@ -26,6 +26,15 @@ interface FieldOption {
   getValue: (wo: any) => string;
 }
 
+function escapeHtml(str: string): string {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function parseTimeToMinutes(time: string): number {
   if (!time) return 0;
   const parts = time.split(":");
@@ -238,13 +247,13 @@ export default function WorkOrderReports() {
     const meta = getFilterMeta();
     let bodyContent = "";
     if (reportMode === "summary") {
-      const headerCols = mtColumns.map(c => `<th style="text-align:right;font-size:10px;padding:4px 6px">${c.label}</th>`).join("");
+      const headerCols = mtColumns.map(c => `<th style="text-align:right;font-size:10px;padding:4px 6px">${escapeHtml(c.label)}</th>`).join("");
       const dataRows = filteredPivotData.map(row => {
         const cells = mtColumns.map(col => {
           const val = row.byType[col.name] || 0;
           return `<td style="text-align:right;padding:4px 6px">${formatMinutesToHHMM(val)}</td>`;
         }).join("");
-        return `<tr><td style="padding:4px 6px">${row.licensePlate}</td><td style="padding:4px 6px">${row.name}</td>${cells}</tr>`;
+        return `<tr><td style="padding:4px 6px">${escapeHtml(row.licensePlate)}</td><td style="padding:4px 6px">${escapeHtml(row.name)}</td>${cells}</tr>`;
       }).join("");
       const totalCells = mtColumns.map(col => {
         const total = filteredPivotData.reduce((s, r) => s + (r.byType[col.name] || 0), 0);
@@ -296,7 +305,7 @@ export default function WorkOrderReports() {
       </head><body>
         <h1>${t.workOrders.workOrderReport}${reportMode === "summary" ? ` - ${t.workOrders.summaryReport}` : ""}</h1>
         <div class="subtitle">${t.workOrders.reportSubtitle}</div>
-        <div class="meta">${meta.map(m => `<span>${m}</span>`).join("")}</div>
+        <div class="meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>
         ${bodyContent}
         <div style="margin-top: 20px; color: #999; font-size: 10px;">${format(new Date(), "dd/MM/yyyy HH:mm")}</div>
       </body></html>

@@ -7,8 +7,10 @@ let syncTimer: ReturnType<typeof setInterval> | null = null;
 // Per-interface byte counters from previous poll for delta computation
 const prevCounters: Record<string, { tx: number; rx: number; ts: number }> = {};
 
-// Reusable HTTPS agent that skips certificate verification.
-// FortiGate and other local appliances use self-signed certificates.
+// Reusable HTTPS agent scoped exclusively to FortiGate requests.
+// FortiGate appliances use self-signed certificates. This agent is only
+// passed to fortigateFetch() and does NOT affect any other TLS connections
+// in the process (NODE_TLS_REJECT_UNAUTHORIZED is never modified).
 const tlsAgent = new https.Agent({ rejectUnauthorized: false });
 
 /** Thin fetch wrapper using Node https/http modules (bypasses self-signed cert rejection). */
