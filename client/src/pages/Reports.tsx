@@ -603,7 +603,7 @@ export default function Reports() {
                             backgroundColor: 'hsl(var(--card))',
                             boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' 
                           }}
-                          formatter={(value: number) => [`Kz ${value.toFixed(2)}`, 'Cost']}
+                          formatter={((value: number) => [`Kz ${value.toFixed(2)}`, 'Cost']) as any}
                         />
                         <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} />
                       </BarChart>
@@ -653,7 +653,7 @@ export default function Reports() {
                               <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip formatter={(value: number) => [`Kz ${value.toFixed(2)}`, 'Cost']} />
+                          <Tooltip formatter={((value: number) => [`Kz ${value.toFixed(2)}`, 'Cost']) as any} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -716,7 +716,7 @@ export default function Reports() {
                         backgroundColor: 'hsl(var(--card))',
                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' 
                       }}
-                      formatter={(value: number) => [`$${value.toFixed(2)}`]}
+                      formatter={((value: number) => [`$${value.toFixed(2)}`]) as any}
                     />
                     <Legend />
                     <Area 

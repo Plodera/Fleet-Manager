@@ -191,7 +191,7 @@ export default function Dashboard() {
                         backgroundColor: 'hsl(var(--card))',
                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' 
                       }}
-                      formatter={(value: number) => [`Kz ${value.toFixed(2)}`, 'Cost']}
+                      formatter={((value: number) => [`Kz ${value.toFixed(2)}`, 'Cost']) as any}
                     />
                     <Bar 
                       dataKey="cost" 
