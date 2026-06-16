@@ -8,6 +8,7 @@ import {
   glpiSettings,
   hikvisionNvrs, hikvisionGlobalSettings,
   fortigateSettings, fortigateBandwidth,
+  teamsSettings, teamsKpiMappings,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -37,6 +38,8 @@ import {
   type HikvisionNvr, type InsertHikvisionNvr,
   type HikvisionGlobalSettings, type InsertHikvisionGlobalSettings,
   type FortigateSettings, type InsertFortigateSettings, type FortigateBandwidth,
+  type TeamsSettings, type InsertTeamsSettings,
+  type TeamsKpiMapping, type InsertTeamsKpiMapping,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
 import { eq, desc, sql, and, gte, lt } from "drizzle-orm";
@@ -205,6 +208,12 @@ export interface IStorage {
   createTrackerNotificationRule(data: InsertTrackerNotificationRule): Promise<TrackerNotificationRule>;
   updateTrackerNotificationRule(id: number, updates: Partial<TrackerNotificationRule>): Promise<TrackerNotificationRule>;
   deleteTrackerNotificationRule(id: number): Promise<void>;
+
+  // Teams Sync Settings
+  getTeamsSettings(): Promise<TeamsSettings | undefined>;
+  upsertTeamsSettings(settings: InsertTeamsSettings): Promise<TeamsSettings>;
+  getTeamsKpiMappings(dashboardId: number): Promise<TeamsKpiMapping[]>;
+  upsertTeamsKpiMappings(dashboardId: number, mappings: Omit<InsertTeamsKpiMapping, 'dashboardId'>[]): Promise<TeamsKpiMapping[]>;
 
   // IT Operations Monitor
   getItHostTypes(): Promise<ItHostType[]>;
@@ -1212,6 +1221,38 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // ── Teams Sync Settings ────────────────────────────────────────────────
+  async getTeamsSettings(): Promise<TeamsSettings | undefined> {
+    const rows = await getDb().select().from(teamsSettings).limit(1);
+    return rows[0];
+  }
+
+  async upsertTeamsSettings(data: InsertTeamsSettings): Promise<TeamsSettings> {
+    const existing = await getDb().select().from(teamsSettings).limit(1);
+    if (existing.length > 0) {
+      const [row] = await getDb().update(teamsSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(teamsSettings.id, existing[0].id))
+        .returning();
+      return row;
+    }
+    const [row] = await getDb().insert(teamsSettings).values(data).returning();
+    return row;
+  }
+
+  async getTeamsKpiMappings(dashboardId: number): Promise<TeamsKpiMapping[]> {
+    return getDb().select().from(teamsKpiMappings).where(eq(teamsKpiMappings.dashboardId, dashboardId));
+  }
+
+  async upsertTeamsKpiMappings(dashboardId: number, mappings: Omit<InsertTeamsKpiMapping, 'dashboardId'>[]): Promise<TeamsKpiMapping[]> {
+    await getDb().delete(teamsKpiMappings).where(eq(teamsKpiMappings.dashboardId, dashboardId));
+    if (mappings.length === 0) return [];
+    const rows = await getDb().insert(teamsKpiMappings)
+      .values(mappings.map(m => ({ ...m, dashboardId })))
+      .returning();
+    return rows;
+  }
+
   // ── Hikvision NVR methods ────────────────────────────────────────────────
   async getHikvisionNvrs(): Promise<HikvisionNvr[]> {
     return getDb().select().from(hikvisionNvrs).orderBy(hikvisionNvrs.id);
@@ -1490,5 +1531,9 @@ export const storage = {
   insertFortigateBandwidth: (...args: Parameters<DatabaseStorage['insertFortigateBandwidth']>) => getStorage().insertFortigateBandwidth(...args),
   getFortigateBandwidth: (...args: Parameters<DatabaseStorage['getFortigateBandwidth']>) => getStorage().getFortigateBandwidth(...args),
   pruneFortigateBandwidth: () => getStorage().pruneFortigateBandwidth(),
+  getTeamsSettings: () => getStorage().getTeamsSettings(),
+  upsertTeamsSettings: (...args: Parameters<DatabaseStorage['upsertTeamsSettings']>) => getStorage().upsertTeamsSettings(...args),
+  getTeamsKpiMappings: (...args: Parameters<DatabaseStorage['getTeamsKpiMappings']>) => getStorage().getTeamsKpiMappings(...args),
+  upsertTeamsKpiMappings: (...args: Parameters<DatabaseStorage['upsertTeamsKpiMappings']>) => getStorage().upsertTeamsKpiMappings(...args),
   get sessionStore() { return getStorage().sessionStore; },
 };

@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Upload, X, Image, Film, Eye } from "lucide-react";
+import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Upload, X, Image, Film, Eye, RefreshCw, MessageSquare, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean; showVideo: boolean; videoPosition: string; videoSizePercent: number; kpiRotationSeconds: number; kpiTransitionStyle: string; shimmerDurationSeconds: number; kpisPerPage: number; kpiFontScale: number; tickerText: string; tickerPosition: string; bannerText: string; bannerStyle: string; bannerFontSize: number; bannerScrollSpeed: number; department?: { name: string } };
 type KPI = { id: number; dashboardId: number; name: string; labelEn: string; labelPt: string; unit: string | null; sortOrder: number; isActive: boolean };
+type TeamsSettingsType = { tenantId: string; clientId: string; clientSecret: string; teamId: string; channelId: string; enabled: boolean; lastSyncAt: string | null; lastError: string | null };
+type TeamsKpiMappingType = { id?: number; dashboardId: number; teamsFieldKey: string; teamsFieldLabel: string; kpiId: number | null; periodType: string };
+type ExtractedFieldType = { key: string; label: string; value: string };
+type FetchResultType = { ok: boolean; messageId?: string; messageDate?: string; messageText?: string; fields: ExtractedFieldType[]; error?: string };
 type VideoEntry = { id: number; dashboardId: number; title: string; videoType: string; url: string; isActive: boolean; sortOrder: number };
 
 export default function TVDashboardConfig() {
@@ -38,12 +42,13 @@ export default function TVDashboardConfig() {
   const canDataEntry = isAdmin || userPermissions.includes("tv_data_entry");
   const canVideos    = isAdmin || userPermissions.includes("manage_tv_videos");
 
-  const TAB_ORDER = ["dashboards","kpis","dataentry","videos"];
+  const TAB_ORDER = ["dashboards","kpis","dataentry","videos","teamssync"];
   const allowedTabs = TAB_ORDER.filter(tab =>
     (tab === "dashboards" && canDashboards) ||
     (tab === "kpis"       && canKpis)       ||
     (tab === "dataentry"  && canDataEntry)  ||
-    (tab === "videos"     && canVideos)
+    (tab === "videos"     && canVideos)     ||
+    (tab === "teamssync"  && isAdmin)
   );
 
   useEffect(() => {
@@ -72,6 +77,13 @@ export default function TVDashboardConfig() {
   const [dataEntryPeriodType, setDataEntryPeriodType] = useState("daily");
   const [dataEntryDate, setDataEntryDate] = useState(new Date().toISOString().split("T")[0]);
   const [kpiValues, setKpiValues] = useState<Record<number, string>>({});
+
+  // Teams Sync state
+  const [teamsForm, setTeamsForm] = useState<TeamsSettingsType>({ tenantId: "", clientId: "", clientSecret: "", teamId: "", channelId: "", enabled: false, lastSyncAt: null, lastError: null });
+  const [teamsMappings, setTeamsMappings] = useState<TeamsKpiMappingType[]>([]);
+  const [syncPreview, setSyncPreview] = useState<FetchResultType | null>(null);
+  const [syncPreviewOpen, setSyncPreviewOpen] = useState(false);
+  const [previewValues, setPreviewValues] = useState<Record<string, string>>({}); // kpiId -> value override
 
   const { data: dashboards = [] } = useQuery<Dashboard[]>({ queryKey: ["/api/tv-dashboards"] });
   const { data: departments = [] } = useQuery<any[]>({ queryKey: ["/api/departments"] });
@@ -103,6 +115,103 @@ export default function TVDashboardConfig() {
     },
     enabled: !!selectedDashboardId && kpis.length > 0,
   });
+
+  // Teams queries & mutations
+  const { data: teamsSettingsData } = useQuery<TeamsSettingsType>({
+    queryKey: ["/api/settings/teams"],
+    queryFn: async () => { const res = await fetch("/api/settings/teams"); return res.json(); },
+  });
+  useEffect(() => {
+    if (teamsSettingsData) setTeamsForm(teamsSettingsData);
+  }, [teamsSettingsData]);
+
+  const { data: teamsMappingsData } = useQuery<TeamsKpiMappingType[]>({
+    queryKey: ["/api/settings/teams/kpi-mappings", selectedDashboardId],
+    queryFn: async () => {
+      if (!selectedDashboardId) return [];
+      const res = await fetch(`/api/settings/teams/kpi-mappings/${selectedDashboardId}`);
+      return res.json();
+    },
+    enabled: !!selectedDashboardId,
+  });
+  useEffect(() => {
+    if (teamsMappingsData) setTeamsMappings(teamsMappingsData);
+  }, [teamsMappingsData]);
+
+  const saveTeamsSettingsMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("PUT", "/api/settings/teams", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/teams"] });
+      toast({ title: "Teams settings saved" });
+    },
+    onError: (err: any) => toast({ title: "Failed to save", description: err.message, variant: "destructive" }),
+  });
+
+  const saveTeamsMappingsMutation = useMutation({
+    mutationFn: ({ dashboardId, mappings }: { dashboardId: number; mappings: any[] }) =>
+      apiRequest("PUT", `/api/settings/teams/kpi-mappings/${dashboardId}`, { mappings }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/teams/kpi-mappings", selectedDashboardId] });
+      toast({ title: "KPI mappings saved" });
+    },
+    onError: (err: any) => toast({ title: "Failed to save mappings", description: err.message, variant: "destructive" }),
+  });
+
+  const fetchFieldsMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/teams/fetch-fields", {}),
+    onSuccess: (data: any) => {
+      setSyncPreview(data);
+      if (data.ok && data.fields.length > 0) {
+        // Pre-fill preview values from mappings
+        const initial: Record<string, string> = {};
+        const activeKpis = kpis.filter(k => k.isActive);
+        for (const mapping of teamsMappings) {
+          const field = data.fields.find((f: ExtractedFieldType) => f.key === mapping.teamsFieldKey);
+          if (field && mapping.kpiId) initial[String(mapping.kpiId)] = field.value;
+        }
+        // Also try to match by label similarity for any unmapped fields
+        for (const field of data.fields) {
+          const matched = teamsMappings.find(m => m.teamsFieldKey === field.key);
+          if (!matched) {
+            const kpi = activeKpis.find(k =>
+              k.name.toLowerCase().replace(/\s+/g, "_") === field.key ||
+              k.labelEn.toLowerCase().includes(field.label.toLowerCase().split(" ")[0])
+            );
+            if (kpi && !initial[String(kpi.id)]) initial[String(kpi.id)] = field.value;
+          }
+        }
+        setPreviewValues(initial);
+      }
+      setSyncPreviewOpen(true);
+    },
+    onError: (err: any) => toast({ title: "Sync failed", description: err.message, variant: "destructive" }),
+  });
+
+  const handleConfirmSync = () => {
+    if (!selectedDashboardId) return;
+    const values = Object.entries(previewValues)
+      .filter(([, v]) => v !== "")
+      .map(([kpiId, value]) => ({
+        kpiId: parseInt(kpiId),
+        periodType: dataEntryPeriodType,
+        periodDate: dataEntryDate,
+        value,
+      }));
+    if (values.length > 0) {
+      saveValuesMutation.mutate(values);
+    }
+    setSyncPreviewOpen(false);
+    toast({ title: `Saved ${values.length} KPI value(s) from Teams` });
+  };
+
+  const handleAddMapping = () => {
+    if (!selectedDashboardId) return;
+    setTeamsMappings(prev => [...prev, { dashboardId: selectedDashboardId, teamsFieldKey: "", teamsFieldLabel: "", kpiId: null, periodType: "daily" }]);
+  };
+
+  const handleRemoveMapping = (idx: number) => {
+    setTeamsMappings(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const createDashMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/tv-dashboards", data),
@@ -353,6 +462,7 @@ export default function TVDashboardConfig() {
           {canKpis       && <TabsTrigger value="kpis"       data-testid="tab-kpis">{t.tvDashboard.kpisTab}</TabsTrigger>}
           {canDataEntry  && <TabsTrigger value="dataentry"  data-testid="tab-data-entry">{t.tvDashboard.dataEntryTab}</TabsTrigger>}
           {canVideos     && <TabsTrigger value="videos"     data-testid="tab-videos">{t.tvDashboard.videosTab}</TabsTrigger>}
+          {isAdmin       && <TabsTrigger value="teamssync"  data-testid="tab-teams-sync"><MessageSquare className="w-3.5 h-3.5 mr-1.5" />Teams Sync</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="dashboards" className="mt-4">
@@ -610,7 +720,315 @@ export default function TVDashboardConfig() {
             </>
           )}
         </TabsContent>
+
+        {/* ── Teams Sync Tab ── */}
+        <TabsContent value="teamssync" className="mt-4 space-y-6">
+
+          {/* Azure Setup Instructions */}
+          <Card>
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-start gap-3">
+                <Info className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                <div className="text-sm space-y-2">
+                  <p className="font-semibold">How to set up an Azure App Registration</p>
+                  <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                    <li>Go to <strong>portal.azure.com</strong> → Azure Active Directory → App registrations → New registration.</li>
+                    <li>Name it (e.g. "AAMS Teams Sync"), choose <em>Single tenant</em>, click Register.</li>
+                    <li>Copy the <strong>Application (client) ID</strong> and <strong>Directory (tenant) ID</strong> into the fields below.</li>
+                    <li>Go to <strong>Certificates &amp; secrets</strong> → New client secret → copy the <em>Value</em> (not the ID).</li>
+                    <li>Go to <strong>API permissions</strong> → Add permission → Microsoft Graph → Application permissions → add <code>ChannelMessage.Read.All</code> → Grant admin consent.</li>
+                    <li>Find your <strong>Team ID</strong>: open Teams → right-click the team → Get link to team → copy the ID after <code>groupId=</code>.</li>
+                    <li>Find your <strong>Channel ID</strong>: right-click the channel → Get link to channel → copy the ID after <code>channel=</code> (starts with <code>19:</code>).</li>
+                  </ol>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Azure Credentials Form */}
+          <Card>
+            <CardContent className="pt-5 space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-semibold text-sm">Azure Credentials</p>
+                <div className="flex items-center gap-2">
+                  <Switch checked={teamsForm.enabled} onCheckedChange={v => setTeamsForm(p => ({ ...p, enabled: v }))} data-testid="switch-teams-enabled" />
+                  <Label className="text-sm">Enabled</Label>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm">Tenant ID</Label>
+                  <Input value={teamsForm.tenantId} onChange={e => setTeamsForm(p => ({ ...p, tenantId: e.target.value }))} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" data-testid="input-teams-tenant-id" />
+                </div>
+                <div>
+                  <Label className="text-sm">Client ID (App ID)</Label>
+                  <Input value={teamsForm.clientId} onChange={e => setTeamsForm(p => ({ ...p, clientId: e.target.value }))} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" data-testid="input-teams-client-id" />
+                </div>
+                <div>
+                  <Label className="text-sm">Client Secret</Label>
+                  <Input type="password" value={teamsForm.clientSecret} onChange={e => setTeamsForm(p => ({ ...p, clientSecret: e.target.value }))} placeholder="Secret value (not ID)" data-testid="input-teams-client-secret" />
+                </div>
+                <div>
+                  <Label className="text-sm">Team ID</Label>
+                  <Input value={teamsForm.teamId} onChange={e => setTeamsForm(p => ({ ...p, teamId: e.target.value }))} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" data-testid="input-teams-team-id" />
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="text-sm">Channel ID</Label>
+                  <Input value={teamsForm.channelId} onChange={e => setTeamsForm(p => ({ ...p, channelId: e.target.value }))} placeholder="19:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@thread.tacv2" data-testid="input-teams-channel-id" />
+                </div>
+              </div>
+              {teamsForm.lastError && (
+                <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded text-sm text-destructive">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>Last error: {teamsForm.lastError}</span>
+                </div>
+              )}
+              {teamsForm.lastSyncAt && (
+                <p className="text-xs text-muted-foreground">Last successful sync: {new Date(teamsForm.lastSyncAt).toLocaleString()}</p>
+              )}
+              <div className="flex justify-end">
+                <Button onClick={() => saveTeamsSettingsMutation.mutate(teamsForm)} disabled={saveTeamsSettingsMutation.isPending} data-testid="button-save-teams-settings">
+                  <Save className="w-4 h-4 mr-2" />
+                  {saveTeamsSettingsMutation.isPending ? "Saving…" : "Save Azure Settings"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* KPI Field Mappings */}
+          <Card>
+            <CardContent className="pt-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-sm">KPI Field Mappings</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Map Teams message fields to your dashboard KPIs. Select a dashboard first.</p>
+                </div>
+              </div>
+              <DashboardSelector />
+              {selectedDashboardId && (
+                <>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm" data-testid="table-teams-mappings">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left p-3 font-medium">Teams Field Label</th>
+                          <th className="text-left p-3 font-medium">Field Key (auto)</th>
+                          <th className="text-left p-3 font-medium">Maps to KPI</th>
+                          <th className="text-left p-3 font-medium">Period</th>
+                          <th className="w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {teamsMappings.map((m, idx) => (
+                          <tr key={idx} className="border-t">
+                            <td className="p-2">
+                              <Input
+                                value={m.teamsFieldLabel}
+                                onChange={e => {
+                                  const label = e.target.value;
+                                  const key = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+                                  setTeamsMappings(prev => prev.map((x, i) => i === idx ? { ...x, teamsFieldLabel: label, teamsFieldKey: key } : x));
+                                }}
+                                placeholder="e.g. Total kwh"
+                                data-testid={`input-teams-field-label-${idx}`}
+                              />
+                            </td>
+                            <td className="p-2 text-muted-foreground font-mono text-xs">{m.teamsFieldKey || "—"}</td>
+                            <td className="p-2">
+                              <Select value={m.kpiId?.toString() ?? ""} onValueChange={v => setTeamsMappings(prev => prev.map((x, i) => i === idx ? { ...x, kpiId: v ? parseInt(v) : null } : x))}>
+                                <SelectTrigger className="w-44" data-testid={`select-teams-kpi-${idx}`}>
+                                  <SelectValue placeholder="Select KPI…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {kpis.filter(k => k.isActive).map(k => (
+                                    <SelectItem key={k.id} value={k.id.toString()}>{k.labelEn || k.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="p-2">
+                              <Select value={m.periodType} onValueChange={v => setTeamsMappings(prev => prev.map((x, i) => i === idx ? { ...x, periodType: v } : x))}>
+                                <SelectTrigger className="w-28" data-testid={`select-teams-period-${idx}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="daily">Daily</SelectItem>
+                                  <SelectItem value="monthly">Monthly</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="p-2">
+                              <Button variant="ghost" size="icon" onClick={() => handleRemoveMapping(idx)} data-testid={`button-remove-mapping-${idx}`}>
+                                <X className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                        {teamsMappings.length === 0 && (
+                          <tr><td colSpan={5} className="p-6 text-center text-muted-foreground text-sm">No mappings yet. Add one below.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-between">
+                    <Button variant="outline" onClick={handleAddMapping} data-testid="button-add-mapping">
+                      <Plus className="w-4 h-4 mr-2" />Add Mapping
+                    </Button>
+                    <Button onClick={() => saveTeamsMappingsMutation.mutate({ dashboardId: selectedDashboardId, mappings: teamsMappings })} disabled={saveTeamsMappingsMutation.isPending} data-testid="button-save-mappings">
+                      <Save className="w-4 h-4 mr-2" />
+                      {saveTeamsMappingsMutation.isPending ? "Saving…" : "Save Mappings"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Sync from Teams */}
+          {selectedDashboardId && (
+            <Card>
+              <CardContent className="pt-5 space-y-3">
+                <p className="font-semibold text-sm">Sync Data from Teams</p>
+                <p className="text-xs text-muted-foreground">Fetches the latest message from the configured channel, extracts numeric fields, and lets you review before saving.</p>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div>
+                    <Label className="text-sm mb-1 block">Period Type</Label>
+                    <Select value={dataEntryPeriodType} onValueChange={setDataEntryPeriodType}>
+                      <SelectTrigger className="w-36" data-testid="select-teams-sync-period-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm mb-1 block">Period Date</Label>
+                    <Input
+                      type={dataEntryPeriodType === "monthly" ? "month" : "date"}
+                      value={dataEntryPeriodType === "monthly" ? dataEntryDate.substring(0, 7) : dataEntryDate}
+                      onChange={e => setDataEntryDate(dataEntryPeriodType === "monthly" ? e.target.value + "-01" : e.target.value)}
+                      className="w-48"
+                      data-testid="input-teams-sync-date"
+                    />
+                  </div>
+                  <div className="mt-5">
+                    <Button onClick={() => fetchFieldsMutation.mutate()} disabled={fetchFieldsMutation.isPending} data-testid="button-sync-from-teams">
+                      <RefreshCw className={`w-4 h-4 mr-2 ${fetchFieldsMutation.isPending ? "animate-spin" : ""}`} />
+                      {fetchFieldsMutation.isPending ? "Fetching…" : "Sync from Teams"}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
       </Tabs>
+
+      {/* Teams Sync Preview Dialog */}
+      <Dialog open={syncPreviewOpen} onOpenChange={setSyncPreviewOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              Teams Sync Preview
+            </DialogTitle>
+            <DialogDescription>
+              {syncPreview?.ok
+                ? `Extracted from message dated ${syncPreview.messageDate ? new Date(syncPreview.messageDate).toLocaleString() : "unknown"}. Review and adjust values before saving.`
+                : "Could not fetch Teams data."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+            {syncPreview && !syncPreview.ok && (
+              <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded text-sm text-destructive">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{syncPreview.error}</span>
+              </div>
+            )}
+            {syncPreview?.ok && (
+              <>
+                {/* Extracted fields table */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Fields extracted from message ({syncPreview.fields.length})</p>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead><tr className="bg-muted/50"><th className="text-left p-2 font-medium">Field</th><th className="text-left p-2 font-medium">Extracted Value</th></tr></thead>
+                      <tbody>
+                        {syncPreview.fields.map((f, i) => (
+                          <tr key={i} className="border-t">
+                            <td className="p-2 font-mono text-xs text-muted-foreground">{f.label}</td>
+                            <td className="p-2 font-semibold">{f.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* KPI value review */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Values to save (edit if needed)</p>
+                  {kpis.filter(k => k.isActive).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No active KPIs configured for this dashboard.</p>
+                  ) : (
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead><tr className="bg-muted/50"><th className="text-left p-2 font-medium">KPI</th><th className="text-left p-2 font-medium">Value</th><th className="text-left p-2 font-medium w-28">Status</th></tr></thead>
+                        <tbody>
+                          {kpis.filter(k => k.isActive).map(kpi => {
+                            const val = previewValues[String(kpi.id)] ?? "";
+                            const hasVal = val !== "";
+                            return (
+                              <tr key={kpi.id} className="border-t">
+                                <td className="p-2 font-medium">{kpi.labelEn || kpi.name}<span className="text-muted-foreground text-xs ml-1">{kpi.unit ? `(${kpi.unit})` : ""}</span></td>
+                                <td className="p-2">
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    value={val}
+                                    onChange={e => setPreviewValues(prev => ({ ...prev, [String(kpi.id)]: e.target.value }))}
+                                    className="w-36"
+                                    placeholder="not mapped"
+                                    data-testid={`input-preview-value-${kpi.id}`}
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  {hasVal
+                                    ? <span className="flex items-center gap-1 text-green-600 text-xs"><CheckCircle className="w-3.5 h-3.5" />Mapped</span>
+                                    : <span className="text-muted-foreground text-xs">Not mapped</span>}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Raw message (collapsible) */}
+                {syncPreview.messageText && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">View raw message text</summary>
+                    <pre className="mt-2 p-3 bg-muted rounded whitespace-pre-wrap font-mono text-xs max-h-48 overflow-y-auto">{syncPreview.messageText}</pre>
+                  </details>
+                )}
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSyncPreviewOpen(false)} data-testid="button-cancel-sync">Cancel</Button>
+            {syncPreview?.ok && (
+              <Button onClick={handleConfirmSync} disabled={saveValuesMutation.isPending} data-testid="button-confirm-sync">
+                <Save className="w-4 h-4 mr-2" />
+                {saveValuesMutation.isPending ? "Saving…" : `Save ${Object.values(previewValues).filter(v => v !== "").length} values`}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dashDialog} onOpenChange={setDashDialog}>
         <DialogContent className="max-h-[90vh] flex flex-col">

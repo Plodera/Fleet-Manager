@@ -2576,6 +2576,82 @@ export async function registerRoutes(
     }
   });
 
+  // ── Microsoft Teams Sync for TV Dashboard ──────────────────────────────
+
+  app.get('/api/settings/teams', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const settings = await storage.getTeamsSettings();
+      const safe = settings
+        ? { ...settings, clientSecret: settings.clientSecret ? "********" : "" }
+        : { tenantId: "", clientId: "", clientSecret: "", teamId: "", channelId: "", enabled: false, lastSyncAt: null, lastError: null };
+      res.json(safe);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch Teams settings" });
+    }
+  });
+
+  app.put('/api/settings/teams', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const existing = await storage.getTeamsSettings();
+      const { tenantId, clientId, clientSecret, teamId, channelId, enabled } = req.body;
+      const savedSecret = clientSecret === "********" && existing ? existing.clientSecret : (clientSecret ?? "");
+      const settings = await storage.upsertTeamsSettings({ tenantId, clientId, clientSecret: savedSecret, teamId, channelId, enabled });
+      res.json({ ...settings, clientSecret: "********" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to save Teams settings" });
+    }
+  });
+
+  app.get('/api/settings/teams/kpi-mappings/:dashboardId', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'manage_tv_dashboards') && !hasPermission(user, 'tv_data_entry')) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const mappings = await storage.getTeamsKpiMappings(Number(req.params.dashboardId));
+      res.json(mappings);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch KPI mappings" });
+    }
+  });
+
+  app.put('/api/settings/teams/kpi-mappings/:dashboardId', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const dashboardId = Number(req.params.dashboardId);
+      const { mappings } = req.body;
+      const saved = await storage.upsertTeamsKpiMappings(dashboardId, mappings);
+      res.json(saved);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to save KPI mappings" });
+    }
+  });
+
+  // Preview: fetch latest Teams message and extract fields (no save)
+  app.post('/api/teams/fetch-fields', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'tv_data_entry')) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const { fetchTeamsFields } = await import("./teamsSync");
+      const result = await fetchTeamsFields();
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ ok: false, fields: [], error: err.message });
+    }
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

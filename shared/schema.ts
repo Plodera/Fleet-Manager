@@ -890,6 +890,39 @@ export type InsertHikvisionNvr = z.infer<typeof insertHikvisionNvrSchema>;
 export type HikvisionGlobalSettings = typeof hikvisionGlobalSettings.$inferSelect;
 export type InsertHikvisionGlobalSettings = z.infer<typeof insertHikvisionGlobalSettingsSchema>;
 
+// Microsoft Teams sync settings for TV Dashboard KPI auto-population
+export const teamsSettings = pgTable("teams_settings", {
+  id: serial("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().default(""),
+  clientId: text("client_id").notNull().default(""),
+  clientSecret: text("client_secret").notNull().default(""),
+  teamId: text("team_id").notNull().default(""),
+  channelId: text("channel_id").notNull().default(""),
+  enabled: boolean("enabled").notNull().default(false),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTeamsSettingsSchema = createInsertSchema(teamsSettings).omit({ id: true, lastSyncAt: true, lastError: true, updatedAt: true });
+export type TeamsSettings = typeof teamsSettings.$inferSelect;
+export type InsertTeamsSettings = z.infer<typeof insertTeamsSettingsSchema>;
+
+// KPI field mappings: which regex-extracted Teams field maps to which TV KPI
+export const teamsKpiMappings = pgTable("teams_kpi_mappings", {
+  id: serial("id").primaryKey(),
+  dashboardId: integer("dashboard_id").references(() => tvDashboards.id, { onDelete: "cascade" }).notNull(),
+  teamsFieldKey: text("teams_field_key").notNull(), // key extracted from Teams message e.g. "total_kwh"
+  teamsFieldLabel: text("teams_field_label").notNull(), // human label e.g. "Total kwh"
+  kpiId: integer("kpi_id").references(() => tvDashboardKpis.id, { onDelete: "cascade" }),
+  periodType: text("period_type").notNull().default("daily"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTeamsKpiMappingSchema = createInsertSchema(teamsKpiMappings).omit({ id: true, updatedAt: true });
+export type TeamsKpiMapping = typeof teamsKpiMappings.$inferSelect;
+export type InsertTeamsKpiMapping = z.infer<typeof insertTeamsKpiMappingSchema>;
+
 // GLPI ticketing system integration settings
 export const glpiSettings = pgTable("glpi_settings", {
   id: serial("id").primaryKey(),
