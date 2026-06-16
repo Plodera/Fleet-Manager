@@ -55,6 +55,7 @@
     "embla-carousel-react": "^8.6.0",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
+    "fast-xml-parser": "^5.9.0",
     "framer-motion": "^11.13.1",
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
@@ -63,7 +64,7 @@
     "memorystore": "^1.6.7",
     "multer": "^2.1.1",
     "next-themes": "^0.4.6",
-    "nodemailer": "^7.0.11",
+    "nodemailer": "^9.0.0",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "pg": "^8.16.3",
@@ -101,7 +102,7 @@
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.20",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "^0.31.10",
     "esbuild": "^0.28.1",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
@@ -111,17 +112,20 @@
   },
   "overrides": {
     "drizzle-kit": {
-      "@esbuild-kit/esm-loader": "npm:tsx@^4.20.4"
+      "@esbuild-kit/esm-loader": "npm:tsx@^4.20.4",
+      "esbuild": "0.28.1"
+    },
+    "vite": {
+      "esbuild": "0.28.1"
     },
     "@esbuild-kit/esm-loader": {
-      "esbuild": "^0.28.1"
+      "esbuild": "0.28.1"
     },
-    "fast-xml-parser": "5.5.6",
     "minimatch": "9.0.7",
     "path-to-regexp": "0.1.13",
     "picomatch": "4.0.4",
     "brace-expansion": "2.0.3",
-    "dompurify": "3.4.7",
+    "dompurify": "3.4.10",
     "rollup": "4.59.0"
   },
   "optionalDependencies": {
