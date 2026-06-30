@@ -26,6 +26,7 @@ export class RateLimiter {
 
   /**
    * Returns true if the key is within the allowed limit, false if rate-limited.
+   * Always increments the counter (use consume + isLimited for selective counting).
    */
   check(key: string): boolean {
     const now = Date.now();
@@ -37,6 +38,30 @@ export class RateLimiter {
     }
     entry.count += 1;
     return entry.count <= this.maxRequests;
+  }
+
+  /**
+   * Returns true if the key is already over the limit WITHOUT incrementing.
+   */
+  isLimited(key: string): boolean {
+    const now = Date.now();
+    const entry = this.map.get(key);
+    if (!entry || now >= entry.resetAt) return false;
+    return entry.count >= this.maxRequests;
+  }
+
+  /**
+   * Increments the counter for the key without performing a limit check.
+   * Pair with isLimited() to count only specific events (e.g. failed logins).
+   */
+  consume(key: string): void {
+    const now = Date.now();
+    const entry = this.map.get(key);
+    if (!entry || now >= entry.resetAt) {
+      this.map.set(key, { count: 1, resetAt: now + this.windowMs });
+    } else {
+      entry.count += 1;
+    }
   }
 
   private sweep(): void {

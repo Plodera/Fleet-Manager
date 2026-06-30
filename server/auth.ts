@@ -6,6 +6,9 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
+import { RateLimiter } from "./lib/rateLimiter";
+
+const loginRateLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 10 });
 
 const scryptAsync = promisify(scrypt);
 
@@ -108,11 +111,27 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), async (req, res) => {
-    const user = req.user as SelectUser;
-    // Save session ID for single session enforcement
-    await storage.updateUserSession(user.id, req.sessionID);
-    res.status(200).json(req.user);
+  app.post("/api/login", (req, res, next) => {
+    const ip = req.ip ?? "unknown";
+
+    if (loginRateLimiter.isLimited(ip)) {
+      return res.status(429).json({ message: "Too many login attempts. Please try again in a minute." });
+    }
+
+    passport.authenticate("local", async (err: unknown, user: SelectUser | false) => {
+      if (err) return next(err);
+
+      if (!user) {
+        loginRateLimiter.consume(ip);
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
+      req.login(user, async (loginErr) => {
+        if (loginErr) return next(loginErr);
+        await storage.updateUserSession(user.id, req.sessionID);
+        res.status(200).json(user);
+      });
+    })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
