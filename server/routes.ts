@@ -2793,8 +2793,40 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // In-memory rate limiter for the public machine-status GET endpoint: 60 requests per IP per minute
+  const _statusReadRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+  const _statusReadSweepInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of _statusReadRateLimitMap) {
+      if (now >= entry.resetAt) {
+        _statusReadRateLimitMap.delete(ip);
+      }
+    }
+  }, 5 * 60_000);
+  if (_statusReadSweepInterval.unref) _statusReadSweepInterval.unref();
+
+  function checkStatusReadRateLimit(ip: string): boolean {
+    const now = Date.now();
+    const window = 60_000; // 1 minute
+    const limit = 60;
+    let entry = _statusReadRateLimitMap.get(ip);
+    if (!entry || now >= entry.resetAt) {
+      entry = { count: 1, resetAt: now + window };
+      _statusReadRateLimitMap.set(ip, entry);
+      return true;
+    }
+    entry.count += 1;
+    if (entry.count > limit) return false;
+    return true;
+  }
+
   // Public QR status endpoint (no auth)
   app.get("/api/machine-status/:slug", async (req, res) => {
+    const clientIp = req.ip ?? req.socket.remoteAddress ?? "unknown";
+    if (!checkStatusReadRateLimit(clientIp)) {
+      return res.status(429).json({ message: "Too many requests. Please wait a minute before trying again." });
+    }
     const statusData = await storage.getMachineStatus(req.params.slug);
     if (!statusData) return res.status(404).json({ message: "Machine not found" });
     res.json(statusData);
