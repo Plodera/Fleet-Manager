@@ -404,7 +404,7 @@ export default function MachineStatus() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-slate-700">History</h3>
                 <span className="text-xs text-slate-400" data-testid="text-history-count">
-                  {visible.length} of {filtered.length}
+                  Showing {visible.length} of {filtered.length}
                 </span>
               </div>
 

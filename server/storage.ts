@@ -1505,7 +1505,7 @@ export class DatabaseStorage implements IStorage {
       recentBreakdown,
       nextScheduled,
       status,
-      history: allRecords.slice(0, 5),
+      history: allRecords,
     };
   }
 
