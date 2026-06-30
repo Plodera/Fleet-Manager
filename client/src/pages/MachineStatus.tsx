@@ -63,6 +63,7 @@ export default function MachineStatus() {
     performedBy: "",
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
 
   const { data, isLoading, isError } = useQuery<MachineStatusData>({
     queryKey: ["/api/machine-status", slug],
@@ -88,6 +89,11 @@ export default function MachineStatus() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (res.status === 429) {
+          const error = new Error(err.message || "Too many submissions. Please wait a minute before trying again.");
+          (error as any).isRateLimit = true;
+          throw error;
+        }
         throw new Error(err.message || "Failed to submit report");
       }
       return res.json();
@@ -99,6 +105,8 @@ export default function MachineStatus() {
       setForm({ recordType: "maintenance", description: "", performedBy: "" });
     },
     onError: (err: Error) => {
+      const isRL = !!(err as any).isRateLimit;
+      setIsRateLimited(isRL);
       setFormError(err.message);
     },
   });
@@ -106,6 +114,7 @@ export default function MachineStatus() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    setIsRateLimited(false);
     if (!form.description.trim()) {
       setFormError("Please enter a description.");
       return;
@@ -274,7 +283,13 @@ export default function MachineStatus() {
                 </div>
 
                 {formError && (
-                  <p className="text-xs text-red-600" data-testid="text-form-error">{formError}</p>
+                  <div
+                    data-testid="text-form-error"
+                    className={`text-xs rounded-lg px-3 py-2 ${isRateLimited ? "bg-amber-50 border border-amber-200 text-amber-800" : "text-red-600"}`}
+                  >
+                    {isRateLimited && <span className="font-semibold">Slow down! </span>}
+                    {formError}
+                  </div>
                 )}
 
                 <button

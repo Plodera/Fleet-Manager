@@ -36,6 +36,9 @@ process.exit = function (code?: number | string | null | undefined) {
 } as typeof process.exit;
 
 const app = express();
+// Trust exactly one proxy hop so req.ip reflects the real client IP
+// (used by the public QR report rate limiter and session handling).
+app.set("trust proxy", 1);
 const httpServer = createServer(app);
 
 declare module "http" {

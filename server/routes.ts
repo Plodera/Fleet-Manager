@@ -2800,8 +2800,29 @@ export async function registerRoutes(
     res.json(statusData);
   });
 
+  // In-memory rate limiter for the public QR report endpoint: 5 requests per IP per minute
+  const _reportRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+  function checkReportRateLimit(ip: string): boolean {
+    const now = Date.now();
+    const window = 60_000; // 1 minute
+    const limit = 5;
+    let entry = _reportRateLimitMap.get(ip);
+    if (!entry || now >= entry.resetAt) {
+      entry = { count: 1, resetAt: now + window };
+      _reportRateLimitMap.set(ip, entry);
+      return true;
+    }
+    entry.count += 1;
+    if (entry.count > limit) return false;
+    return true;
+  }
+
   // Public QR report endpoint (no auth required — anyone with the QR link can submit)
   app.post("/api/machine-status/:slug/report", async (req, res) => {
+    const clientIp = req.ip ?? req.socket.remoteAddress ?? "unknown";
+    if (!checkReportRateLimit(clientIp)) {
+      return res.status(429).json({ message: "Too many submissions. Please wait a minute before trying again." });
+    }
     try {
       const statusData = await storage.getMachineStatus(req.params.slug);
       if (!statusData) return res.status(404).json({ message: "Machine not found" });
