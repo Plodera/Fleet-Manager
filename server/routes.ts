@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
+import { RateLimiter } from "./lib/rateLimiter";
 import { setupAuth, validateSession } from "./auth";
 import { api } from "@shared/routes";
 import { z } from "zod";
@@ -2833,39 +2834,12 @@ export async function registerRoutes(
   });
 
   // In-memory rate limiter for the public QR report endpoint: 5 requests per IP per minute
-  const _reportRateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-  // Sweep expired entries every 5 minutes to prevent unbounded memory growth
-  const _rateLimitSweepInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [ip, entry] of _reportRateLimitMap) {
-      if (now >= entry.resetAt) {
-        _reportRateLimitMap.delete(ip);
-      }
-    }
-  }, 5 * 60_000);
-  // Allow the sweep timer to be garbage-collected when the process exits cleanly
-  if (_rateLimitSweepInterval.unref) _rateLimitSweepInterval.unref();
-
-  function checkReportRateLimit(ip: string): boolean {
-    const now = Date.now();
-    const window = 60_000; // 1 minute
-    const limit = 5;
-    let entry = _reportRateLimitMap.get(ip);
-    if (!entry || now >= entry.resetAt) {
-      entry = { count: 1, resetAt: now + window };
-      _reportRateLimitMap.set(ip, entry);
-      return true;
-    }
-    entry.count += 1;
-    if (entry.count > limit) return false;
-    return true;
-  }
+  const _reportRateLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 5 });
 
   // Public QR report endpoint (no auth required — anyone with the QR link can submit)
   app.post("/api/machine-status/:slug/report", async (req, res) => {
     const clientIp = req.ip ?? req.socket.remoteAddress ?? "unknown";
-    if (!checkReportRateLimit(clientIp)) {
+    if (!_reportRateLimiter.check(clientIp)) {
       return res.status(429).json({ message: "Too many submissions. Please wait a minute before trying again." });
     }
     try {
