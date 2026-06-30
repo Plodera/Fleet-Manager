@@ -6,7 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { sendBookingNotification, sendBookingStatusUpdate, sendTripStatusToApprover } from "./email";
+import { sendBookingNotification, sendBookingStatusUpdate, sendTripStatusToApprover, sendBreakdownAlertEmail } from "./email";
 import { scheduleTrackerNotifications, runChecksForTracker } from "./trackerNotifications";
 import type { User } from "@shared/schema";
 import multer from "multer";
@@ -2733,6 +2733,16 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  app.patch("/api/factory-machines/:id/alert-recipients", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
+    const parsed = z.object({ breakdownAlertRecipients: z.array(z.string().email()) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+    const updated = await storage.updateFactoryMachine(Number(req.params.id), { breakdownAlertRecipients: parsed.data.breakdownAlertRecipients });
+    res.json(updated);
+  });
+
   // Machine Records
   app.get("/api/machine-records", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
@@ -2753,6 +2763,17 @@ export async function registerRoutes(
     // Always derive createdById from the authenticated session, not the client
     const recordData = { ...parsed.data, createdById: (req.user as User).id };
     const created = await storage.createMachineRecord(recordData);
+
+    if (created.recordType === 'breakdown') {
+      const machine = await storage.getFactoryMachine(created.machineId);
+      if (machine && machine.breakdownAlertRecipients && machine.breakdownAlertRecipients.length > 0) {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        sendBreakdownAlertEmail(machine, created, machine.breakdownAlertRecipients, baseUrl).catch(err =>
+          console.error("Failed to send breakdown alert email:", err)
+        );
+      }
+    }
+
     res.status(201).json(created);
   });
 
@@ -2805,6 +2826,16 @@ export async function registerRoutes(
         nextMaintenanceDate: null,
         createdById: null,
       });
+
+      if (record.recordType === 'breakdown') {
+        const machine = statusData.machine;
+        if (machine.breakdownAlertRecipients && machine.breakdownAlertRecipients.length > 0) {
+          const baseUrl = `${req.protocol}://${req.get('host')}`;
+          sendBreakdownAlertEmail(machine, record, machine.breakdownAlertRecipients, baseUrl).catch(err =>
+            console.error("Failed to send breakdown alert email:", err)
+          );
+        }
+      }
 
       res.status(201).json(record);
     } catch (err) {

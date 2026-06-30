@@ -166,6 +166,39 @@ Vehicle Management System
   await sendEmail(emailContent);
 }
 
+export async function sendBreakdownAlertEmail(
+  machine: { name: string; location: string | null; department: string | null; qrSlug: string },
+  record: { description: string; performedBy: string | null; date: string },
+  recipients: string[],
+  baseUrl: string
+): Promise<void> {
+  const machineUrl = `${baseUrl}/machine/${machine.qrSlug}`;
+  const subject = `Machine Breakdown Alert: ${machine.name}`;
+  const body = `
+A breakdown has been reported for the following machine:
+
+Machine: ${machine.name}
+Location: ${machine.location ?? "Not specified"}
+Department: ${machine.department ?? "Not specified"}
+Date: ${record.date}
+Reported By: ${record.performedBy ?? "Anonymous"}
+
+Description:
+${record.description}
+
+View the machine status page for more details:
+${machineUrl}
+
+This is an automated alert from the AAMS Machine Management System.
+  `.trim();
+
+  for (const recipient of recipients) {
+    if (recipient.trim()) {
+      await sendEmail({ to: recipient.trim(), subject, body });
+    }
+  }
+}
+
 export async function sendTestEmail(to: string): Promise<{ success: boolean; error?: string }> {
   const settings = await storage.getEmailSettings();
   

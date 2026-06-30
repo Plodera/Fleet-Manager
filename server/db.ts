@@ -107,6 +107,9 @@ export async function initDatabase() {
     await _pool.query(`ALTER TABLE fortigate_bandwidth ADD COLUMN IF NOT EXISTS sampled_at TIMESTAMP NOT NULL DEFAULT NOW()`).catch(() => {});
     await _pool.query(`ALTER TABLE fortigate_bandwidth ADD COLUMN IF NOT EXISTS tx_kbps TEXT NOT NULL DEFAULT '0'`).catch(() => {});
     await _pool.query(`ALTER TABLE fortigate_bandwidth ADD COLUMN IF NOT EXISTS rx_kbps TEXT NOT NULL DEFAULT '0'`).catch(() => {});
+
+    // Add breakdown alert recipients to factory_machines if not present
+    await _pool.query(`ALTER TABLE factory_machines ADD COLUMN IF NOT EXISTS breakdown_alert_recipients TEXT[] NOT NULL DEFAULT '{}'`).catch(() => {});
   } catch (err: any) {
     console.warn('[db] Auto-migration warning:', err.message);
   }

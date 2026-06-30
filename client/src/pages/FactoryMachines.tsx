@@ -17,12 +17,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pencil, Trash2, Plus, QrCode, Factory, CalendarDays, Wrench, AlertTriangle, Clock } from "lucide-react";
+import { Pencil, Trash2, Plus, QrCode, Factory, CalendarDays, Wrench, AlertTriangle, Clock, Bell, X } from "lucide-react";
 import { insertFactoryMachineSchema, insertMachineRecordSchema } from "@shared/schema";
 import { QRCodeCanvas } from "qrcode.react";
 
 type MachineType = { id: number; name: string; description: string | null; isActive: boolean };
-type Machine = { id: number; name: string; machineTypeId: number | null; manufacturer: string | null; model: string | null; serialNumber: string | null; location: string | null; department: string | null; description: string | null; isActive: boolean; qrSlug: string; machineType?: MachineType };
+type Machine = { id: number; name: string; machineTypeId: number | null; manufacturer: string | null; model: string | null; serialNumber: string | null; location: string | null; department: string | null; description: string | null; isActive: boolean; qrSlug: string; breakdownAlertRecipients: string[]; machineType?: MachineType };
 type MachineRecord = { id: number; machineId: number; recordType: string; date: string; description: string; performedBy: string | null; nextMaintenanceDate: string | null; createdById: number | null; createdAt: string };
 
 const machineFormSchema = insertFactoryMachineSchema.omit({ qrSlug: true }).extend({
@@ -60,6 +60,10 @@ export default function FactoryMachines() {
   const [recordDialogOpen, setRecordDialogOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MachineRecord | null>(null);
   const [recordFilter, setRecordFilter] = useState<string>("all");
+  const [alertRecipientsDialogOpen, setAlertRecipientsDialogOpen] = useState(false);
+  const [alertRecipientsMachine, setAlertRecipientsMachine] = useState<Machine | null>(null);
+  const [recipientInput, setRecipientInput] = useState("");
+  const [recipientList, setRecipientList] = useState<string[]>([]);
 
   const publicBaseUrl = window.location.origin;
 
@@ -121,6 +125,17 @@ export default function FactoryMachines() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const updateAlertRecipientsMutation = useMutation({
+    mutationFn: ({ id, recipients }: { id: number; recipients: string[] }) =>
+      apiRequest("PATCH", `/api/factory-machines/${id}/alert-recipients`, { breakdownAlertRecipients: recipients }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory-machines"] });
+      toast({ title: "Alert recipients saved" });
+      setAlertRecipientsDialogOpen(false);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   function openAddMachine() {
     setEditingMachine(null);
     machineForm.reset({ name: "", machineTypeId: null, manufacturer: "", model: "", serialNumber: "", location: "", department: "", description: "", isActive: true });
@@ -136,6 +151,33 @@ export default function FactoryMachines() {
   function openQr(m: Machine) {
     setQrMachine(m);
     setQrDialogOpen(true);
+  }
+
+  function openAlertRecipients(m: Machine) {
+    setAlertRecipientsMachine(m);
+    setRecipientList(m.breakdownAlertRecipients ?? []);
+    setRecipientInput("");
+    setAlertRecipientsDialogOpen(true);
+  }
+
+  function addRecipient() {
+    const email = recipientInput.trim().toLowerCase();
+    if (!email) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({ title: "Invalid email address", variant: "destructive" });
+      return;
+    }
+    if (recipientList.includes(email)) {
+      toast({ title: "Email already added", variant: "destructive" });
+      return;
+    }
+    setRecipientList(prev => [...prev, email]);
+    setRecipientInput("");
+  }
+
+  function removeRecipient(email: string) {
+    setRecipientList(prev => prev.filter(r => r !== email));
   }
 
   function openAddRecord(machineId?: number) {
@@ -233,6 +275,9 @@ export default function FactoryMachines() {
                       <div className="flex gap-1">
                         <Button size="icon" variant="ghost" title={fm.viewQr} onClick={() => openQr(m)} data-testid={`button-qr-${m.id}`}>
                           <QrCode className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Breakdown alert recipients" onClick={() => openAlertRecipients(m)} data-testid={`button-alert-recipients-${m.id}`}>
+                          <Bell className={`w-4 h-4 ${(m.breakdownAlertRecipients ?? []).length > 0 ? "text-amber-500" : ""}`} />
                         </Button>
                         <Button size="icon" variant="ghost" onClick={() => openEditMachine(m)} data-testid={`button-edit-machine-${m.id}`}>
                           <Pencil className="w-4 h-4" />
@@ -454,6 +499,57 @@ export default function FactoryMachines() {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Breakdown Alert Recipients Dialog ── */}
+      <Dialog open={alertRecipientsDialogOpen} onOpenChange={setAlertRecipientsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Breakdown Alert Recipients</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              These email addresses will receive an alert whenever a breakdown is logged for <strong>{alertRecipientsMachine?.name}</strong>.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                placeholder="email@example.com"
+                value={recipientInput}
+                onChange={e => setRecipientInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addRecipient(); } }}
+                data-testid="input-alert-recipient"
+              />
+              <Button type="button" onClick={addRecipient} data-testid="button-add-recipient">
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            {recipientList.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4 border rounded-md">No recipients configured. Add an email address above.</p>
+            ) : (
+              <ul className="space-y-2 max-h-48 overflow-y-auto" data-testid="list-alert-recipients">
+                {recipientList.map(email => (
+                  <li key={email} className="flex items-center justify-between px-3 py-2 rounded-md border bg-muted/30 text-sm">
+                    <span data-testid={`text-recipient-${email}`}>{email}</span>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeRecipient(email)} data-testid={`button-remove-recipient-${email}`}>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAlertRecipientsDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => { if (alertRecipientsMachine) updateAlertRecipientsMutation.mutate({ id: alertRecipientsMachine.id, recipients: recipientList }); }}
+              disabled={updateAlertRecipientsMutation.isPending}
+              data-testid="button-save-alert-recipients"
+            >
+              {updateAlertRecipientsMutation.isPending ? "Saving..." : "Save Recipients"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

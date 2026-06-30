@@ -995,6 +995,7 @@ export const factoryMachines = pgTable("factory_machines", {
   description: text("description"),
   isActive: boolean("is_active").notNull().default(true),
   qrSlug: text("qr_slug").notNull().unique(),
+  breakdownAlertRecipients: text("breakdown_alert_recipients").array().notNull().default([]),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
