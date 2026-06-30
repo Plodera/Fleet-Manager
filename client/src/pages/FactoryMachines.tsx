@@ -294,6 +294,7 @@ export default function FactoryMachines() {
                   <TableHead>{fm.serialNumber}</TableHead>
                   <TableHead>{fm.location}</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Access</TableHead>
                   <TableHead className="w-32"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -310,6 +311,18 @@ export default function FactoryMachines() {
                       <Badge variant={m.isActive ? "default" : "secondary"}>
                         {m.isActive ? "Active" : "Inactive"}
                       </Badge>
+                    </TableCell>
+                    <TableCell data-testid={`access-mode-${m.id}`}>
+                      {(() => {
+                        const mode = (m.reportAccessMode ?? "public") as ReportAccessMode;
+                        const ModeIcon = REPORT_ACCESS_ICONS[mode];
+                        return (
+                          <span className={`inline-flex items-center gap-1 text-xs font-medium ${REPORT_ACCESS_COLORS[mode]}`}>
+                            <ModeIcon className="w-3.5 h-3.5" />
+                            {REPORT_ACCESS_LABELS[mode]}
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
