@@ -1,7 +1,8 @@
-import { useRoute } from "wouter";
+import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, AlertTriangle, Wrench, Clock, CalendarDays, MapPin, Building2, Tag, Cpu } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Wrench, Clock, CalendarDays, MapPin, Building2, Tag, Cpu, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/use-auth";
 
 type MachineType = { id: number; name: string };
 type Machine = { id: number; name: string; manufacturer: string | null; model: string | null; serialNumber: string | null; location: string | null; department: string | null; description: string | null; isActive: boolean; qrSlug: string; machineType?: MachineType };
@@ -45,6 +46,7 @@ function formatDate(dateStr: string | null | undefined): string {
 export default function MachineStatus() {
   const [, params] = useRoute("/machine/:slug");
   const slug = params?.slug ?? "";
+  const { user } = useAuth();
 
   const { data, isLoading, isError } = useQuery<MachineStatusData>({
     queryKey: ["/api/machine-status", slug],
@@ -224,7 +226,15 @@ export default function MachineStatus() {
         )}
 
         {/* Footer */}
-        <div className="text-center pb-4">
+        <div className="text-center pb-4 space-y-2">
+          {user && (
+            <Link href="/factory-machines" data-testid="link-manage-machines">
+              <a className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 font-medium">
+                <ExternalLink className="w-3 h-3" />
+                Manage in AAMS →
+              </a>
+            </Link>
+          )}
           <p className="text-xs text-slate-400">AAMS · Factory Machine Maintenance</p>
         </div>
 

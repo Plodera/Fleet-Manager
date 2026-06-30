@@ -1480,10 +1480,18 @@ export class DatabaseStorage implements IStorage {
     const lastBreakdown = allRecords.find(r => r.recordType === 'breakdown') ?? null;
     const nextScheduled = allRecords.find(r => r.recordType === 'scheduled' && r.nextMaintenanceDate) ?? null;
 
-    // Status: breakdown if most recent record is breakdown with no subsequent maintenance
+    // Status: breakdown if the last breakdown record is newer than the last maintenance record
+    const lastMaintenanceRecord = allRecords.find(r => r.recordType === 'maintenance');
+    const lastBreakdownRecord = allRecords.find(r => r.recordType === 'breakdown');
     let status: 'operational' | 'breakdown' = 'operational';
-    if (allRecords.length > 0 && allRecords[0].recordType === 'breakdown') {
-      status = 'breakdown';
+    if (lastBreakdownRecord) {
+      if (!lastMaintenanceRecord) {
+        status = 'breakdown';
+      } else {
+        const breakdownTime = new Date(lastBreakdownRecord.date).getTime();
+        const maintenanceTime = new Date(lastMaintenanceRecord.date).getTime();
+        if (breakdownTime > maintenanceTime) status = 'breakdown';
+      }
     }
 
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);

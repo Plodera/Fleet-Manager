@@ -2700,13 +2700,14 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
     if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
-    // Auto-generate unique qrSlug
+    // Auto-generate unique qrSlug — verify no collision before insert
     let qrSlug = "";
-    let attempts = 0;
-    do {
-      qrSlug = "mach-" + Math.random().toString(36).substring(2, 8);
-      attempts++;
-    } while (attempts < 10);
+    for (let attempts = 0; attempts < 10; attempts++) {
+      const candidate = "mach-" + Math.random().toString(36).substring(2, 8);
+      const existing = await storage.getFactoryMachineBySlug(candidate);
+      if (!existing) { qrSlug = candidate; break; }
+    }
+    if (!qrSlug) return res.status(500).json({ message: "Could not generate unique slug" });
     const payload = { ...req.body, qrSlug };
     const { insertFactoryMachineSchema } = await import("@shared/schema");
     const parsed = insertFactoryMachineSchema.safeParse(payload);
@@ -2749,7 +2750,9 @@ export async function registerRoutes(
     const { insertMachineRecordSchema } = await import("@shared/schema");
     const parsed = insertMachineRecordSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error);
-    const created = await storage.createMachineRecord(parsed.data);
+    // Always derive createdById from the authenticated session, not the client
+    const recordData = { ...parsed.data, createdById: (req.user as User).id };
+    const created = await storage.createMachineRecord(recordData);
     res.status(201).json(created);
   });
 

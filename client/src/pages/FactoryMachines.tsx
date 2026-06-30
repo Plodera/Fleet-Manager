@@ -19,8 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pencil, Trash2, Plus, QrCode, Factory, CalendarDays, Wrench, AlertTriangle, Clock } from "lucide-react";
 import { insertFactoryMachineSchema, insertMachineRecordSchema } from "@shared/schema";
-import { QRCodeSVG } from "qrcode.react";
-import { useAuth } from "@/hooks/use-auth";
+import { QRCodeCanvas } from "qrcode.react";
 
 type MachineType = { id: number; name: string; description: string | null; isActive: boolean };
 type Machine = { id: number; name: string; machineTypeId: number | null; manufacturer: string | null; model: string | null; serialNumber: string | null; location: string | null; department: string | null; description: string | null; isActive: boolean; qrSlug: string; machineType?: MachineType };
@@ -52,7 +51,6 @@ const RECORD_TYPE_ICONS: Record<string, any> = {
 export default function FactoryMachines() {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const { user } = useAuth();
   const fm = t.factoryMachines;
 
   const [machineDialogOpen, setMachineDialogOpen] = useState(false);
@@ -159,9 +157,8 @@ export default function FactoryMachines() {
   }
 
   function onRecordSubmit(values: z.infer<typeof recordFormSchema>) {
-    const payload = { ...values, createdById: user?.id ?? null };
-    if (editingRecord) updateRecordMutation.mutate({ id: editingRecord.id, data: payload });
-    else createRecordMutation.mutate(payload);
+    if (editingRecord) updateRecordMutation.mutate({ id: editingRecord.id, data: values });
+    else createRecordMutation.mutate(values);
   }
 
   const filteredRecords = recordFilter === "all" ? allRecords : allRecords.filter(r => r.machineId === Number(recordFilter));
@@ -428,8 +425,8 @@ export default function FactoryMachines() {
           {qrMachine && (
             <div className="flex flex-col items-center gap-4 py-2">
               <p className="text-sm text-muted-foreground text-center">{fm.qrCodeDescription}</p>
-              <div className="p-4 bg-white rounded-lg border" data-testid="qr-code-container">
-                <QRCodeSVG
+              <div id="qr-print-canvas" className="p-4 bg-white rounded-lg border" data-testid="qr-code-container">
+                <QRCodeCanvas
                   value={`${publicBaseUrl}/machine/${qrMachine.qrSlug}`}
                   size={200}
                   level="M"

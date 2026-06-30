@@ -174,7 +174,7 @@ export function Sidebar() {
         { href: "/settings", label: t.nav.settings, icon: Settings, permission: "admin_only", hideFromDriver: true },
         { href: "/equipment-types", label: t.nav.equipmentTypes, icon: Settings2, permission: "admin_only", hideFromDriver: true },
         { href: "/work-order-config", label: t.nav.workOrderConfig, icon: Cog, permission: "admin_only", hideFromDriver: true },
-        { href: "/factory-machine-type-config", label: t.nav.machineTypeConfig, icon: Factory, permission: "admin_only", hideFromDriver: true },
+        { href: "/factory-machine-type-config", label: t.nav.machineTypeConfig, icon: Settings2, permission: "admin_only", hideFromDriver: true },
       ],
     },
   ];
