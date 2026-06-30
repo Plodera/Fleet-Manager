@@ -57,6 +57,8 @@ export default function MachineStatus() {
 
   const [showForm, setShowForm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<"all" | "maintenance" | "breakdown" | "scheduled">("all");
+  const [historyVisible, setHistoryVisible] = useState(10);
   const [form, setForm] = useState<ReportFormState>({
     recordType: "maintenance",
     description: "",
@@ -393,29 +395,77 @@ export default function MachineStatus() {
         </div>
 
         {/* Recent History */}
-        {history.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border p-4" data-testid="card-history">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Recent History</h3>
-            <div className="space-y-3">
-              {history.map(r => {
-                const Icon = RECORD_ICONS[r.recordType] ?? Wrench;
-                return (
-                  <div key={r.id} className="flex items-start gap-3" data-testid={`history-item-${r.id}`}>
-                    <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${RECORD_COLORS[r.recordType] ?? "text-slate-400"}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-700 truncate">{r.description}</p>
-                      <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
-                        <span>{formatDate(r.date)}</span>
-                        <span className="capitalize">{RECORD_LABELS[r.recordType] ?? r.recordType}</span>
-                        {r.performedBy && <span>· {r.performedBy}</span>}
+        {history.length > 0 && (() => {
+          const filtered = historyFilter === "all" ? history : history.filter(r => r.recordType === historyFilter);
+          const visible = filtered.slice(0, historyVisible);
+          const hasMore = filtered.length > historyVisible;
+          return (
+            <div className="bg-white rounded-xl shadow-sm border p-4" data-testid="card-history">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-700">History</h3>
+                <span className="text-xs text-slate-400" data-testid="text-history-count">
+                  {visible.length} of {filtered.length}
+                </span>
+              </div>
+
+              {/* Filter pills */}
+              <div className="flex gap-1.5 flex-wrap mb-3" data-testid="history-filter-pills">
+                {(["all", "maintenance", "breakdown", "scheduled"] as const).map(f => {
+                  const isActive = historyFilter === f;
+                  const color = f === "all" ? (isActive ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200")
+                    : f === "maintenance" ? (isActive ? "bg-green-600 text-white" : "bg-green-50 text-green-700 hover:bg-green-100")
+                    : f === "breakdown" ? (isActive ? "bg-red-500 text-white" : "bg-red-50 text-red-600 hover:bg-red-100")
+                    : (isActive ? "bg-blue-500 text-white" : "bg-blue-50 text-blue-600 hover:bg-blue-100");
+                  return (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => { setHistoryFilter(f); setHistoryVisible(10); }}
+                      data-testid={`filter-pill-${f}`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors capitalize ${color}`}
+                    >
+                      {f === "all" ? "All" : RECORD_LABELS[f]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {visible.length === 0 ? (
+                <p className="text-sm text-slate-400 italic" data-testid="text-history-empty">No {historyFilter} records yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {visible.map(r => {
+                    const Icon = RECORD_ICONS[r.recordType] ?? Wrench;
+                    return (
+                      <div key={r.id} className="flex items-start gap-3" data-testid={`history-item-${r.id}`}>
+                        <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${RECORD_COLORS[r.recordType] ?? "text-slate-400"}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-slate-700">{r.description}</p>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                            <span>{formatDate(r.date)}</span>
+                            <span className="capitalize">{RECORD_LABELS[r.recordType] ?? r.recordType}</span>
+                            {r.performedBy && <span>· {r.performedBy}</span>}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
+
+              {hasMore && (
+                <button
+                  type="button"
+                  onClick={() => setHistoryVisible(v => v + 10)}
+                  data-testid="button-show-more-history"
+                  className="mt-4 w-full py-2 text-xs font-medium text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Show more ({filtered.length - historyVisible} remaining)
+                </button>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Footer */}
         <div className="text-center pb-4 space-y-2">
