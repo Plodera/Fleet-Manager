@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, AlertTriangle, Wrench, Clock, CalendarDays, MapPin, Building2, Tag, Cpu, ExternalLink, ClipboardList, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Wrench, Clock, CalendarDays, MapPin, Building2, Tag, Cpu, ExternalLink, ClipboardList, ChevronDown, ChevronUp, Lock, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 type MachineType = { id: number; name: string };
-type Machine = { id: number; name: string; manufacturer: string | null; model: string | null; serialNumber: string | null; location: string | null; department: string | null; description: string | null; isActive: boolean; qrSlug: string; machineType?: MachineType };
+type Machine = { id: number; name: string; manufacturer: string | null; model: string | null; serialNumber: string | null; location: string | null; department: string | null; description: string | null; isActive: boolean; qrSlug: string; reportAccessMode?: string; machineType?: MachineType };
 type MachineRecord = { id: number; machineId: number; recordType: string; date: string; description: string; performedBy: string | null; nextMaintenanceDate: string | null };
 type MachineStatusData = {
   machine: Machine;
@@ -144,6 +144,7 @@ export default function MachineStatus() {
 
   const { machine, lastMaintenance, recentBreakdown, nextScheduled, status, history } = data;
   const isOperational = status === "operational";
+  const accessMode = machine.reportAccessMode ?? "public";
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4">
@@ -198,7 +199,27 @@ export default function MachineStatus() {
         </div>
 
         {/* Report Issue Section */}
-        {submitted ? (
+        {accessMode === "disabled" ? (
+          <div className="bg-slate-100 border border-slate-200 rounded-xl p-4 flex items-center gap-3" data-testid="report-disabled-notice">
+            <EyeOff className="w-5 h-5 text-slate-400 flex-shrink-0" />
+            <p className="text-sm text-slate-500">Reporting is disabled for this machine.</p>
+          </div>
+        ) : accessMode === "login_required" && !user ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3" data-testid="report-login-required">
+            <Lock className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Login required to submit a report</p>
+              <p className="text-xs text-amber-700 mt-0.5">You need an AAMS account to log maintenance or report issues for this machine.</p>
+              <a
+                href="/auth"
+                className="mt-2 inline-block text-xs text-amber-700 underline font-medium"
+                data-testid="link-login-to-report"
+              >
+                Log in →
+              </a>
+            </div>
+          </div>
+        ) : submitted ? (
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3" data-testid="report-success">
             <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
             <div>

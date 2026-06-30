@@ -2744,6 +2744,18 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.patch("/api/factory-machines/:id/report-access", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
+    const parsed = z.object({
+      reportAccessMode: z.enum(["public", "login_required", "disabled"]),
+    }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+    const updated = await storage.updateFactoryMachine(Number(req.params.id), { reportAccessMode: parsed.data.reportAccessMode });
+    res.json(updated);
+  });
+
   // Machine Records
   app.get("/api/machine-records", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
@@ -2836,7 +2848,7 @@ export async function registerRoutes(
   // In-memory rate limiter for the public QR report endpoint: 5 requests per IP per minute
   const _reportRateLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 5 });
 
-  // Public QR report endpoint (no auth required — anyone with the QR link can submit)
+  // Public QR report endpoint — access controlled by machine's reportAccessMode setting
   app.post("/api/machine-status/:slug/report", async (req, res) => {
     const clientIp = req.ip ?? req.socket.remoteAddress ?? "unknown";
     if (!_reportRateLimiter.check(clientIp)) {
@@ -2845,6 +2857,14 @@ export async function registerRoutes(
     try {
       const statusData = await storage.getMachineStatus(req.params.slug);
       if (!statusData) return res.status(404).json({ message: "Machine not found" });
+
+      const accessMode = statusData.machine.reportAccessMode ?? "public";
+      if (accessMode === "disabled") {
+        return res.status(403).json({ message: "Reporting is disabled for this machine." });
+      }
+      if (accessMode === "login_required" && !req.isAuthenticated()) {
+        return res.status(401).json({ message: "You must be logged in to submit a report for this machine." });
+      }
 
       const { z } = await import("zod");
       const reportSchema = z.object({

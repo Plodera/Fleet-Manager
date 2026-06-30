@@ -110,6 +110,8 @@ export async function initDatabase() {
 
     // Add breakdown alert recipients to factory_machines if not present
     await _pool.query(`ALTER TABLE factory_machines ADD COLUMN IF NOT EXISTS breakdown_alert_recipients TEXT[] NOT NULL DEFAULT '{}'`).catch(() => {});
+    // Add report access mode to factory_machines if not present (public | login_required | disabled)
+    await _pool.query(`ALTER TABLE factory_machines ADD COLUMN IF NOT EXISTS report_access_mode TEXT NOT NULL DEFAULT 'public'`).catch(() => {});
   } catch (err: any) {
     console.warn('[db] Auto-migration warning:', err.message);
   }

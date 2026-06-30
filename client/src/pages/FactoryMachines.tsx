@@ -17,12 +17,32 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pencil, Trash2, Plus, QrCode, Factory, CalendarDays, Wrench, AlertTriangle, Clock, Bell, X } from "lucide-react";
+import { Pencil, Trash2, Plus, QrCode, Factory, CalendarDays, Wrench, AlertTriangle, Clock, Bell, X, Globe, Lock, EyeOff } from "lucide-react";
 import { insertFactoryMachineSchema, insertMachineRecordSchema } from "@shared/schema";
 import { QRCodeCanvas } from "qrcode.react";
 
 type MachineType = { id: number; name: string; description: string | null; isActive: boolean };
-type Machine = { id: number; name: string; machineTypeId: number | null; manufacturer: string | null; model: string | null; serialNumber: string | null; location: string | null; department: string | null; description: string | null; isActive: boolean; qrSlug: string; breakdownAlertRecipients: string[]; machineType?: MachineType };
+type Machine = { id: number; name: string; machineTypeId: number | null; manufacturer: string | null; model: string | null; serialNumber: string | null; location: string | null; department: string | null; description: string | null; isActive: boolean; qrSlug: string; breakdownAlertRecipients: string[]; reportAccessMode: "public" | "login_required" | "disabled"; machineType?: MachineType };
+
+type ReportAccessMode = "public" | "login_required" | "disabled";
+
+const REPORT_ACCESS_LABELS: Record<ReportAccessMode, string> = {
+  public: "Public",
+  login_required: "Login Required",
+  disabled: "Disabled",
+};
+
+const REPORT_ACCESS_ICONS: Record<ReportAccessMode, any> = {
+  public: Globe,
+  login_required: Lock,
+  disabled: EyeOff,
+};
+
+const REPORT_ACCESS_COLORS: Record<ReportAccessMode, string> = {
+  public: "text-green-600",
+  login_required: "text-amber-500",
+  disabled: "text-red-500",
+};
 type MachineRecord = { id: number; machineId: number; recordType: string; date: string; description: string; performedBy: string | null; nextMaintenanceDate: string | null; createdById: number | null; createdAt: string };
 
 const machineFormSchema = insertFactoryMachineSchema.omit({ qrSlug: true }).extend({
@@ -64,6 +84,9 @@ export default function FactoryMachines() {
   const [alertRecipientsMachine, setAlertRecipientsMachine] = useState<Machine | null>(null);
   const [recipientInput, setRecipientInput] = useState("");
   const [recipientList, setRecipientList] = useState<string[]>([]);
+  const [accessModeDialogOpen, setAccessModeDialogOpen] = useState(false);
+  const [accessModeMachine, setAccessModeMachine] = useState<Machine | null>(null);
+  const [accessModeValue, setAccessModeValue] = useState<ReportAccessMode>("public");
 
   const publicBaseUrl = window.location.origin;
 
@@ -136,6 +159,17 @@ export default function FactoryMachines() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const updateAccessModeMutation = useMutation({
+    mutationFn: ({ id, mode }: { id: number; mode: ReportAccessMode }) =>
+      apiRequest("PATCH", `/api/factory-machines/${id}/report-access`, { reportAccessMode: mode }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory-machines"] });
+      toast({ title: "Report access mode updated" });
+      setAccessModeDialogOpen(false);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   function openAddMachine() {
     setEditingMachine(null);
     machineForm.reset({ name: "", machineTypeId: null, manufacturer: "", model: "", serialNumber: "", location: "", department: "", description: "", isActive: true });
@@ -158,6 +192,12 @@ export default function FactoryMachines() {
     setRecipientList(m.breakdownAlertRecipients ?? []);
     setRecipientInput("");
     setAlertRecipientsDialogOpen(true);
+  }
+
+  function openAccessMode(m: Machine) {
+    setAccessModeMachine(m);
+    setAccessModeValue((m.reportAccessMode ?? "public") as ReportAccessMode);
+    setAccessModeDialogOpen(true);
   }
 
   function addRecipient() {
@@ -279,6 +319,11 @@ export default function FactoryMachines() {
                         <Button size="icon" variant="ghost" title="Breakdown alert recipients" onClick={() => openAlertRecipients(m)} data-testid={`button-alert-recipients-${m.id}`}>
                           <Bell className={`w-4 h-4 ${(m.breakdownAlertRecipients ?? []).length > 0 ? "text-amber-500" : ""}`} />
                         </Button>
+                        {(() => { const mode = (m.reportAccessMode ?? "public") as ReportAccessMode; const ModeIcon = REPORT_ACCESS_ICONS[mode]; return (
+                          <Button size="icon" variant="ghost" title={`Report access: ${REPORT_ACCESS_LABELS[mode]}`} onClick={() => openAccessMode(m)} data-testid={`button-access-mode-${m.id}`}>
+                            <ModeIcon className={`w-4 h-4 ${REPORT_ACCESS_COLORS[mode]}`} />
+                          </Button>
+                        ); })()}
                         <Button size="icon" variant="ghost" onClick={() => openEditMachine(m)} data-testid={`button-edit-machine-${m.id}`}>
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -499,6 +544,55 @@ export default function FactoryMachines() {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Report Access Mode Dialog ── */}
+      <Dialog open={accessModeDialogOpen} onOpenChange={setAccessModeDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Report Access Mode</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Choose who can submit maintenance or breakdown reports via the QR code page for <strong>{accessModeMachine?.name}</strong>.
+            </p>
+            <div className="space-y-2">
+              {(["public", "login_required", "disabled"] as ReportAccessMode[]).map(mode => {
+                const Icon = REPORT_ACCESS_ICONS[mode];
+                const isSelected = accessModeValue === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setAccessModeValue(mode)}
+                    data-testid={`button-access-option-${mode}`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors ${isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
+                  >
+                    <Icon className={`w-5 h-5 flex-shrink-0 ${REPORT_ACCESS_COLORS[mode]}`} />
+                    <div>
+                      <p className="text-sm font-medium">{REPORT_ACCESS_LABELS[mode]}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {mode === "public" && "Anyone can submit a report via QR code (current default)"}
+                        {mode === "login_required" && "Reporter must have an AAMS account and be logged in"}
+                        {mode === "disabled" && "No reporting allowed — QR page shows status only"}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAccessModeDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => { if (accessModeMachine) updateAccessModeMutation.mutate({ id: accessModeMachine.id, mode: accessModeValue }); }}
+              disabled={updateAccessModeMutation.isPending}
+              data-testid="button-save-access-mode"
+            >
+              {updateAccessModeMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
