@@ -36,6 +36,9 @@ import TVDashboardIndex from "@/pages/TVDashboardIndex";
 import StatusTracker from "@/pages/StatusTracker";
 import ITMonitorConfig from "@/pages/ITMonitorConfig";
 import ITDashboard from "@/pages/ITDashboard";
+import FactoryMachines from "@/pages/FactoryMachines";
+import FactoryMachineTypeConfig from "@/pages/FactoryMachineTypeConfig";
+import MachineStatus from "@/pages/MachineStatus";
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, anyPermission, driverOnly = false, noShell = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, anyPermission?: string[], driverOnly?: boolean, noShell?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -183,6 +186,13 @@ function Router() {
       <Route path="/it-dashboard">
         <PrivateRoute component={ITDashboard} requiredPermission="view_it_dashboard" noShell />
       </Route>
+      <Route path="/factory-machines">
+        <PrivateRoute component={FactoryMachines} requiredPermission="view_factory_machines" />
+      </Route>
+      <Route path="/factory-machine-type-config">
+        <PrivateRoute component={FactoryMachineTypeConfig} adminOnly />
+      </Route>
+      <Route path="/machine/:slug" component={MachineStatus} />
       
       <Route component={NotFound} />
     </Switch>

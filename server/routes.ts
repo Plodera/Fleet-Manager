@@ -2652,6 +2652,130 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Factory Machine Maintenance ────────────────────────────────────────────
+
+  // Machine Types (admin only)
+  app.get("/api/factory-machine-types", async (req, res) => {
+    const types = await storage.getFactoryMachineTypes();
+    res.json(types);
+  });
+
+  app.post("/api/factory-machine-types", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Forbidden");
+    const { insertFactoryMachineTypeSchema } = await import("@shared/schema");
+    const parsed = insertFactoryMachineTypeSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+    const created = await storage.createFactoryMachineType(parsed.data);
+    res.status(201).json(created);
+  });
+
+  app.put("/api/factory-machine-types/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Forbidden");
+    const updated = await storage.updateFactoryMachineType(Number(req.params.id), req.body);
+    res.json(updated);
+  });
+
+  app.delete("/api/factory-machine-types/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Forbidden");
+    await storage.deleteFactoryMachineType(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // Factory Machines
+  app.get("/api/factory-machines", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
+    const machines = await storage.getFactoryMachines();
+    res.json(machines);
+  });
+
+  app.post("/api/factory-machines", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
+    // Auto-generate unique qrSlug
+    let qrSlug = "";
+    let attempts = 0;
+    do {
+      qrSlug = "mach-" + Math.random().toString(36).substring(2, 8);
+      attempts++;
+    } while (attempts < 10);
+    const payload = { ...req.body, qrSlug };
+    const { insertFactoryMachineSchema } = await import("@shared/schema");
+    const parsed = insertFactoryMachineSchema.safeParse(payload);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+    const created = await storage.createFactoryMachine(parsed.data);
+    res.status(201).json(created);
+  });
+
+  app.put("/api/factory-machines/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
+    const { qrSlug, ...updates } = req.body;
+    const updated = await storage.updateFactoryMachine(Number(req.params.id), updates);
+    res.json(updated);
+  });
+
+  app.delete("/api/factory-machines/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Forbidden");
+    await storage.deleteFactoryMachine(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // Machine Records
+  app.get("/api/machine-records", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
+    const machineId = req.query.machineId ? Number(req.query.machineId) : undefined;
+    const records = await storage.getMachineRecords(machineId);
+    res.json(records);
+  });
+
+  app.post("/api/machine-records", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
+    const { insertMachineRecordSchema } = await import("@shared/schema");
+    const parsed = insertMachineRecordSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+    const created = await storage.createMachineRecord(parsed.data);
+    res.status(201).json(created);
+  });
+
+  app.put("/api/machine-records/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
+    const updated = await storage.updateMachineRecord(Number(req.params.id), req.body);
+    res.json(updated);
+  });
+
+  app.delete("/api/machine-records/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
+    await storage.deleteMachineRecord(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // Public QR status endpoint (no auth)
+  app.get("/api/machine-status/:slug", async (req, res) => {
+    const statusData = await storage.getMachineStatus(req.params.slug);
+    if (!statusData) return res.status(404).json({ message: "Machine not found" });
+    res.json(statusData);
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {

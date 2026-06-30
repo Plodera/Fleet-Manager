@@ -24,6 +24,7 @@ export const PERMISSIONS = {
   MANAGE_TV_KPIS: 'manage_tv_kpis',
   TV_DATA_ENTRY: 'tv_data_entry',
   MANAGE_TV_VIDEOS: 'manage_tv_videos',
+  VIEW_FACTORY_MACHINES: 'view_factory_machines',
 } as const;
 
 export const AVAILABLE_PERMISSIONS = [
@@ -49,6 +50,7 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'tv_data_entry', label: 'TV Config: Data Entry', labelPt: 'Config TV: Entrada de Dados' },
   { id: 'manage_tv_videos', label: 'TV Config: Videos', labelPt: 'Config TV: Vídeos' },
   { id: 'manage_users', label: 'User Management', labelPt: 'Gestão de Utilizadores' },
+  { id: 'view_factory_machines', label: 'Factory Machines', labelPt: 'Máquinas de Fábrica' },
 ] as const;
 
 export const roleEnum = pgEnum("role", ["admin", "staff", "customer"]);
@@ -967,3 +969,51 @@ export const fortigateBandwidth = pgTable("fortigate_bandwidth", {
 });
 
 export type FortigateBandwidth = typeof fortigateBandwidth.$inferSelect;
+
+// ─── Factory Machine Maintenance ───────────────────────────────────────────
+
+export const factoryMachineTypes = pgTable("factory_machine_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const insertFactoryMachineTypeSchema = createInsertSchema(factoryMachineTypes).omit({ id: true });
+export type FactoryMachineType = typeof factoryMachineTypes.$inferSelect;
+export type InsertFactoryMachineType = z.infer<typeof insertFactoryMachineTypeSchema>;
+
+export const factoryMachines = pgTable("factory_machines", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  machineTypeId: integer("machine_type_id").references(() => factoryMachineTypes.id),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  serialNumber: text("serial_number"),
+  location: text("location"),
+  department: text("department"),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  qrSlug: text("qr_slug").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFactoryMachineSchema = createInsertSchema(factoryMachines).omit({ id: true, createdAt: true });
+export type FactoryMachine = typeof factoryMachines.$inferSelect;
+export type InsertFactoryMachine = z.infer<typeof insertFactoryMachineSchema>;
+
+export const machineRecords = pgTable("machine_records", {
+  id: serial("id").primaryKey(),
+  machineId: integer("machine_id").notNull().references(() => factoryMachines.id, { onDelete: "cascade" }),
+  recordType: text("record_type").notNull(), // 'maintenance' | 'breakdown' | 'scheduled'
+  date: date("date").notNull(),
+  description: text("description").notNull(),
+  performedBy: text("performed_by"),
+  nextMaintenanceDate: date("next_maintenance_date"),
+  createdById: integer("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMachineRecordSchema = createInsertSchema(machineRecords).omit({ id: true, createdAt: true });
+export type MachineRecord = typeof machineRecords.$inferSelect;
+export type InsertMachineRecord = z.infer<typeof insertMachineRecordSchema>;

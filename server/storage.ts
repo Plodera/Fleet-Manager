@@ -9,6 +9,10 @@ import {
   hikvisionNvrs, hikvisionGlobalSettings,
   fortigateSettings, fortigateBandwidth,
   teamsSettings, teamsKpiMappings,
+  factoryMachineTypes, factoryMachines, machineRecords,
+  type FactoryMachineType, type InsertFactoryMachineType,
+  type FactoryMachine, type InsertFactoryMachine,
+  type MachineRecord, type InsertMachineRecord,
   type User, type InsertUser, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
@@ -234,6 +238,23 @@ export interface IStorage {
   getItKpiValues(periodType: string, periodDate: string): Promise<any[]>;
   upsertItKpiValues(values: any[]): Promise<void>;
 
+
+  // Factory Machine Maintenance
+  getFactoryMachineTypes(): Promise<FactoryMachineType[]>;
+  createFactoryMachineType(data: InsertFactoryMachineType): Promise<FactoryMachineType>;
+  updateFactoryMachineType(id: number, updates: Partial<InsertFactoryMachineType>): Promise<FactoryMachineType>;
+  deleteFactoryMachineType(id: number): Promise<void>;
+  getFactoryMachines(): Promise<(FactoryMachine & { machineType?: FactoryMachineType })[]>;
+  getFactoryMachine(id: number): Promise<(FactoryMachine & { machineType?: FactoryMachineType }) | undefined>;
+  getFactoryMachineBySlug(slug: string): Promise<(FactoryMachine & { machineType?: FactoryMachineType }) | undefined>;
+  createFactoryMachine(data: InsertFactoryMachine): Promise<FactoryMachine>;
+  updateFactoryMachine(id: number, updates: Partial<InsertFactoryMachine>): Promise<FactoryMachine>;
+  deleteFactoryMachine(id: number): Promise<void>;
+  getMachineRecords(machineId?: number): Promise<MachineRecord[]>;
+  createMachineRecord(data: InsertMachineRecord): Promise<MachineRecord>;
+  updateMachineRecord(id: number, updates: Partial<InsertMachineRecord>): Promise<MachineRecord>;
+  deleteMachineRecord(id: number): Promise<void>;
+  getMachineStatus(slug: string): Promise<any>;
 
   sessionStore: session.Store;
 }
@@ -1359,6 +1380,127 @@ export class DatabaseStorage implements IStorage {
       .where(lt(fortigateBandwidth.sampledAt, cutoff));
   }
 
+  // ─── Factory Machine Maintenance ─────────────────────────────────────────
+
+  async getFactoryMachineTypes(): Promise<FactoryMachineType[]> {
+    return getDb().select().from(factoryMachineTypes).orderBy(factoryMachineTypes.name);
+  }
+
+  async createFactoryMachineType(data: InsertFactoryMachineType): Promise<FactoryMachineType> {
+    const [row] = await getDb().insert(factoryMachineTypes).values(data).returning();
+    return row;
+  }
+
+  async updateFactoryMachineType(id: number, updates: Partial<InsertFactoryMachineType>): Promise<FactoryMachineType> {
+    const [row] = await getDb().update(factoryMachineTypes).set(updates).where(eq(factoryMachineTypes.id, id)).returning();
+    return row;
+  }
+
+  async deleteFactoryMachineType(id: number): Promise<void> {
+    await getDb().delete(factoryMachineTypes).where(eq(factoryMachineTypes.id, id));
+  }
+
+  async getFactoryMachines(): Promise<(FactoryMachine & { machineType?: FactoryMachineType })[]> {
+    const rows = await getDb()
+      .select()
+      .from(factoryMachines)
+      .leftJoin(factoryMachineTypes, eq(factoryMachines.machineTypeId, factoryMachineTypes.id))
+      .orderBy(factoryMachines.name);
+    return rows.map(r => ({ ...r.factory_machines, machineType: r.factory_machine_types ?? undefined }));
+  }
+
+  async getFactoryMachine(id: number): Promise<(FactoryMachine & { machineType?: FactoryMachineType }) | undefined> {
+    const rows = await getDb()
+      .select()
+      .from(factoryMachines)
+      .leftJoin(factoryMachineTypes, eq(factoryMachines.machineTypeId, factoryMachineTypes.id))
+      .where(eq(factoryMachines.id, id));
+    if (!rows[0]) return undefined;
+    return { ...rows[0].factory_machines, machineType: rows[0].factory_machine_types ?? undefined };
+  }
+
+  async getFactoryMachineBySlug(slug: string): Promise<(FactoryMachine & { machineType?: FactoryMachineType }) | undefined> {
+    const rows = await getDb()
+      .select()
+      .from(factoryMachines)
+      .leftJoin(factoryMachineTypes, eq(factoryMachines.machineTypeId, factoryMachineTypes.id))
+      .where(eq(factoryMachines.qrSlug, slug));
+    if (!rows[0]) return undefined;
+    return { ...rows[0].factory_machines, machineType: rows[0].factory_machine_types ?? undefined };
+  }
+
+  async createFactoryMachine(data: InsertFactoryMachine): Promise<FactoryMachine> {
+    const [row] = await getDb().insert(factoryMachines).values(data).returning();
+    return row;
+  }
+
+  async updateFactoryMachine(id: number, updates: Partial<InsertFactoryMachine>): Promise<FactoryMachine> {
+    const [row] = await getDb().update(factoryMachines).set(updates).where(eq(factoryMachines.id, id)).returning();
+    return row;
+  }
+
+  async deleteFactoryMachine(id: number): Promise<void> {
+    await getDb().delete(factoryMachines).where(eq(factoryMachines.id, id));
+  }
+
+  async getMachineRecords(machineId?: number): Promise<MachineRecord[]> {
+    const query = getDb().select().from(machineRecords);
+    if (machineId) {
+      return query.where(eq(machineRecords.machineId, machineId)).orderBy(machineRecords.date);
+    }
+    return query.orderBy(machineRecords.date);
+  }
+
+  async createMachineRecord(data: InsertMachineRecord): Promise<MachineRecord> {
+    const [row] = await getDb().insert(machineRecords).values(data).returning();
+    return row;
+  }
+
+  async updateMachineRecord(id: number, updates: Partial<InsertMachineRecord>): Promise<MachineRecord> {
+    const [row] = await getDb().update(machineRecords).set(updates).where(eq(machineRecords.id, id)).returning();
+    return row;
+  }
+
+  async deleteMachineRecord(id: number): Promise<void> {
+    await getDb().delete(machineRecords).where(eq(machineRecords.id, id));
+  }
+
+  async getMachineStatus(slug: string): Promise<any> {
+    const machine = await this.getFactoryMachineBySlug(slug);
+    if (!machine) return null;
+
+    const records = await getDb()
+      .select()
+      .from(machineRecords)
+      .where(eq(machineRecords.machineId, machine.id))
+      .orderBy(machineRecords.date);
+
+    const allRecords = records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const lastMaintenance = allRecords.find(r => r.recordType === 'maintenance') ?? null;
+    const lastBreakdown = allRecords.find(r => r.recordType === 'breakdown') ?? null;
+    const nextScheduled = allRecords.find(r => r.recordType === 'scheduled' && r.nextMaintenanceDate) ?? null;
+
+    // Status: breakdown if most recent record is breakdown with no subsequent maintenance
+    let status: 'operational' | 'breakdown' = 'operational';
+    if (allRecords.length > 0 && allRecords[0].recordType === 'breakdown') {
+      status = 'breakdown';
+    }
+
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const recentBreakdown = allRecords.find(r =>
+      r.recordType === 'breakdown' && new Date(r.date) >= ninetyDaysAgo
+    ) ?? null;
+
+    return {
+      machine,
+      lastMaintenance,
+      recentBreakdown,
+      nextScheduled,
+      status,
+      history: allRecords.slice(0, 5),
+    };
+  }
+
 }
 
 let _storage: DatabaseStorage | null = null;
@@ -1536,4 +1678,20 @@ export const storage = {
   getTeamsKpiMappings: (...args: Parameters<DatabaseStorage['getTeamsKpiMappings']>) => getStorage().getTeamsKpiMappings(...args),
   upsertTeamsKpiMappings: (...args: Parameters<DatabaseStorage['upsertTeamsKpiMappings']>) => getStorage().upsertTeamsKpiMappings(...args),
   get sessionStore() { return getStorage().sessionStore; },
+  // Factory Machine Maintenance
+  getFactoryMachineTypes: () => getStorage().getFactoryMachineTypes(),
+  createFactoryMachineType: (...args: Parameters<DatabaseStorage['createFactoryMachineType']>) => getStorage().createFactoryMachineType(...args),
+  updateFactoryMachineType: (...args: Parameters<DatabaseStorage['updateFactoryMachineType']>) => getStorage().updateFactoryMachineType(...args),
+  deleteFactoryMachineType: (...args: Parameters<DatabaseStorage['deleteFactoryMachineType']>) => getStorage().deleteFactoryMachineType(...args),
+  getFactoryMachines: () => getStorage().getFactoryMachines(),
+  getFactoryMachine: (...args: Parameters<DatabaseStorage['getFactoryMachine']>) => getStorage().getFactoryMachine(...args),
+  getFactoryMachineBySlug: (...args: Parameters<DatabaseStorage['getFactoryMachineBySlug']>) => getStorage().getFactoryMachineBySlug(...args),
+  createFactoryMachine: (...args: Parameters<DatabaseStorage['createFactoryMachine']>) => getStorage().createFactoryMachine(...args),
+  updateFactoryMachine: (...args: Parameters<DatabaseStorage['updateFactoryMachine']>) => getStorage().updateFactoryMachine(...args),
+  deleteFactoryMachine: (...args: Parameters<DatabaseStorage['deleteFactoryMachine']>) => getStorage().deleteFactoryMachine(...args),
+  getMachineRecords: (...args: Parameters<DatabaseStorage['getMachineRecords']>) => getStorage().getMachineRecords(...args),
+  createMachineRecord: (...args: Parameters<DatabaseStorage['createMachineRecord']>) => getStorage().createMachineRecord(...args),
+  updateMachineRecord: (...args: Parameters<DatabaseStorage['updateMachineRecord']>) => getStorage().updateMachineRecord(...args),
+  deleteMachineRecord: (...args: Parameters<DatabaseStorage['deleteMachineRecord']>) => getStorage().deleteMachineRecord(...args),
+  getMachineStatus: (...args: Parameters<DatabaseStorage['getMachineStatus']>) => getStorage().getMachineStatus(...args),
 };
