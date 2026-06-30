@@ -1,7 +1,7 @@
+import { useState } from "react";
 import { useRoute, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, AlertTriangle, Wrench, Clock, CalendarDays, MapPin, Building2, Tag, Cpu, ExternalLink } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, AlertTriangle, Wrench, Clock, CalendarDays, MapPin, Building2, Tag, Cpu, ExternalLink, ClipboardList, ChevronDown, ChevronUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 type MachineType = { id: number; name: string };
@@ -43,10 +43,26 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
+type ReportFormState = {
+  recordType: "maintenance" | "breakdown" | "scheduled";
+  description: string;
+  performedBy: string;
+};
+
 export default function MachineStatus() {
   const [, params] = useRoute("/machine/:slug");
   const slug = params?.slug ?? "";
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const [showForm, setShowForm] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState<ReportFormState>({
+    recordType: "maintenance",
+    description: "",
+    performedBy: "",
+  });
+  const [formError, setFormError] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery<MachineStatusData>({
     queryKey: ["/api/machine-status", slug],
@@ -58,6 +74,44 @@ export default function MachineStatus() {
     enabled: !!slug,
     retry: false,
   });
+
+  const reportMutation = useMutation({
+    mutationFn: async (payload: ReportFormState) => {
+      const res = await fetch(`/api/machine-status/${slug}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recordType: payload.recordType,
+          description: payload.description,
+          performedBy: payload.performedBy.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to submit report");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/machine-status", slug] });
+      setSubmitted(true);
+      setShowForm(false);
+      setForm({ recordType: "maintenance", description: "", performedBy: "" });
+    },
+    onError: (err: Error) => {
+      setFormError(err.message);
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    if (!form.description.trim()) {
+      setFormError("Please enter a description.");
+      return;
+    }
+    reportMutation.mutate(form);
+  }
 
   if (isLoading) {
     return (
@@ -133,6 +187,108 @@ export default function MachineStatus() {
             <p className="mt-3 text-sm text-slate-500">{machine.description}</p>
           )}
         </div>
+
+        {/* Report Issue Section */}
+        {submitted ? (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3" data-testid="report-success">
+            <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-green-800">Report submitted!</p>
+              <p className="text-xs text-green-700 mt-0.5">Your record has been logged and will appear in the machine history.</p>
+              <button
+                className="mt-2 text-xs text-green-700 underline"
+                onClick={() => setSubmitted(false)}
+                data-testid="button-report-another"
+              >
+                Submit another report
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <button
+              className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-slate-50 transition-colors"
+              onClick={() => setShowForm(v => !v)}
+              data-testid="button-toggle-report-form"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <ClipboardList className="w-4 h-4 text-orange-500" />
+                Log Maintenance / Report Issue
+              </span>
+              {showForm ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            </button>
+
+            {showForm && (
+              <form onSubmit={handleSubmit} className="px-4 pb-4 space-y-3 border-t" data-testid="form-report-issue">
+                <div className="pt-3">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Record Type</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["maintenance", "breakdown", "scheduled"] as const).map(type => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, recordType: type }))}
+                        data-testid={`button-record-type-${type}`}
+                        className={`py-2 rounded-lg text-xs font-medium border transition-colors ${
+                          form.recordType === type
+                            ? type === "maintenance" ? "bg-green-100 border-green-300 text-green-700"
+                              : type === "breakdown" ? "bg-red-100 border-red-300 text-red-700"
+                              : "bg-blue-100 border-blue-300 text-blue-700"
+                            : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                        }`}
+                      >
+                        {RECORD_LABELS[type]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="report-description" className="block text-xs font-medium text-slate-600 mb-1">
+                    Description <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    id="report-description"
+                    rows={3}
+                    placeholder="Describe what was done or the issue observed…"
+                    value={form.description}
+                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                    data-testid="input-report-description"
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="report-performed-by" className="block text-xs font-medium text-slate-600 mb-1">
+                    Performed by <span className="text-slate-400">(optional)</span>
+                  </label>
+                  <input
+                    id="report-performed-by"
+                    type="text"
+                    placeholder="Your name or team"
+                    value={form.performedBy}
+                    onChange={e => setForm(f => ({ ...f, performedBy: e.target.value }))}
+                    data-testid="input-report-performed-by"
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+
+                {formError && (
+                  <p className="text-xs text-red-600" data-testid="text-form-error">{formError}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={reportMutation.isPending}
+                  data-testid="button-submit-report"
+                  className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  {reportMutation.isPending ? "Submitting…" : "Submit Report"}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
 
         {/* Status Cards */}
         <div className="grid grid-cols-1 gap-3">

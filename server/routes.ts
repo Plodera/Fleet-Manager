@@ -2779,6 +2779,40 @@ export async function registerRoutes(
     res.json(statusData);
   });
 
+  // Public QR report endpoint (no auth required — anyone with the QR link can submit)
+  app.post("/api/machine-status/:slug/report", async (req, res) => {
+    try {
+      const statusData = await storage.getMachineStatus(req.params.slug);
+      if (!statusData) return res.status(404).json({ message: "Machine not found" });
+
+      const { z } = await import("zod");
+      const reportSchema = z.object({
+        recordType: z.enum(["maintenance", "breakdown", "scheduled"]),
+        description: z.string().min(1, "Description is required").max(1000),
+        performedBy: z.string().max(200).optional(),
+      });
+
+      const parsed = reportSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+
+      const today = new Date().toISOString().split("T")[0];
+      const record = await storage.createMachineRecord({
+        machineId: statusData.machine.id,
+        recordType: parsed.data.recordType,
+        date: today,
+        description: parsed.data.description,
+        performedBy: parsed.data.performedBy ?? null,
+        nextMaintenanceDate: null,
+        createdById: null,
+      });
+
+      res.status(201).json(record);
+    } catch (err) {
+      console.error("Error creating machine report:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Seed Data
   const existingUsers = await storage.getUsers();
   if (existingUsers.length === 0) {
