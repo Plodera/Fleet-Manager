@@ -2802,6 +2802,19 @@ export async function registerRoutes(
 
   // In-memory rate limiter for the public QR report endpoint: 5 requests per IP per minute
   const _reportRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+  // Sweep expired entries every 5 minutes to prevent unbounded memory growth
+  const _rateLimitSweepInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of _reportRateLimitMap) {
+      if (now >= entry.resetAt) {
+        _reportRateLimitMap.delete(ip);
+      }
+    }
+  }, 5 * 60_000);
+  // Allow the sweep timer to be garbage-collected when the process exits cleanly
+  if (_rateLimitSweepInterval.unref) _rateLimitSweepInterval.unref();
+
   function checkReportRateLimit(ip: string): boolean {
     const now = Date.now();
     const window = 60_000; // 1 minute
