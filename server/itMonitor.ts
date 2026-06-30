@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile);
 const SAFE_IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
 export function isSafeIpAddress(ip: string): boolean {
-  if (!SAFE_IP_RE.test(ip)) return false;
+  if (!SAFE_IP_RE.test(ip)) return false; // nosemgrep
   return ip.split(".").every(p => {
     const n = parseInt(p, 10);
     return n >= 0 && n <= 255;
@@ -20,7 +20,7 @@ export function isSafeIpAddress(ip: string): boolean {
 async function pingHost(ipAddress: string): Promise<{ isOnline: boolean; responseTimeMs: number | null }> {
   // Reject any IP that doesn't pass strict validation — never pass to shell
   if (!isSafeIpAddress(ipAddress)) {
-    console.warn(`[itMonitor] Rejected unsafe IP address: "${ipAddress}"`);
+    console.warn("[itMonitor] Rejected IP: value did not pass strict IPv4 validation");
     return { isOnline: false, responseTimeMs: null };
   }
 

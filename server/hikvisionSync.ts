@@ -19,21 +19,24 @@ async function digestFetch(url: string, username: string, password: string): Pro
   }
 
   const wwwAuth = challenge.headers.get("WWW-Authenticate") || "";
-  const getParam = (key: string) => {
-    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const m = wwwAuth.match(new RegExp(`${escapedKey}="([^"]*)"`));
-    return m ? m[1] : "";
-  };
+  // Use static regex literals per field (avoids non-literal RegExp and ReDoS risk).
+  // These patterns match only their specific, hardcoded Digest auth field names.
+  const getParam = (re: RegExp): string => { const m = wwwAuth.match(re); return m ? m[1] : ""; };
 
-  const realm  = getParam("realm");
-  const nonce  = getParam("nonce");
-  const qop    = getParam("qop") || "auth";
-  const opaque = getParam("opaque");
+  const realm  = getParam(/\brealm="([^"]*)"/);
+  const nonce  = getParam(/\bnonce="([^"]*)"/);
+  const qop    = getParam(/\bqop=([^\s,"]*)/) || "auth";
+  const opaque = getParam(/\bopaque="([^"]*)"/);
+  // nosemgrep: detect-non-literal-regexp — removed; all regexes above are now static literals.
 
   const uri = new URL(url).pathname + (new URL(url).search || "");
   const nc  = "00000001";
   const cnonce = createHash("md5").update(Math.random().toString()).digest("hex").slice(0, 8);
 
+  // MD5 here is mandated by RFC 2617 HTTP Digest Authentication — it is a protocol
+  // wire-format requirement, NOT password storage. No modern alternative is available
+  // within the Digest scheme supported by Hikvision ISAPI firmware.
+  // nosemgrep: md5-used-as-password
   const ha1 = createHash("md5").update(`${username}:${realm}:${password}`).digest("hex");
   const ha2 = createHash("md5").update(`GET:${uri}`).digest("hex");
   const response = createHash("md5").update(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`).digest("hex");

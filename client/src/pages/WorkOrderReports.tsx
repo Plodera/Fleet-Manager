@@ -289,7 +289,7 @@ export default function WorkOrderReports() {
     if (!printWindow) return;
     printWindow.document.write(`
       <!DOCTYPE html><html><head>
-        <title>${t.workOrders.workOrderReport}</title>
+        <title>${escapeHtml(t.workOrders.workOrderReport)}</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
           h1 { font-size: 18px; margin-bottom: 4px; }
@@ -303,8 +303,8 @@ export default function WorkOrderReports() {
           .total { margin-top: 8px; font-weight: 600; font-size: 12px; }
         </style>
       </head><body>
-        <h1>${t.workOrders.workOrderReport}${reportMode === "summary" ? ` - ${t.workOrders.summaryReport}` : ""}</h1>
-        <div class="subtitle">${t.workOrders.reportSubtitle}</div>
+        <h1>${escapeHtml(t.workOrders.workOrderReport)}${reportMode === "summary" ? ` - ${escapeHtml(t.workOrders.summaryReport)}` : ""}</h1>
+        <div class="subtitle">${escapeHtml(t.workOrders.reportSubtitle)}</div>
         <div class="meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>
         ${bodyContent}
         <div style="margin-top: 20px; color: #999; font-size: 10px;">${format(new Date(), "dd/MM/yyyy HH:mm")}</div>

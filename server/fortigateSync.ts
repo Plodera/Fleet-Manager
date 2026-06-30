@@ -11,6 +11,8 @@ const prevCounters: Record<string, { tx: number; rx: number; ts: number }> = {};
 // FortiGate appliances use self-signed certificates. This agent is only
 // passed to fortigateFetch() and does NOT affect any other TLS connections
 // in the process (NODE_TLS_REJECT_UNAUTHORIZED is never modified).
+// nosemgrep: bypass-tls-verification — intentional: FortiGate appliances use self-signed certs.
+// This agent is scoped exclusively to fortigateFetch(); NODE_TLS_REJECT_UNAUTHORIZED is NOT modified.
 const tlsAgent = new https.Agent({ rejectUnauthorized: false });
 
 /** Thin fetch wrapper using Node https/http modules (bypasses self-signed cert rejection). */
