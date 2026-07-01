@@ -1,0 +1,67 @@
+aiscoweb@aiscoweb:/opt/fleetcmd$ pm2 logs fleetcmd --lines 30 --nostream
+[TAILING] Tailing last 30 lines for [fleetcmd] process (change the value with --lines option)
+/home/aiscoweb/.pm2/logs/fleetcmd-error.log last 30 lines:
+1|fleetcmd |     '2026-07-15',
+1|fleetcmd |     1
+1|fleetcmd |   ],
+1|fleetcmd |   cause: error: column "created_by_id" of relation "machine_records" does not exist
+1|fleetcmd |       at /opt/fleetcmd/dist/index.cjs:66:15801
+1|fleetcmd |       at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|fleetcmd |       at async /opt/fleetcmd/dist/index.cjs:66:32720
+1|fleetcmd |       at async vd.queryWithCache (/opt/fleetcmd/dist/index.cjs:58:37193)
+1|fleetcmd |       at async /opt/fleetcmd/dist/index.cjs:66:32511
+1|fleetcmd |       at async Mb.createMachineRecord (/opt/fleetcmd/dist/index.cjs:135:32408)
+1|fleetcmd |       at async /opt/fleetcmd/dist/index.cjs:276:7082 {
+1|fleetcmd |     length: 142,
+1|fleetcmd |     severity: 'ERROR',
+1|fleetcmd |     code: '42703',
+1|fleetcmd |     detail: undefined,
+1|fleetcmd |     hint: undefined,
+1|fleetcmd |     position: '131',
+1|fleetcmd |     internalPosition: undefined,
+1|fleetcmd |     internalQuery: undefined,
+1|fleetcmd |     where: undefined,
+1|fleetcmd |     schema: undefined,
+1|fleetcmd |     table: undefined,
+1|fleetcmd |     column: undefined,
+1|fleetcmd |     dataType: undefined,
+1|fleetcmd |     constraint: undefined,
+1|fleetcmd |     file: 'parse_target.c',
+1|fleetcmd |     line: '1066',
+1|fleetcmd |     routine: 'checkInsertTargets'
+1|fleetcmd |   }
+1|fleetcmd | }
+
+/home/aiscoweb/.pm2/logs/fleetcmd-out.log last 30 lines:
+1|fleetcmd | [itMonitor] Check complete: 65/67 online
+1|fleetcmd | 5:55:24 AM [express] GET /api/tv-dashboards/2/display 304 in 30ms :: {"id":2,"name":"Rolling Mill Dept.","departmentId":6,"labelEn":"RMill","labelPt":"RMill","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":55,"kpiRotationSeconds":8,"kpiT...
+1|fleetcmd | 5:55:33 AM [express] PATCH /api/factory-machines/1/report-access 200 in 23ms :: {"id":1,"name":"Vezanni","machineTypeId":1,"manufacturer":"Danielli","model":"TestModel","serialNumber":"2541V451","location":"Scrap Yard","department":"SMS","description":"Scrap Cutting Machine","isA...
+1|fleetcmd | 5:55:33 AM [express] GET /api/factory-machines 200 in 7ms :: [{"id":1,"name":"Vezanni","machineTypeId":1,"manufacturer":"Danielli","model":"TestModel","serialNumber":"2541V451","location":"Scrap Yard","department":"SMS","description":"Scrap Cutting Machine","is...
+1|fleetcmd | [itMonitor] Pinging 67 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/67 online
+1|fleetcmd | 5:55:45 AM [express] GET /api/tv-dashboards/1/display 304 in 20ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":10,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 67 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 64/67 online
+1|fleetcmd | 5:56:24 AM [express] GET /api/tv-dashboards/2/display 304 in 28ms :: {"id":2,"name":"Rolling Mill Dept.","departmentId":6,"labelEn":"RMill","labelPt":"RMill","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":55,"kpiRotationSeconds":8,"kpiT...
+1|fleetcmd | [itMonitor] Pinging 67 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/67 online
+1|fleetcmd | 5:56:45 AM [express] GET /api/tv-dashboards/1/display 304 in 21ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":10,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 67 host(s)...
+1|fleetcmd | [fortigateSync] wan1 TX=2848.68 RX=19016.25 kbps, wan2 TX=3512.08 RX=18165.47 kbps
+1|fleetcmd | [itMonitor] Check complete: 65/67 online
+1|fleetcmd | [glpiSync] Synced — total=69 new=5 pending=7 open=12 assigned=0 solved=47 planned=0 closed=10
+1|fleetcmd | 5:57:24 AM [express] GET /api/tv-dashboards/2/display 304 in 26ms :: {"id":2,"name":"Rolling Mill Dept.","departmentId":6,"labelEn":"RMill","labelPt":"RMill","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":55,"kpiRotationSeconds":8,"kpiT...
+1|fleetcmd | [itMonitor] Pinging 67 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 64/67 online
+1|fleetcmd | 5:57:45 AM [express] GET /api/tv-dashboards/1/display 304 in 18ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":10,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 67 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/67 online
+1|fleetcmd | 5:58:24 AM [express] GET /api/tv-dashboards/2/display 304 in 27ms :: {"id":2,"name":"Rolling Mill Dept.","departmentId":6,"labelEn":"RMill","labelPt":"RMill","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":55,"kpiRotationSeconds":8,"kpiT...
+1|fleetcmd | [itMonitor] Pinging 67 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/67 online
+1|fleetcmd | 5:58:45 AM [express] GET /api/tv-dashboards/1/display 304 in 23ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":10,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 67 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/67 online
+1|fleetcmd | 5:59:24 AM [express] GET /api/tv-dashboards/2/display 304 in 51ms :: {"id":2,"name":"Rolling Mill Dept.","departmentId":6,"labelEn":"RMill","labelPt":"RMill","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":55,"kpiRotationSeconds":8,"kpiT...
+
+aiscoweb@aiscoweb:/opt/fleetcmd$ 
