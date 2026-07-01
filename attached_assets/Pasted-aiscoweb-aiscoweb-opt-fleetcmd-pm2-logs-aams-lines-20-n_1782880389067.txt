@@ -1,0 +1,47 @@
+aiscoweb@aiscoweb:/opt/fleetcmd$ pm2 logs aams --lines 20 --nostream
+[TAILING] Tailing last 20 lines for [aams] process (change the value with --lines option)
+/home/aiscoweb/.pm2/logs/aams-out.log last 20 lines:
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+
+/home/aiscoweb/.pm2/logs/aams-error.log last 20 lines:
+2|aams     |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+2|aams     | 
+2|aams     | Node.js v20.20.0
+2|aams     | /opt/fleetcmd/dist/index.cjs:1
+2|aams     | "use strict";var C6=Object.create;var Bl=Object.defineProperty;var N6=Object.getOwnPropertyDescriptor;var j6=Object.getOwnPropertyNames;var O6=Object.getPrototypeOf,R6=Object.prototype.hasOwnProperty;var j=(t,e,i)=>()=>{if(i)throw i[0];try{return t&&(e=t(t=0)),e}catch(n){throw i=[n],n}};var x=(t,e)=>()=>{try{return e||t((e={exports:{}}).exports,e),e.exports}catch(i){throw e=0,i}},$t=(t,e)=>{for(var i in e)Bl(t,i,{get:e[i],enumerable:!0})},Xw=(t,e,i,n)=>{if(e&&typeof e=="object"||typeof e=="function")for(let a of j6(e))!R6.call(t,a)&&a!==i&&Bl(t,a,{get:()=>e[a],enumerable:!(n=N6(e,a))||n.enumerable});return t};var Oe=(t,e,i)=>(i=t!=null?C6(O6(t)):{},Xw(e||!t||!t.__esModule?Bl(i,"default",{value:t,enumerable:!0}):i,t)),D6=t=>Xw(Bl({},"__esModule",{value:!0}),t);var bi=x(($ne,t1)=>{var M6=require("path").relative;t1.exports=B6;var q6=process.cwd();function Jw(t,e){for(var i=t.split(/[ ,]+/),n=String(e).toLowerCase(),a=0;a<i.length;a++){var r=i[a];if(r&&(r==="*"||r.toLowerCase()===n))return!0}return!1}function L6(t,e,i){var n=Object.getOwnPropertyDescriptor(t,e),a=n.value;return n.get=function(){return a},n.writable&&(n.set=function(s){return a=s}),delete n.value,delete n.writable,Object.defineProperty(t,e,n),n}function U6(t){for(var e="",i=0;i<t;i++)e+=", arg"+i;return e.substr(2)}function F6(t){var e=this.name+": "+this.namespace;this.message&&(e+=" deprecated "+this.message);for(var i=0;i<t.length;i++)e+=`
+2|aams     |                                                                                                                                                                                                                                                                                 ^
+2|aams     | 
+2|aams     | Error: DATABASE_URL must be set. Did you forget to provision a database?
+2|aams     |     at /opt/fleetcmd/dist/index.cjs:133:1032
+2|aams     |     at /opt/fleetcmd/dist/index.cjs:1:254
+2|aams     |     at /opt/fleetcmd/dist/index.cjs:135:9662
+2|aams     |     at /opt/fleetcmd/dist/index.cjs:1:254
+2|aams     |     at Object.<anonymous> (/opt/fleetcmd/dist/index.cjs:260:1437)
+2|aams     |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+2|aams     |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+2|aams     |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+2|aams     |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+2|aams     |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+2|aams     | 
+2|aams     | Node.js v20.20.0
+
+aiscoweb@aiscoweb:/opt/fleetcmd$ 
