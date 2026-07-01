@@ -1,0 +1,133 @@
+aiscoweb@aiscoweb:~$ pm2 logs aams --lines 30 --nostream
+[TAILING] Tailing last 30 lines for [aams] process (change the value with --lines option)
+/home/aiscoweb/.pm2/logs/aams-out.log last 30 lines:
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+2|aams     | 
+2|aams     | > rest-express@1.0.0 start
+2|aams     | > NODE_ENV=production node dist/index.cjs
+2|aams     | 
+
+/home/aiscoweb/.pm2/logs/aams-error.log last 30 lines:
+2|aams     | 
+2|aams     | Node.js v20.20.0
+2|aams     | node:internal/modules/cjs/loader:1210
+2|aams     |   throw err;
+2|aams     |   ^
+2|aams     | 
+2|aams     | Error: Cannot find module '/opt/fleetcmd/dist/index.cjs'
+2|aams     |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2|aams     |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+2|aams     |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+2|aams     |     at node:internal/main/run_main_module:28:49 {
+2|aams     |   code: 'MODULE_NOT_FOUND',
+2|aams     |   requireStack: []
+2|aams     | }
+2|aams     | 
+2|aams     | Node.js v20.20.0
+2|aams     | node:internal/modules/cjs/loader:1210
+2|aams     |   throw err;
+2|aams     |   ^
+2|aams     | 
+2|aams     | Error: Cannot find module '/opt/fleetcmd/dist/index.cjs'
+2|aams     |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2|aams     |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+2|aams     |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+2|aams     |     at node:internal/main/run_main_module:28:49 {
+2|aams     |   code: 'MODULE_NOT_FOUND',
+2|aams     |   requireStack: []
+2|aams     | }
+2|aams     | 
+2|aams     | Node.js v20.20.0
+
+aiscoweb@aiscoweb:~$ pm2 logs fleetcmd --lines 30 --nostream
+[TAILING] Tailing last 30 lines for [fleetcmd] process (change the value with --lines option)
+/home/aiscoweb/.pm2/logs/fleetcmd-out.log last 30 lines:
+1|fleetcmd | > NODE_ENV=production node dist/index.cjs
+1|fleetcmd | 
+1|fleetcmd | 
+1|fleetcmd | > rest-express@1.0.0 start
+1|fleetcmd | > NODE_ENV=production node dist/index.cjs
+1|fleetcmd | 
+1|fleetcmd | 
+1|fleetcmd | > rest-express@1.0.0 start
+1|fleetcmd | > NODE_ENV=production node dist/index.cjs
+1|fleetcmd | 
+1|fleetcmd | 
+1|fleetcmd | > rest-express@1.0.0 start
+1|fleetcmd | > NODE_ENV=production node dist/index.cjs
+1|fleetcmd | 
+1|fleetcmd | 
+1|fleetcmd | > rest-express@1.0.0 start
+1|fleetcmd | > NODE_ENV=production node dist/index.cjs
+1|fleetcmd | 
+1|fleetcmd | 
+1|fleetcmd | > rest-express@1.0.0 start
+1|fleetcmd | > NODE_ENV=production node dist/index.cjs
+1|fleetcmd | 
+1|fleetcmd | 
+1|fleetcmd | > rest-express@1.0.0 start
+1|fleetcmd | > NODE_ENV=production node dist/index.cjs
+1|fleetcmd | 
+1|fleetcmd | 
+1|fleetcmd | > rest-express@1.0.0 start
+1|fleetcmd | > NODE_ENV=production node dist/index.cjs
+1|fleetcmd | 
+
+/home/aiscoweb/.pm2/logs/fleetcmd-error.log last 30 lines:
+1|fleetcmd | 
+1|fleetcmd | Node.js v20.20.0
+1|fleetcmd | node:internal/modules/cjs/loader:1210
+1|fleetcmd |   throw err;
+1|fleetcmd |   ^
+1|fleetcmd | 
+1|fleetcmd | Error: Cannot find module '/opt/fleetcmd/dist/index.cjs'
+1|fleetcmd |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+1|fleetcmd |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+1|fleetcmd |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+1|fleetcmd |     at node:internal/main/run_main_module:28:49 {
+1|fleetcmd |   code: 'MODULE_NOT_FOUND',
+1|fleetcmd |   requireStack: []
+1|fleetcmd | }
+1|fleetcmd | 
+1|fleetcmd | Node.js v20.20.0
+1|fleetcmd | node:internal/modules/cjs/loader:1210
+1|fleetcmd |   throw err;
+1|fleetcmd |   ^
+1|fleetcmd | 
+1|fleetcmd | Error: Cannot find module '/opt/fleetcmd/dist/index.cjs'
+1|fleetcmd |     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+1|fleetcmd |     at Module._load (node:internal/modules/cjs/loader:1038:27)
+1|fleetcmd |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+1|fleetcmd |     at node:internal/main/run_main_module:28:49 {
+1|fleetcmd |   code: 'MODULE_NOT_FOUND',
+1|fleetcmd |   requireStack: []
+1|fleetcmd | }
+1|fleetcmd | 
+1|fleetcmd | Node.js v20.20.0
+
+aiscoweb@aiscoweb:~$ 
