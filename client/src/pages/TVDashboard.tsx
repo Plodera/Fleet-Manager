@@ -763,6 +763,20 @@ export default function TVDashboard() {
   const displayMode: string = data?.displayMode || "simultaneous";
   const isSequential = displayMode === "sequential";
   const sequentialVideoSeconds = Math.max(5, data?.sequentialVideoSeconds ?? 30);
+
+  // Reset sequential state whenever the display mode is toggled
+  useEffect(() => {
+    setSeqPhase('kpi');
+    setSeqPageIdx(0);
+  }, [displayMode]);
+
+  // Keep page indices in bounds when kpisPerPage changes
+  useEffect(() => {
+    if (kpiPages > 0) {
+      setCurrentKpiPage(prev => (prev >= kpiPages ? 0 : prev));
+      setSeqPageIdx(prev => (prev >= kpiPages ? 0 : prev));
+    }
+  }, [kpiPages]);
   const kpiPageVideos: { pageIndex: number; videoId: number | null }[] = data?.kpiPageVideos || [];
 
   useEffect(() => {
