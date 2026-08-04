@@ -1,0 +1,36 @@
+                                               Table "public.tv_dashboards"
+          Column          |            Type             | Collation | Nullable |                  Default                  
+--------------------------+-----------------------------+-----------+----------+-------------------------------------------
+ id                       | integer                     |           | not null | nextval('tv_dashboards_id_seq'::regclass)
+ name                     | text                        |           | not null | 
+ department_id            | integer                     |           |          | 
+ label_en                 | text                        |           | not null | ''::text
+ label_pt                 | text                        |           | not null | ''::text
+ is_active                | boolean                     |           | not null | true
+ created_at               | timestamp without time zone |           |          | now()
+ video_position           | text                        |           | not null | 'bottom'::text
+ kpi_rotation_seconds     | integer                     |           | not null | 8
+ show_video               | boolean                     |           | not null | true
+ kpi_transition_style     | text                        |           | not null | 'fade'::text
+ video_size_percent       | integer                     |           | not null | 55
+ shimmer_duration_seconds | integer                     |           | not null | 6
+ kpis_per_page            | integer                     |           | not null | 6
+ kpi_font_scale           | real                        |           | not null | 1.0
+ ticker_text              | text                        |           | not null | ''::text
+ ticker_position          | text                        |           | not null | 'off'::text
+ banner_text              | text                        |           | not null | ''::text
+ banner_style             | text                        |           | not null | 'off'::text
+ banner_font_size         | integer                     |           | not null | 36
+ banner_scroll_speed      | integer                     |           | not null | 5
+ display_mode             | text                        |           | not null | 'simultaneous'::text
+ sequential_video_seconds | integer                     |           | not null | 30
+ banner_vertical_position | integer                     |           | not null | 75
+Indexes:
+    "tv_dashboards_pkey" PRIMARY KEY, btree (id)
+Foreign-key constraints:
+    "tv_dashboards_department_id_fkey" FOREIGN KEY (department_id) REFERENCES departments(id)
+Referenced by:
+    TABLE "teams_kpi_mappings" CONSTRAINT "teams_kpi_mappings_dashboard_id_fkey" FOREIGN KEY (dashboard_id) REFERENCES tv_dashboards(id) ON DELETE CASCADE
+    TABLE "tv_dashboard_kpi_page_videos" CONSTRAINT "tv_dashboard_kpi_page_videos_dashboard_id_fkey" FOREIGN KEY (dashboard_id) REFERENCES tv_dashboards(id) ON DELETE CASCADE
+    TABLE "tv_dashboard_kpis" CONSTRAINT "tv_dashboard_kpis_dashboard_id_fkey" FOREIGN KEY (dashboard_id) REFERENCES tv_dashboards(id) ON DELETE CASCADE
+    TABLE "tv_dashboard_videos" CONSTRAINT "tv_dashboard_videos_dashboard_id_fkey" FOREIGN KEY (dashboard_id) REFERENCES tv_dashboards(id) ON DELETE CASCADE
