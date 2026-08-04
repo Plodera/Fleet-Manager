@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
-type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean; showVideo: boolean; videoPosition: string; videoSizePercent: number; kpiRotationSeconds: number; kpiTransitionStyle: string; shimmerDurationSeconds: number; kpisPerPage: number; kpiFontScale: number; tickerText: string; tickerPosition: string; bannerText: string; bannerStyle: string; bannerFontSize: number; bannerScrollSpeed: number; department?: { name: string } };
+type Dashboard = { id: number; name: string; departmentId: number | null; labelEn: string; labelPt: string; isActive: boolean; showVideo: boolean; videoPosition: string; videoSizePercent: number; kpiRotationSeconds: number; kpiTransitionStyle: string; shimmerDurationSeconds: number; kpisPerPage: number; kpiFontScale: number; tickerText: string; tickerPosition: string; bannerText: string; bannerStyle: string; bannerFontSize: number; bannerScrollSpeed: number; displayMode: string; sequentialVideoSeconds: number; department?: { name: string } };
 type KPI = { id: number; dashboardId: number; name: string; labelEn: string; labelPt: string; unit: string | null; sortOrder: number; isActive: boolean };
 type TeamsSettingsType = { tenantId: string; clientId: string; clientSecret: string; teamId: string; channelId: string; enabled: boolean; lastSyncAt: string | null; lastError: string | null };
 type TeamsKpiMappingType = { id?: number; dashboardId: number; teamsFieldKey: string; teamsFieldLabel: string; kpiId: number | null; periodType: string };
@@ -59,7 +59,8 @@ export default function TVDashboardConfig() {
 
   const [dashDialog, setDashDialog] = useState(false);
   const [editDash, setEditDash] = useState<Dashboard | null>(null);
-  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36", bannerScrollSpeed: "5" });
+  const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36", bannerScrollSpeed: "5", displayMode: "simultaneous", sequentialVideoSeconds: "30" });
+  const [seqMappings, setSeqMappings] = useState<Record<number, number | null>>({});
 
   const [kpiDialog, setKpiDialog] = useState(false);
   const [editKpi, setEditKpi] = useState<KPI | null>(null);
@@ -105,6 +106,31 @@ export default function TVDashboardConfig() {
     },
     enabled: !!selectedDashboardId,
   });
+  const { data: kpiPageVideosData = [] } = useQuery<any[]>({
+    queryKey: ["/api/tv-dashboards", selectedDashboardId, "kpi-page-videos"],
+    queryFn: async () => {
+      if (!selectedDashboardId) return [];
+      const res = await fetch(`/api/tv-dashboards/${selectedDashboardId}/kpi-page-videos`);
+      return res.json();
+    },
+    enabled: !!selectedDashboardId,
+  });
+  useEffect(() => {
+    const m: Record<number, number | null> = {};
+    kpiPageVideosData.forEach((pv: any) => { m[pv.pageIndex] = pv.videoId ?? null; });
+    setSeqMappings(m);
+  }, [JSON.stringify(kpiPageVideosData)]);
+
+  const saveSeqMappingsMutation = useMutation({
+    mutationFn: (mappings: { pageIndex: number; videoId: number | null }[]) =>
+      apiRequest("PUT", `/api/tv-dashboards/${selectedDashboardId}/kpi-page-videos`, { mappings }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tv-dashboards", selectedDashboardId, "kpi-page-videos"] });
+      toast({ title: "Sequential mapping saved" });
+    },
+    onError: (err: any) => toast({ title: "Save failed", description: err.message, variant: "destructive" }),
+  });
+
   const { data: existingValues = [] } = useQuery<any[]>({
     queryKey: ["/api/tv-kpi-values", selectedDashboardId, dataEntryPeriodType, dataEntryDate],
     queryFn: async () => {
@@ -316,16 +342,16 @@ export default function TVDashboardConfig() {
   const openDashDialog = (dash?: Dashboard) => {
     if (dash) {
       setEditDash(dash);
-      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString(), kpisPerPage: (dash.kpisPerPage ?? 6).toString(), kpiFontScale: normFontScale(dash.kpiFontScale ?? 1.0), tickerText: dash.tickerText || "", tickerPosition: dash.tickerPosition || "off", bannerText: dash.bannerText || "", bannerStyle: dash.bannerStyle || "off", bannerFontSize: (dash.bannerFontSize ?? 36).toString(), bannerScrollSpeed: (dash.bannerScrollSpeed ?? 5).toString() });
+      setDashForm({ name: dash.name, departmentId: dash.departmentId?.toString() || "", labelEn: dash.labelEn, labelPt: dash.labelPt, isActive: dash.isActive, showVideo: dash.showVideo !== false, videoPosition: dash.videoPosition || "bottom", videoSizePercent: (dash.videoSizePercent ?? 55).toString(), kpiRotationSeconds: (dash.kpiRotationSeconds ?? 8).toString(), kpiTransitionStyle: dash.kpiTransitionStyle || "fade", shimmerDurationSeconds: (dash.shimmerDurationSeconds ?? 6).toString(), kpisPerPage: (dash.kpisPerPage ?? 6).toString(), kpiFontScale: normFontScale(dash.kpiFontScale ?? 1.0), tickerText: dash.tickerText || "", tickerPosition: dash.tickerPosition || "off", bannerText: dash.bannerText || "", bannerStyle: dash.bannerStyle || "off", bannerFontSize: (dash.bannerFontSize ?? 36).toString(), bannerScrollSpeed: (dash.bannerScrollSpeed ?? 5).toString(), displayMode: dash.displayMode || "simultaneous", sequentialVideoSeconds: (dash.sequentialVideoSeconds ?? 30).toString() });
     } else {
       setEditDash(null);
-      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36", bannerScrollSpeed: "5" });
+      setDashForm({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36", bannerScrollSpeed: "5", displayMode: "simultaneous", sequentialVideoSeconds: "30" });
     }
     setDashDialog(true);
   };
 
   const submitDash = () => {
-    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, videoSizePercent: parseInt(dashForm.videoSizePercent) || 55, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8, shimmerDurationSeconds: parseInt(dashForm.shimmerDurationSeconds) || 6, kpisPerPage: parseInt(dashForm.kpisPerPage) || 6, kpiFontScale: parseFloat(dashForm.kpiFontScale) || 1.0, bannerFontSize: parseInt(dashForm.bannerFontSize) || 36, bannerScrollSpeed: parseInt(dashForm.bannerScrollSpeed) || 5 };
+    const data = { ...dashForm, departmentId: dashForm.departmentId ? parseInt(dashForm.departmentId) : null, videoSizePercent: parseInt(dashForm.videoSizePercent) || 55, kpiRotationSeconds: parseInt(dashForm.kpiRotationSeconds) || 8, shimmerDurationSeconds: parseInt(dashForm.shimmerDurationSeconds) || 6, kpisPerPage: parseInt(dashForm.kpisPerPage) || 6, kpiFontScale: parseFloat(dashForm.kpiFontScale) || 1.0, bannerFontSize: parseInt(dashForm.bannerFontSize) || 36, bannerScrollSpeed: parseInt(dashForm.bannerScrollSpeed) || 5, sequentialVideoSeconds: parseInt(dashForm.sequentialVideoSeconds) || 30 };
     if (editDash) {
       updateDashMutation.mutate({ id: editDash.id, data });
     } else {
@@ -665,60 +691,147 @@ export default function TVDashboardConfig() {
 
         <TabsContent value="videos" className="mt-4">
           <DashboardSelector />
-          {selectedDashboardId && (
-            <>
-              <div className="flex justify-end mb-4">
-                <Button onClick={() => openVideoDialog()} data-testid="button-add-video">
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t.tvDashboard.addVideo}
-                </Button>
-              </div>
-              {videos.length === 0 ? (
-                <Card><CardContent className="py-12 text-center text-muted-foreground">
-                  <p className="font-medium">{t.tvDashboard.noVideos}</p>
-                  <p className="text-sm mt-1">{t.tvDashboard.noVideosMessage}</p>
-                </CardContent></Card>
-              ) : (
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full" data-testid="table-videos">
-                    <thead>
-                      <tr className="bg-muted/50">
-                        <th className="text-left p-3 text-sm font-medium">{t.tvDashboard.videoTitle}</th>
-                        <th className="text-left p-3 text-sm font-medium">{t.tvDashboard.videoType}</th>
-                        <th className="text-left p-3 text-sm font-medium">{t.tvDashboard.videoUrl}</th>
-                        <th className="text-center p-3 text-sm font-medium">{t.tvDashboard.sortOrder}</th>
-                        <th className="text-center p-3 text-sm font-medium">{t.tvDashboard.active}</th>
-                        <th className="text-right p-3 text-sm font-medium w-24"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {videos.map(v => (
-                        <tr key={v.id} className="border-t hover:bg-muted/30" data-testid={`row-video-${v.id}`}>
-                          <td className="p-3 font-medium">{v.title}</td>
-                          <td className="p-3 text-sm text-muted-foreground">{v.videoType === "youtube" ? t.tvDashboard.youtube : v.videoType === "image" ? t.tvDashboard.imageType : t.tvDashboard.upload}</td>
-                          <td className="p-3 text-sm text-muted-foreground truncate max-w-[200px]">{v.url}</td>
-                          <td className="p-3 text-center text-sm">{v.sortOrder}</td>
-                          <td className="p-3 text-center">
-                            <span className={`inline-block px-2 py-0.5 rounded text-xs ${v.isActive ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-500"}`}>
-                              {v.isActive ? t.tvDashboard.active : t.tvDashboard.inactive}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right">
-                            <Button variant="ghost" size="icon" onClick={() => openVideoDialog(v)} data-testid={`button-edit-video-${v.id}`}>
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: "video", id: v.id, name: v.title })} data-testid={`button-delete-video-${v.id}`}>
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          {selectedDashboardId && (() => {
+            const selDash = dashboards.find(d => d.id === selectedDashboardId);
+            const isSequential = selDash?.displayMode === "sequential";
+            const kpisPerPage = selDash?.kpisPerPage ?? 6;
+            const activeKpis = kpis.filter(k => k.isActive);
+            const totalPages = Math.ceil(activeKpis.length / kpisPerPage);
+            const activeVideos = videos.filter(v => v.isActive);
+
+            return (
+              <>
+                <div className="flex justify-end mb-4">
+                  <Button onClick={() => openVideoDialog()} data-testid="button-add-video">
+                    <Plus className="w-4 h-4 mr-2" />
+                    {t.tvDashboard.addVideo}
+                  </Button>
                 </div>
-              )}
-            </>
-          )}
+                {videos.length === 0 ? (
+                  <Card><CardContent className="py-12 text-center text-muted-foreground">
+                    <p className="font-medium">{t.tvDashboard.noVideos}</p>
+                    <p className="text-sm mt-1">{t.tvDashboard.noVideosMessage}</p>
+                  </CardContent></Card>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full" data-testid="table-videos">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left p-3 text-sm font-medium">{t.tvDashboard.videoTitle}</th>
+                          <th className="text-left p-3 text-sm font-medium">{t.tvDashboard.videoType}</th>
+                          <th className="text-left p-3 text-sm font-medium">{t.tvDashboard.videoUrl}</th>
+                          <th className="text-center p-3 text-sm font-medium">{t.tvDashboard.sortOrder}</th>
+                          <th className="text-center p-3 text-sm font-medium">{t.tvDashboard.active}</th>
+                          <th className="text-right p-3 text-sm font-medium w-24"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {videos.map(v => (
+                          <tr key={v.id} className="border-t hover:bg-muted/30" data-testid={`row-video-${v.id}`}>
+                            <td className="p-3 font-medium">{v.title}</td>
+                            <td className="p-3 text-sm text-muted-foreground">{v.videoType === "youtube" ? t.tvDashboard.youtube : v.videoType === "image" ? t.tvDashboard.imageType : t.tvDashboard.upload}</td>
+                            <td className="p-3 text-sm text-muted-foreground truncate max-w-[200px]">{v.url}</td>
+                            <td className="p-3 text-center text-sm">{v.sortOrder}</td>
+                            <td className="p-3 text-center">
+                              <span className={`inline-block px-2 py-0.5 rounded text-xs ${v.isActive ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-500"}`}>
+                                {v.isActive ? t.tvDashboard.active : t.tvDashboard.inactive}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <Button variant="ghost" size="icon" onClick={() => openVideoDialog(v)} data-testid={`button-edit-video-${v.id}`}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: "video", id: v.id, name: v.title })} data-testid={`button-delete-video-${v.id}`}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Sequential Mapping Section */}
+                {isSequential && (
+                  <Card className="mt-6">
+                    <CardContent className="pt-5 space-y-4">
+                      <div>
+                        <p className="font-semibold text-sm">Sequential Playback — KPI Page → Video Mapping</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          For each KPI page, choose which video plays after it. Leave a page set to "None" to skip straight to the next KPI page.
+                        </p>
+                      </div>
+                      {activeKpis.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No active KPIs configured. Add KPIs first to see pages here.</p>
+                      ) : activeVideos.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No active videos available. Add videos above first.</p>
+                      ) : (
+                        <>
+                          <div className="border rounded-lg overflow-hidden">
+                            <table className="w-full text-sm" data-testid="table-seq-mappings">
+                              <thead>
+                                <tr className="bg-muted/50">
+                                  <th className="text-left p-3 font-medium">KPI Page</th>
+                                  <th className="text-left p-3 font-medium">KPIs on this page</th>
+                                  <th className="text-left p-3 font-medium">Video that plays after</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {Array.from({ length: totalPages }, (_, i) => {
+                                  const pageKpis = activeKpis.slice(i * kpisPerPage, (i + 1) * kpisPerPage);
+                                  return (
+                                    <tr key={i} className="border-t">
+                                      <td className="p-3 font-medium text-muted-foreground">Page {i + 1}</td>
+                                      <td className="p-3 text-xs text-muted-foreground">
+                                        {pageKpis.map(k => k.labelEn || k.name).join(", ")}
+                                      </td>
+                                      <td className="p-3">
+                                        <Select
+                                          value={seqMappings[i] != null ? String(seqMappings[i]) : "none"}
+                                          onValueChange={v => setSeqMappings(prev => ({ ...prev, [i]: v === "none" ? null : parseInt(v) }))}
+                                        >
+                                          <SelectTrigger className="w-56" data-testid={`select-seq-video-${i}`}>
+                                            <SelectValue placeholder="None (skip video)" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="none">— None (skip to next KPI page) —</SelectItem>
+                                            {activeVideos.map(v => (
+                                              <SelectItem key={v.id} value={String(v.id)}>{v.title}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div className="flex justify-end">
+                            <Button
+                              onClick={() => {
+                                const mappings = Object.entries(seqMappings).map(([pageIndex, videoId]) => ({
+                                  pageIndex: parseInt(pageIndex),
+                                  videoId: videoId ?? null,
+                                }));
+                                saveSeqMappingsMutation.mutate(mappings);
+                              }}
+                              disabled={saveSeqMappingsMutation.isPending}
+                              data-testid="button-save-seq-mappings"
+                            >
+                              <Save className="w-4 h-4 mr-2" />
+                              {saveSeqMappingsMutation.isPending ? "Saving…" : "Save Sequential Mapping"}
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            );
+          })()}
         </TabsContent>
 
         {/* ── Teams Sync Tab ── */}
@@ -1062,11 +1175,28 @@ export default function TVDashboardConfig() {
               <Label>{t.tvDashboard.labelPt}</Label>
               <Input value={dashForm.labelPt} onChange={e => setDashForm(p => ({ ...p, labelPt: e.target.value }))} data-testid="input-dashboard-label-pt" />
             </div>
+            <div className="border-t border-border pt-3">
+              <p className="text-sm font-semibold mb-2">Video Display Mode</p>
+              <Select value={dashForm.displayMode} onValueChange={v => setDashForm(p => ({ ...p, displayMode: v }))} data-testid="select-display-mode">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="simultaneous">Simultaneous — KPIs and video share the screen</SelectItem>
+                  <SelectItem value="sequential">Sequential — KPI page shows, then video plays full-screen</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {dashForm.displayMode === "sequential"
+                  ? "Each KPI page shows full-screen, then its linked video plays. Configure the page→video links in the Videos tab."
+                  : "KPIs and video are displayed on the same screen at the same time."}
+              </p>
+            </div>
             <div className="flex items-center gap-2">
               <Switch checked={dashForm.showVideo} onCheckedChange={v => setDashForm(p => ({ ...p, showVideo: v }))} data-testid="switch-show-video" />
               <Label>{t.tvDashboard.showVideo}</Label>
             </div>
-            {dashForm.showVideo && (
+            {dashForm.showVideo && dashForm.displayMode === "simultaneous" && (
               <>
                 <div>
                   <Label>{t.tvDashboard.videoPosition}</Label>
@@ -1100,6 +1230,13 @@ export default function TVDashboardConfig() {
                   </Select>
                 </div>
               </>
+            )}
+            {dashForm.displayMode === "sequential" && (
+              <div>
+                <Label>Video duration per page (seconds)</Label>
+                <Input type="number" min="5" max="300" value={dashForm.sequentialVideoSeconds} onChange={e => setDashForm(p => ({ ...p, sequentialVideoSeconds: e.target.value }))} data-testid="input-sequential-video-seconds" />
+                <p className="text-xs text-muted-foreground mt-1">How long each linked video plays before moving to the next KPI page (default: 30s).</p>
+              </div>
             )}
             <div>
               <Label>{t.tvDashboard.kpiRotation}</Label>

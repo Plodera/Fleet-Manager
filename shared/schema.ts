@@ -607,6 +607,8 @@ export const tvDashboards = pgTable("tv_dashboards", {
   bannerStyle: text("banner_style").notNull().default("off"),
   bannerFontSize: integer("banner_font_size").notNull().default(36),
   bannerScrollSpeed: integer("banner_scroll_speed").notNull().default(5),
+  displayMode: text("display_mode").notNull().default("simultaneous"),
+  sequentialVideoSeconds: integer("sequential_video_seconds").notNull().default(30),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -641,10 +643,23 @@ export const tvDashboardVideos = pgTable("tv_dashboard_videos", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
+export const tvDashboardKpiPageVideos = pgTable("tv_dashboard_kpi_page_videos", {
+  id: serial("id").primaryKey(),
+  dashboardId: integer("dashboard_id").references(() => tvDashboards.id, { onDelete: "cascade" }).notNull(),
+  pageIndex: integer("page_index").notNull(),
+  videoId: integer("video_id").references(() => tvDashboardVideos.id, { onDelete: "set null" }),
+});
+
 export const tvDashboardsRelations = relations(tvDashboards, ({ one, many }) => ({
   department: one(departments, { fields: [tvDashboards.departmentId], references: [departments.id] }),
   kpis: many(tvDashboardKpis),
   videos: many(tvDashboardVideos),
+  kpiPageVideos: many(tvDashboardKpiPageVideos),
+}));
+
+export const tvDashboardKpiPageVideosRelations = relations(tvDashboardKpiPageVideos, ({ one }) => ({
+  dashboard: one(tvDashboards, { fields: [tvDashboardKpiPageVideos.dashboardId], references: [tvDashboards.id] }),
+  video: one(tvDashboardVideos, { fields: [tvDashboardKpiPageVideos.videoId], references: [tvDashboardVideos.id] }),
 }));
 
 export const tvDashboardKpisRelations = relations(tvDashboardKpis, ({ one, many }) => ({
@@ -681,6 +696,7 @@ export type TvDashboardKpiValue = typeof tvDashboardKpiValues.$inferSelect;
 export type InsertTvDashboardKpiValue = z.infer<typeof insertTvDashboardKpiValueSchema>;
 export type TvDashboardVideo = typeof tvDashboardVideos.$inferSelect;
 export type InsertTvDashboardVideo = z.infer<typeof insertTvDashboardVideoSchema>;
+export type TvDashboardKpiPageVideo = typeof tvDashboardKpiPageVideos.$inferSelect;
 
 // Asset Trackers
 export const trackers = pgTable("trackers", {

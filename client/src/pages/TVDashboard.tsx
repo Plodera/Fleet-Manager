@@ -694,9 +694,15 @@ export default function TVDashboard() {
   const [currentKpiPage, setCurrentKpiPage] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
+  // Sequential mode state
+  const [seqPhase, setSeqPhase] = useState<'kpi' | 'video'>('kpi');
+  const [seqPageIdx, setSeqPageIdx] = useState(0);
+  const [seqFading, setSeqFading] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const videoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const kpiTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const seqTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data, isLoading } = useQuery<any>({
     queryKey: ["/api/tv-dashboards", id, "display"],
@@ -754,8 +760,13 @@ export default function TVDashboard() {
     setCurrentKpiPage(newPage);
   }, [currentKpiPage]);
 
+  const displayMode: string = data?.displayMode || "simultaneous";
+  const isSequential = displayMode === "sequential";
+  const sequentialVideoSeconds = Math.max(5, data?.sequentialVideoSeconds ?? 30);
+  const kpiPageVideos: { pageIndex: number; videoId: number | null }[] = data?.kpiPageVideos || [];
+
   useEffect(() => {
-    if (videos.length <= 1) return;
+    if (isSequential || videos.length <= 1) return;
     videoTimerRef.current = setInterval(() => {
       setVideoFading(true);
       setTimeout(() => {
@@ -764,17 +775,51 @@ export default function TVDashboard() {
       }, 500);
     }, 45000);
     return () => { if (videoTimerRef.current) clearInterval(videoTimerRef.current); };
-  }, [videos.length]);
+  }, [isSequential, videos.length]);
 
   const kpiRotationMs = (Math.max(1, data?.kpiRotationSeconds ?? 8) * 1000);
 
   useEffect(() => {
-    if (kpiPages <= 1) return;
+    if (isSequential || kpiPages <= 1) return;
     kpiTimerRef.current = setInterval(() => {
       setCurrentKpiPage(prev => (prev + 1) % kpiPages);
     }, kpiRotationMs);
     return () => { if (kpiTimerRef.current) clearInterval(kpiTimerRef.current); };
-  }, [kpiPages, kpiRotationMs]);
+  }, [isSequential, kpiPages, kpiRotationMs]);
+
+  // Sequential mode timer
+  useEffect(() => {
+    if (!isSequential || kpiPages === 0) return;
+    const clearSeq = () => { if (seqTimerRef.current) clearTimeout(seqTimerRef.current); };
+    clearSeq();
+
+    if (seqPhase === 'kpi') {
+      seqTimerRef.current = setTimeout(() => {
+        const mappedVideoId = kpiPageVideos.find((pv: { pageIndex: number; videoId: number | null }) => pv.pageIndex === seqPageIdx)?.videoId ?? null;
+        const mappedVideo = mappedVideoId ? videos.find((v: any) => v.id === mappedVideoId) : null;
+        if (mappedVideo) {
+          setSeqFading(true);
+          setTimeout(() => { setSeqPhase('video'); setSeqFading(false); }, 400);
+        } else {
+          setSeqFading(true);
+          setTimeout(() => {
+            setSeqPageIdx(prev => (prev + 1) % kpiPages);
+            setSeqFading(false);
+          }, 400);
+        }
+      }, kpiRotationMs);
+    } else {
+      seqTimerRef.current = setTimeout(() => {
+        setSeqFading(true);
+        setTimeout(() => {
+          setSeqPageIdx(prev => (prev + 1) % kpiPages);
+          setSeqPhase('kpi');
+          setSeqFading(false);
+        }, 400);
+      }, sequentialVideoSeconds * 1000);
+    }
+    return clearSeq;
+  }, [isSequential, seqPhase, seqPageIdx, kpiPages, kpiRotationMs, sequentialVideoSeconds, kpiPageVideos, videos]);
 
   const toggleFullScreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -866,6 +911,42 @@ export default function TVDashboard() {
           <BarChart3 className="w-16 h-16" />
           <p className="text-lg font-medium">{t.tvDashboard.noData}</p>
           <p className="text-sm">{t.tvDashboard.noDataMessage}</p>
+        </div>
+      );
+    }
+
+    // ── Sequential mode ──
+    if (isSequential && hasKpis) {
+      const mappedVideoId = kpiPageVideos.find((pv: { pageIndex: number; videoId: number | null }) => pv.pageIndex === seqPageIdx)?.videoId ?? null;
+      const seqVideo = mappedVideoId ? videos.find((v: any) => v.id === mappedVideoId) || null : null;
+      const opacityStyle: React.CSSProperties = {
+        opacity: seqFading ? 0 : 1,
+        transition: "opacity 0.4s ease",
+      };
+
+      if (seqPhase === 'video' && seqVideo) {
+        return (
+          <div className="flex-1 min-h-0" style={opacityStyle}>
+            <VideoPanel
+              currentVideo={seqVideo}
+              videos={[seqVideo]}
+              videoFading={false}
+              currentVideoIndex={0}
+              switchVideo={() => {}}
+              className="h-full"
+            />
+          </div>
+        );
+      }
+
+      // KPI phase — full screen
+      return (
+        <div className="flex-1 min-h-0" style={opacityStyle}>
+          <KpiGrid
+            {...kpiGridProps}
+            currentKpiPage={seqPageIdx}
+            switchKpiPage={() => {}}
+          />
         </div>
       );
     }

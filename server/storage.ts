@@ -2,7 +2,7 @@ import {
   users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
   indents, indentItems, indentApproverDepartments,
-  tvDashboards, tvDashboardKpis, tvDashboardKpiValues, tvDashboardVideos,
+  tvDashboards, tvDashboardKpis, tvDashboardKpiValues, tvDashboardVideos, tvDashboardKpiPageVideos,
   trackers, trackerItems, trackerNotificationRules,
   itHostTypes, itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
   glpiSettings,
@@ -195,6 +195,8 @@ export interface IStorage {
   createTvDashboardVideo(data: InsertTvDashboardVideo): Promise<TvDashboardVideo>;
   updateTvDashboardVideo(id: number, updates: Partial<InsertTvDashboardVideo>): Promise<TvDashboardVideo>;
   deleteTvDashboardVideo(id: number): Promise<void>;
+  getKpiPageVideos(dashboardId: number): Promise<any[]>;
+  upsertKpiPageVideos(dashboardId: number, mappings: { pageIndex: number; videoId: number | null }[]): Promise<void>;
   getTvDashboardDisplay(id: number): Promise<any>;
 
   // Status Trackers
@@ -963,6 +965,21 @@ export class DatabaseStorage implements IStorage {
     await getDb().delete(tvDashboardVideos).where(eq(tvDashboardVideos.id, id));
   }
 
+  async getKpiPageVideos(dashboardId: number): Promise<any[]> {
+    return await getDb().select().from(tvDashboardKpiPageVideos)
+      .where(eq(tvDashboardKpiPageVideos.dashboardId, dashboardId))
+      .orderBy(tvDashboardKpiPageVideos.pageIndex);
+  }
+
+  async upsertKpiPageVideos(dashboardId: number, mappings: { pageIndex: number; videoId: number | null }[]): Promise<void> {
+    await getDb().delete(tvDashboardKpiPageVideos).where(eq(tvDashboardKpiPageVideos.dashboardId, dashboardId));
+    if (mappings.length > 0) {
+      await getDb().insert(tvDashboardKpiPageVideos).values(
+        mappings.map(m => ({ dashboardId, pageIndex: m.pageIndex, videoId: m.videoId ?? null }))
+      );
+    }
+  }
+
   async getTvDashboardDisplay(id: number): Promise<any> {
     const dashboard = await this.getTvDashboard(id);
     if (!dashboard) return null;
@@ -982,13 +999,15 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(tvDashboardVideos.dashboardId, id), eq(tvDashboardVideos.isActive, true)))
       .orderBy(tvDashboardVideos.sortOrder);
 
+    const kpiPageVideos = await this.getKpiPageVideos(id);
+
     let department = null;
     if (dashboard.departmentId) {
       const [dept] = await getDb().select().from(departments).where(eq(departments.id, dashboard.departmentId));
       department = dept || null;
     }
 
-    return { ...dashboard, department, kpis, kpiValues, videos };
+    return { ...dashboard, department, kpis, kpiValues, videos, kpiPageVideos };
   }
 
   // Status Trackers
@@ -1631,6 +1650,8 @@ export const storage = {
   createTvDashboardVideo: (...args: Parameters<DatabaseStorage['createTvDashboardVideo']>) => getStorage().createTvDashboardVideo(...args),
   updateTvDashboardVideo: (...args: Parameters<DatabaseStorage['updateTvDashboardVideo']>) => getStorage().updateTvDashboardVideo(...args),
   deleteTvDashboardVideo: (...args: Parameters<DatabaseStorage['deleteTvDashboardVideo']>) => getStorage().deleteTvDashboardVideo(...args),
+  getKpiPageVideos: (...args: Parameters<DatabaseStorage['getKpiPageVideos']>) => getStorage().getKpiPageVideos(...args),
+  upsertKpiPageVideos: (...args: Parameters<DatabaseStorage['upsertKpiPageVideos']>) => getStorage().upsertKpiPageVideos(...args),
   getTvDashboardDisplay: (...args: Parameters<DatabaseStorage['getTvDashboardDisplay']>) => getStorage().getTvDashboardDisplay(...args),
   getTrackers: () => getStorage().getTrackers(),
   getTracker: (...args: Parameters<DatabaseStorage['getTracker']>) => getStorage().getTracker(...args),

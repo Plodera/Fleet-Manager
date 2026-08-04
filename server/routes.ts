@@ -1862,6 +1862,25 @@ export async function registerRoutes(
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
+  // KPI Page → Video sequential mappings
+  app.get('/api/tv-dashboards/:dashboardId/kpi-page-videos', async (req, res) => {
+    const dashboardId = parseInt(req.params.dashboardId);
+    const mappings = await storage.getKpiPageVideos(dashboardId);
+    res.json(mappings);
+  });
+
+  app.put('/api/tv-dashboards/:dashboardId/kpi-page-videos', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const dashboardId = parseInt(req.params.dashboardId);
+      const { mappings } = req.body;
+      await storage.upsertKpiPageVideos(dashboardId, mappings);
+      res.json({ success: true });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
   app.delete('/api/tv-videos/:id', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
