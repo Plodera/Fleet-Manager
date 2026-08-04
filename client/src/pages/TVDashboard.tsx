@@ -777,6 +777,13 @@ export default function TVDashboard() {
       setSeqPageIdx(prev => (prev >= kpiPages ? 0 : prev));
     }
   }, [kpiPages]);
+
+  // Keep video index in bounds when the active video list shrinks
+  useEffect(() => {
+    if (videos.length > 0) {
+      setCurrentVideoIndex(prev => (prev >= videos.length ? 0 : prev));
+    }
+  }, [videos.length]);
   const kpiPageVideos: { pageIndex: number; videoId: number | null }[] = data?.kpiPageVideos || [];
 
   useEffect(() => {
