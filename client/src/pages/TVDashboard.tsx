@@ -566,9 +566,21 @@ const transitionCSS = `
 `;
 
 function TickerBar({ text, speed = 5 }: { text: string; speed?: number }) {
-  // speed 1–10: factor = 0.375/speed → at speed 5 = 0.075s/char (~15s per 200 chars); min 5s
-  const factor = 0.375 / Math.max(1, Math.min(10, speed));
-  const duration = Math.max(5, Math.round(text.length * factor)) + "s";
+  // Repeat text enough times so the span always spans 2× the screen width,
+  // ensuring the -50% translateX animation travels a full screen-width distance
+  // regardless of how short the text is.
+  const SEP = "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"; // 8 non-breaking spaces
+  const approxCharPx = 11; // rough px width per character at 0.95rem semi-bold
+  const targetHalfPx = 2200; // want each half of the doubled span >= 2200px
+  const reps = Math.max(2, Math.ceil(targetHalfPx / ((text.length + SEP.length) * approxCharPx)));
+  const half = Array(reps).fill(text).join(SEP);
+  const full = half + SEP + half; // doubled for seamless -50% loop
+
+  // Duration: pixels per second based on speed 1–10 (speed 5 ≈ 120px/s)
+  const pxPerSec = speed * 24;
+  const halfPx = reps * (text.length + SEP.length) * approxCharPx;
+  const duration = Math.max(6, Math.round(halfPx / pxPerSec)) + "s";
+
   return (
     <div
       className="shrink-0 overflow-hidden"
@@ -586,7 +598,7 @@ function TickerBar({ text, speed = 5 }: { text: string; speed?: number }) {
         className="ticker-scroll text-white/80 font-semibold tracking-wide"
         style={{ fontSize: "0.95rem", letterSpacing: "0.04em", ["--ticker-duration" as string]: duration }}
       >
-        {text}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{text}
+        {full}
       </span>
     </div>
   );
@@ -625,7 +637,7 @@ function BannerPanel({ text, style, fontSize, speed = 5 }: { text: string; style
   }, [style]);
 
   const containerBase: React.CSSProperties = {
-    background: "rgba(0,0,0,0.6)",
+    background: "transparent",
     borderRadius: "12px",
     overflow: "hidden",
     boxSizing: "border-box",
