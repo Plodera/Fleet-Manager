@@ -1008,13 +1008,21 @@ export default function TVDashboard() {
       return (
         <div className="flex-1 min-h-0 flex flex-col" style={opacityStyle}>
           {seqInlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
-          <KpiGrid
-            {...kpiGridProps}
-            currentKpiPage={seqPageIdx}
-            switchKpiPage={() => {}}
-          />
+          {/* KpiGrid gets all remaining flex space */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            <KpiGrid
+              {...kpiGridProps}
+              currentKpiPage={seqPageIdx}
+              switchKpiPage={() => {}}
+            />
+          </div>
           {seqInlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
-          {showBanner && <BannerPanel text={bannerText} style={bannerStyle} fontSize={bannerFontSize} speed={bannerScrollSpeed} />}
+          {/* BannerPanel wrapped in shrink-0 so its internal flex-1 doesn't steal space from KpiGrid */}
+          {showBanner && (
+            <div className="shrink-0">
+              <BannerPanel text={bannerText} style={bannerStyle} fontSize={bannerFontSize} speed={bannerScrollSpeed} />
+            </div>
+          )}
         </div>
       );
     }
