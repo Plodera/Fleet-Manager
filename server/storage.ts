@@ -999,7 +999,12 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(tvDashboardVideos.dashboardId, id), eq(tvDashboardVideos.isActive, true)))
       .orderBy(tvDashboardVideos.sortOrder);
 
-    const kpiPageVideos = await this.getKpiPageVideos(id);
+    let kpiPageVideos: { id: number; dashboardId: number; pageIndex: number; videoId: number | null }[] = [];
+    try {
+      kpiPageVideos = await this.getKpiPageVideos(id);
+    } catch {
+      // Table may not exist yet on older deployments — return empty mapping
+    }
 
     let department = null;
     if (dashboard.departmentId) {
