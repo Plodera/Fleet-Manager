@@ -161,12 +161,18 @@ export default function TVDashboardConfig() {
     onError: (err: any) => toast({ title: "Save failed", description: err.message, variant: "destructive" }),
   });
 
+  const yesterdayDate = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split("T")[0]; })();
+  const effectivePeriodType = dataEntryPeriodType === "yesterday" ? "daily" : dataEntryPeriodType;
+  const effectivePeriodDate = dataEntryPeriodType === "yesterday" ? yesterdayDate
+    : dataEntryPeriodType === "monthly" ? dataEntryDate.substring(0, 7) + "-01"
+    : dataEntryDate;
+
   const { data: existingValues = [] } = useQuery<any[]>({
-    queryKey: ["/api/tv-kpi-values", selectedDashboardId, dataEntryPeriodType, dataEntryDate],
+    queryKey: ["/api/tv-kpi-values", selectedDashboardId, effectivePeriodType, effectivePeriodDate],
     queryFn: async () => {
       if (!selectedDashboardId || kpis.length === 0) return [];
       const ids = kpis.map(k => k.id).join(",");
-      const res = await fetch(`/api/tv-kpi-values?kpiIds=${ids}&periodType=${dataEntryPeriodType}&periodDate=${dataEntryDate}`);
+      const res = await fetch(`/api/tv-kpi-values?kpiIds=${ids}&periodType=${effectivePeriodType}&periodDate=${effectivePeriodDate}`);
       return res.json();
     },
     enabled: !!selectedDashboardId && kpis.length > 0,
@@ -556,8 +562,8 @@ export default function TVDashboardConfig() {
       .filter(kpi => kpiValues[kpi.id] !== undefined && kpiValues[kpi.id] !== "")
       .map(kpi => ({
         kpiId: kpi.id,
-        periodType: dataEntryPeriodType,
-        periodDate: dataEntryDate,
+        periodType: effectivePeriodType,
+        periodDate: effectivePeriodDate,
         value: kpiValues[kpi.id],
       }));
     if (values.length > 0) {
@@ -757,20 +763,29 @@ export default function TVDashboardConfig() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="daily">{t.tvDashboard.daily}</SelectItem>
+                      <SelectItem value="yesterday">Yesterday</SelectItem>
                       <SelectItem value="monthly">{t.tvDashboard.monthly}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-sm mb-1 block">{t.tvDashboard.periodDate}</Label>
-                  <Input
-                    type={dataEntryPeriodType === "monthly" ? "month" : "date"}
-                    value={dataEntryPeriodType === "monthly" ? dataEntryDate.substring(0, 7) : dataEntryDate}
-                    onChange={e => setDataEntryDate(dataEntryPeriodType === "monthly" ? e.target.value + "-01" : e.target.value)}
-                    className="w-48"
-                    data-testid="input-period-date"
-                  />
-                </div>
+                {dataEntryPeriodType !== "yesterday" && (
+                  <div>
+                    <Label className="text-sm mb-1 block">{t.tvDashboard.periodDate}</Label>
+                    <Input
+                      type={dataEntryPeriodType === "monthly" ? "month" : "date"}
+                      value={dataEntryPeriodType === "monthly" ? dataEntryDate.substring(0, 7) : dataEntryDate}
+                      onChange={e => setDataEntryDate(dataEntryPeriodType === "monthly" ? e.target.value + "-01" : e.target.value)}
+                      className="w-48"
+                      data-testid="input-period-date"
+                    />
+                  </div>
+                )}
+                {dataEntryPeriodType === "yesterday" && (
+                  <div>
+                    <Label className="text-sm mb-1 block">{t.tvDashboard.periodDate}</Label>
+                    <Input type="date" value={yesterdayDate} disabled className="w-48 opacity-60" />
+                  </div>
+                )}
               </div>
 
               {kpis.filter(k => k.isActive).length === 0 ? (

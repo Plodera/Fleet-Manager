@@ -957,7 +957,7 @@ export default function TVDashboard() {
     switchKpiPage,
     getDailyValue,
     getMonthlyValue,
-    monthlyLabel: t.tvDashboard.monthly,
+    monthlyLabel: "MTD",
     transitionStyle,
     shimmerDuration,
     pageSize: kpisPerPage,
