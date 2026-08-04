@@ -1003,14 +1003,18 @@ export default function TVDashboard() {
         );
       }
 
-      // KPI phase — full screen
+      // KPI phase — full screen with optional ticker + banner
+      const seqInlineTicker = showTicker && tickerPosition !== "bottom-bar";
       return (
         <div className="flex-1 min-h-0 flex flex-col" style={opacityStyle}>
+          {seqInlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
           <KpiGrid
             {...kpiGridProps}
             currentKpiPage={seqPageIdx}
             switchKpiPage={() => {}}
           />
+          {seqInlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
+          {showBanner && <BannerPanel text={bannerText} style={bannerStyle} fontSize={bannerFontSize} speed={bannerScrollSpeed} />}
         </div>
       );
     }
