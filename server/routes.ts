@@ -61,6 +61,19 @@ const upload = multer({
   },
 });
 
+// In-memory store tracking when each TV dashboard was last viewed on a TV screen.
+// Keyed by dashboard ID, value is the timestamp of the last ping.
+const tvDashboardLastSeen = new Map<number, Date>();
+const TV_ACTIVE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
+/** Remove entries older than the active window to prevent unbounded growth. */
+function pruneTvLastSeen(): void {
+  const cutoff = new Date(Date.now() - TV_ACTIVE_WINDOW_MS);
+  tvDashboardLastSeen.forEach((ts, id) => {
+    if (ts < cutoff) tvDashboardLastSeen.delete(id);
+  });
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1710,6 +1723,34 @@ export async function registerRoutes(
   app.get(api.tvDashboards.list.path, async (_req, res) => {
     const dashboards = await storage.getTvDashboards();
     res.json(dashboards);
+  });
+
+  // Returns map of dashboardId → ISO timestamp for dashboards seen within the active window.
+  // Used by the bulk-update preview to warn admins about live TV displays.
+  app.get('/api/tv-dashboards/active-viewers', (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    // Evict stale entries before responding so the map stays bounded.
+    pruneTvLastSeen();
+    const result: Record<string, string> = {};
+    tvDashboardLastSeen.forEach((ts, id) => {
+      result[String(id)] = ts.toISOString();
+    });
+    res.json(result);
+  });
+
+  // Called by TV display pages to record that a screen is actively showing this dashboard.
+  // No auth required — TV displays run in a dedicated browser session without a login cookie.
+  // Validates that the dashboard actually exists to prevent arbitrary-ID spoofing / memory abuse.
+  app.post('/api/tv-dashboards/:id/ping', async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+    // Validate the dashboard exists — rejects pings for IDs that have no corresponding row.
+    const dashboard = await storage.getTvDashboard(id);
+    if (!dashboard) return res.status(404).json({ message: "Dashboard not found" });
+    // Prune stale entries first so the map never holds more entries than real active dashboards.
+    pruneTvLastSeen();
+    tvDashboardLastSeen.set(id, new Date());
+    res.status(204).send();
   });
 
   app.get(api.tvDashboards.display.path.replace(':id', ':id(\\d+)'), async (req, res) => {

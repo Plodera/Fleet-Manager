@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Upload, X, Image, Film, Eye, RefreshCw, MessageSquare, CheckCircle, AlertCircle, Info, Layers } from "lucide-react";
+import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Upload, X, Image, Film, Eye, RefreshCw, MessageSquare, CheckCircle, AlertCircle, Info, Layers, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,6 +99,19 @@ export default function TVDashboardConfig() {
   const [previewValues, setPreviewValues] = useState<Record<string, string>>({}); // kpiId -> value override
 
   const { data: dashboards = [] } = useQuery<Dashboard[]>({ queryKey: ["/api/tv-dashboards"] });
+
+  // Fetches which dashboards are currently being shown on a TV screen (pinged in the last 10 min).
+  const { data: activeViewers = {} } = useQuery<Record<string, string>>({
+    queryKey: ["/api/tv-dashboards/active-viewers"],
+    queryFn: async () => {
+      const res = await fetch("/api/tv-dashboards/active-viewers");
+      if (!res.ok) return {};
+      return res.json();
+    },
+    enabled: bulkDialog,
+    refetchInterval: bulkDialog ? 30_000 : false,
+    staleTime: 15_000,
+  });
   const { data: departments = [] } = useQuery<any[]>({ queryKey: ["/api/departments"] });
   const { data: kpis = [] } = useQuery<KPI[]>({
     queryKey: ["/api/tv-dashboards", selectedDashboardId, "kpis"],
@@ -1728,6 +1741,7 @@ export default function TVDashboardConfig() {
           {bulkPreviewMode ? (() => {
             const diff = buildBulkPreview();
             const totalChanges = diff.reduce((sum, d) => sum + d.changes.filter(c => c.willChange).length, 0);
+            const activeLiveCount = diff.filter(({ dashboard }) => !!activeViewers[String(dashboard.id)]).length;
             return (
               <div className="overflow-y-auto flex-1 pr-1 space-y-3">
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-sm">
@@ -1737,14 +1751,30 @@ export default function TVDashboardConfig() {
                     {totalChanges > 0 ? ` with ${totalChanges} field change${totalChanges !== 1 ? "s" : ""}` : " (no fields differ from current values)"}.
                   </span>
                 </div>
+                {activeLiveCount > 0 && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-300 dark:border-orange-700 text-sm">
+                    <Wifi className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+                    <span className="text-orange-800 dark:text-orange-300">
+                      <strong>{activeLiveCount} dashboard{activeLiveCount !== 1 ? "s" : ""}</strong> {activeLiveCount !== 1 ? "are" : "is"} currently live on a TV screen.
+                      Changes will take effect immediately — consider timing this update carefully.
+                    </span>
+                  </div>
+                )}
                 {diff.map(({ dashboard, changes }) => {
                   const changed = changes.filter(c => c.willChange);
                   const unchanged = changes.filter(c => !c.willChange);
+                  const isLive = !!activeViewers[String(dashboard.id)];
                   return (
-                    <div key={dashboard.id} className="border rounded-lg overflow-hidden">
-                      <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b">
+                    <div key={dashboard.id} className={`border rounded-lg overflow-hidden ${isLive ? "border-orange-300 dark:border-orange-700" : ""}`}>
+                      <div className={`flex items-center gap-2 px-3 py-2 border-b ${isLive ? "bg-orange-50/60 dark:bg-orange-950/20" : "bg-muted/50"}`}>
                         <Monitor className="w-3.5 h-3.5 text-muted-foreground" />
                         <span className="text-sm font-medium">{dashboard.name}</span>
+                        {isLive && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 text-xs font-medium border border-orange-200 dark:border-orange-700">
+                            <Wifi className="w-3 h-3" />
+                            Live on TV
+                          </span>
+                        )}
                         {changed.length === 0
                           ? <span className="ml-auto text-xs text-muted-foreground">no changes</span>
                           : <span className="ml-auto text-xs font-medium text-amber-600 dark:text-amber-400">{changed.length} field{changed.length !== 1 ? "s" : ""} changing</span>}

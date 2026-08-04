@@ -721,6 +721,15 @@ export default function TVDashboard() {
     refetchInterval: 60000,
   });
 
+  // Ping the server so the config panel can warn admins that this dashboard is live on a TV.
+  useEffect(() => {
+    if (!id) return;
+    const ping = () => fetch(`/api/tv-dashboards/${id}/ping`, { method: "POST" }).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 60_000);
+    return () => clearInterval(interval);
+  }, [id]);
+
   const videos = useMemo(() => (data?.videos || []).filter((v: any) => v.isActive), [data?.videos]);
   const kpis = data?.kpis || [];
   const kpiValues = data?.kpiValues || [];
