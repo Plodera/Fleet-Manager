@@ -527,13 +527,13 @@ const transitionCSS = `
 }
 
 @keyframes tickerScroll {
-  0% { transform: translateX(0%); }
-  100% { transform: translateX(-50%); }
+  0%   { transform: translateX(100vw); }
+  100% { transform: translateX(-100%); }
 }
 .ticker-scroll {
   display: inline-block;
   white-space: nowrap;
-  animation: tickerScroll var(--ticker-duration, 28s) linear infinite;
+  animation: tickerScroll var(--ticker-duration, 18s) linear infinite;
 }
 
 @keyframes bannerSlideFadeIn {
@@ -566,20 +566,15 @@ const transitionCSS = `
 `;
 
 function TickerBar({ text, speed = 5 }: { text: string; speed?: number }) {
-  // Repeat text enough times so the span always spans 2× the screen width,
-  // ensuring the -50% translateX animation travels a full screen-width distance
-  // regardless of how short the text is.
-  const SEP = "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"; // 8 non-breaking spaces
-  const approxCharPx = 11; // rough px width per character at 0.95rem semi-bold
-  const targetHalfPx = 2200; // want each half of the doubled span >= 2200px
-  const reps = Math.max(2, Math.ceil(targetHalfPx / ((text.length + SEP.length) * approxCharPx)));
-  const half = Array(reps).fill(text).join(SEP);
-  const full = half + SEP + half; // doubled for seamless -50% loop
-
-  // Duration: pixels per second based on speed 1–10 (speed 5 ≈ 120px/s)
-  const pxPerSec = speed * 24;
-  const halfPx = reps * (text.length + SEP.length) * approxCharPx;
-  const duration = Math.max(6, Math.round(halfPx / pxPerSec)) + "s";
+  // Animation: translateX(100vw) → translateX(-100%) — one copy enters from the
+  // right edge and travels across the full viewport to the left, regardless of
+  // how short the text is.
+  // Total travel ≈ 100vw + element_width. Estimate 1200px + text_width.
+  const approxCharPx = 11;
+  const approxTotalPx = 1200 + text.length * approxCharPx;
+  // speed 1–10 → px/sec: speed 5 ≈ 150px/s (comfortable reading pace)
+  const pxPerSec = speed * 30;
+  const duration = Math.max(6, Math.round(approxTotalPx / pxPerSec)) + "s";
 
   return (
     <div
@@ -598,7 +593,7 @@ function TickerBar({ text, speed = 5 }: { text: string; speed?: number }) {
         className="ticker-scroll text-white/80 font-semibold tracking-wide"
         style={{ fontSize: "0.95rem", letterSpacing: "0.04em", ["--ticker-duration" as string]: duration }}
       >
-        {full}
+        {text}
       </span>
     </div>
   );
@@ -1015,12 +1010,12 @@ export default function TVDashboard() {
         );
       }
 
-      // KPI phase — full screen with optional ticker + banner
+      // KPI phase — KpiGrid fills full height; ticker + banner overlay at bottom
       const seqInlineTicker = showTicker && tickerPosition !== "bottom-bar";
+      const hasOverlay = seqInlineTicker || showBanner;
       return (
-        <div className="flex-1 min-h-0 flex flex-col" style={opacityStyle}>
-          {seqInlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
-          {/* KpiGrid gets all remaining flex space */}
+        <div className="flex-1 min-h-0 flex flex-col relative" style={opacityStyle}>
+          {/* KpiGrid always takes 100% of the available height */}
           <div className="flex-1 min-h-0 flex flex-col">
             <KpiGrid
               {...kpiGridProps}
@@ -1028,11 +1023,16 @@ export default function TVDashboard() {
               switchKpiPage={() => {}}
             />
           </div>
-          {seqInlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
-          {/* BannerPanel wrapped in shrink-0 so its internal flex-1 doesn't steal space from KpiGrid */}
-          {showBanner && (
-            <div className="shrink-0">
-              <BannerPanel text={bannerText} style={bannerStyle} fontSize={bannerFontSize} speed={bannerScrollSpeed} />
+          {/* Ticker + banner float over the bottom of the KPI grid — no height taken from grid */}
+          {hasOverlay && (
+            <div className="absolute bottom-0 left-0 right-0 flex flex-col gap-1 pointer-events-none">
+              {seqInlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
+              {showBanner && (
+                <div className="shrink-0">
+                  <BannerPanel text={bannerText} style={bannerStyle} fontSize={bannerFontSize} speed={bannerScrollSpeed} />
+                </div>
+              )}
+              {seqInlineTicker && tickerPosition === "below" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
             </div>
           )}
         </div>
