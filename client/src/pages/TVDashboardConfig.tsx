@@ -58,6 +58,7 @@ export default function TVDashboardConfig() {
   }, [allowedTabs.join(","), activeTab]);
 
   const [bulkDialog, setBulkDialog] = useState(false);
+  const [bulkPreviewMode, setBulkPreviewMode] = useState(false);
   const [bulkSelectAll, setBulkSelectAll] = useState(true);
   const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<number>>(new Set());
   const [bulkGroups, setBulkGroups] = useState({ ticker: false, banner: false, display: false });
@@ -358,9 +359,10 @@ export default function TVDashboardConfig() {
     onError: (err: any) => { toast({ title: "Bulk update failed", description: err.message, variant: "destructive" }); },
   });
 
-  const submitBulkUpdate = () => {
-    const ids = bulkSelectAll ? dashboards.map((d: Dashboard) => d.id) : Array.from(bulkSelectedIds);
-    if (ids.length === 0) { toast({ title: "Select at least one dashboard", variant: "destructive" }); return; }
+  type BulkFieldDiff = { label: string; oldVal: string; newVal: string; willChange: boolean };
+  type BulkDashboardDiff = { dashboard: Dashboard; changes: BulkFieldDiff[] };
+
+  const buildBulkFields = (): Record<string, any> => {
     const fields: Record<string, any> = {};
     if (bulkGroups.ticker) {
       fields.tickerPosition = bulkForm.tickerPosition;
@@ -379,8 +381,60 @@ export default function TVDashboardConfig() {
       fields.kpiRotationSeconds = parseInt(bulkForm.kpiRotationSeconds) || 8;
       fields.kpiTransitionStyle = bulkForm.kpiTransitionStyle;
     }
+    return fields;
+  };
+
+  const buildBulkPreview = (): BulkDashboardDiff[] => {
+    const ids = bulkSelectAll ? dashboards.map((d: Dashboard) => d.id) : Array.from(bulkSelectedIds);
+    const targetDashboards = (dashboards as Dashboard[]).filter(d => ids.includes(d.id));
+    const fields = buildBulkFields();
+
+    const fieldMeta: { key: string; label: string; fmt?: (v: any) => string }[] = [
+      { key: "tickerPosition", label: "Ticker Position" },
+      { key: "tickerText",     label: "Ticker Text" },
+      { key: "bannerStyle",    label: "Banner Style" },
+      { key: "bannerText",     label: "Banner Text" },
+      { key: "bannerFontSize", label: "Banner Font Size", fmt: v => `${v}px` },
+      { key: "bannerScrollSpeed", label: "Scroll Speed" },
+      { key: "bannerVerticalPosition", label: "Banner V. Position", fmt: v => `${v}%` },
+      { key: "displayMode",    label: "Display Mode" },
+      { key: "sequentialVideoSeconds", label: "Sequential Seconds", fmt: v => `${v}s` },
+      { key: "kpiRotationSeconds", label: "KPI Rotation", fmt: v => `${v}s` },
+      { key: "kpiTransitionStyle", label: "KPI Transition" },
+    ];
+
+    return targetDashboards.map(d => {
+      const changes: BulkFieldDiff[] = Object.keys(fields).map(key => {
+        const meta = fieldMeta.find(m => m.key === key);
+        const label = meta?.label ?? key;
+        const fmt = meta?.fmt ?? ((v: any) => String(v ?? "—"));
+        const oldRaw = (d as any)[key];
+        const newRaw = fields[key];
+        return {
+          label,
+          oldVal: fmt(oldRaw ?? "—"),
+          newVal: fmt(newRaw),
+          willChange: String(oldRaw) !== String(newRaw),
+        };
+      });
+      return { dashboard: d, changes };
+    });
+  };
+
+  const submitBulkUpdate = () => {
+    const ids = bulkSelectAll ? dashboards.map((d: Dashboard) => d.id) : Array.from(bulkSelectedIds);
+    if (ids.length === 0) { toast({ title: "Select at least one dashboard", variant: "destructive" }); return; }
+    const fields = buildBulkFields();
     if (Object.keys(fields).length === 0) { toast({ title: "Enable at least one field group to apply", variant: "destructive" }); return; }
     bulkUpdateMutation.mutate({ ids, fields });
+  };
+
+  const openBulkPreview = () => {
+    const ids = bulkSelectAll ? dashboards.map((d: Dashboard) => d.id) : Array.from(bulkSelectedIds);
+    if (ids.length === 0) { toast({ title: "Select at least one dashboard", variant: "destructive" }); return; }
+    const fields = buildBulkFields();
+    if (Object.keys(fields).length === 0) { toast({ title: "Enable at least one field group to apply", variant: "destructive" }); return; }
+    setBulkPreviewMode(true);
   };
 
   const bulkTargetCount = bulkSelectAll ? dashboards.length : bulkSelectedIds.size;
@@ -1652,13 +1706,68 @@ export default function TVDashboardConfig() {
       </Dialog>
 
       {/* ── Bulk Update Dialog ─────────────────────────────────── */}
-      <Dialog open={bulkDialog} onOpenChange={setBulkDialog}>
+      <Dialog open={bulkDialog} onOpenChange={open => { setBulkDialog(open); if (!open) setBulkPreviewMode(false); }}>
         <DialogContent className="max-h-[90vh] flex flex-col max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Layers className="w-4 h-4" /> Bulk Update Dashboards</DialogTitle>
-            <DialogDescription>Push shared settings to multiple dashboards at once. Only enabled groups are written.</DialogDescription>
+            <DialogDescription>
+              {bulkPreviewMode
+                ? "Review changes below. Only fields marked as changed will differ from their current values."
+                : "Push shared settings to multiple dashboards at once. Only enabled groups are written."}
+            </DialogDescription>
           </DialogHeader>
 
+          {/* ── Preview panel ── */}
+          {bulkPreviewMode ? (() => {
+            const diff = buildBulkPreview();
+            const totalChanges = diff.reduce((sum, d) => sum + d.changes.filter(c => c.willChange).length, 0);
+            return (
+              <div className="overflow-y-auto flex-1 pr-1 space-y-3">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-sm">
+                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span className="text-amber-800 dark:text-amber-300">
+                    <strong>{diff.length} dashboard{diff.length !== 1 ? "s" : ""}</strong> will be updated
+                    {totalChanges > 0 ? ` with ${totalChanges} field change${totalChanges !== 1 ? "s" : ""}` : " (no fields differ from current values)"}.
+                  </span>
+                </div>
+                {diff.map(({ dashboard, changes }) => {
+                  const changed = changes.filter(c => c.willChange);
+                  const unchanged = changes.filter(c => !c.willChange);
+                  return (
+                    <div key={dashboard.id} className="border rounded-lg overflow-hidden">
+                      <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b">
+                        <Monitor className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm font-medium">{dashboard.name}</span>
+                        {changed.length === 0
+                          ? <span className="ml-auto text-xs text-muted-foreground">no changes</span>
+                          : <span className="ml-auto text-xs font-medium text-amber-600 dark:text-amber-400">{changed.length} field{changed.length !== 1 ? "s" : ""} changing</span>}
+                      </div>
+                      {changes.length > 0 && (
+                        <table className="w-full text-xs">
+                          <tbody>
+                            {changed.map(c => (
+                              <tr key={c.label} className="border-t bg-amber-50/50 dark:bg-amber-950/10">
+                                <td className="px-3 py-1.5 text-muted-foreground w-36">{c.label}</td>
+                                <td className="px-3 py-1.5 line-through text-muted-foreground">{c.oldVal}</td>
+                                <td className="px-1 py-1.5 text-muted-foreground">→</td>
+                                <td className="px-3 py-1.5 font-semibold text-foreground">{c.newVal}</td>
+                              </tr>
+                            ))}
+                            {unchanged.map(c => (
+                              <tr key={c.label} className="border-t">
+                                <td className="px-3 py-1.5 text-muted-foreground w-36">{c.label}</td>
+                                <td className="px-3 py-1.5 text-muted-foreground" colSpan={3}>{c.oldVal} <span className="italic">(no change)</span></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })() : (
           <div className="space-y-5 overflow-y-auto flex-1 pr-1">
             {/* Dashboard selector */}
             <div className="border rounded-lg p-3 space-y-2">
@@ -1835,16 +1944,29 @@ export default function TVDashboardConfig() {
               )}
             </div>
           </div>
+          )}
 
           <DialogFooter className="pt-2 border-t">
-            <Button variant="outline" onClick={() => setBulkDialog(false)}>Cancel</Button>
-            <Button
-              onClick={submitBulkUpdate}
-              disabled={bulkUpdateMutation.isPending || bulkTargetCount === 0}
-              data-testid="button-bulk-update-submit"
-            >
-              {bulkUpdateMutation.isPending ? "Saving…" : `Save to ${bulkTargetCount} dashboard${bulkTargetCount !== 1 ? "s" : ""}`}
+            <Button variant="outline" onClick={() => { if (bulkPreviewMode) { setBulkPreviewMode(false); } else { setBulkDialog(false); } }}>
+              {bulkPreviewMode ? "← Back" : "Cancel"}
             </Button>
+            {bulkPreviewMode ? (
+              <Button
+                onClick={submitBulkUpdate}
+                disabled={bulkUpdateMutation.isPending}
+                data-testid="button-bulk-update-confirm"
+              >
+                {bulkUpdateMutation.isPending ? "Saving…" : `Confirm & Save to ${bulkTargetCount} dashboard${bulkTargetCount !== 1 ? "s" : ""}`}
+              </Button>
+            ) : (
+              <Button
+                onClick={openBulkPreview}
+                disabled={bulkTargetCount === 0}
+                data-testid="button-bulk-update-submit"
+              >
+                Review Changes →
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
