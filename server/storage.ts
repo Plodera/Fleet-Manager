@@ -985,24 +985,78 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTvDashboardDisplay(id: number): Promise<any> {
-    const dashboard = await this.getTvDashboard(id);
+    // Fetch dashboard — if new columns (display_mode etc.) don't exist yet on older DB,
+    // fall back to a raw query that COALESCEs the missing columns to defaults.
+    let dashboard: any;
+    try {
+      dashboard = await this.getTvDashboard(id);
+    } catch (e: any) {
+      console.warn('[getTvDashboardDisplay] getTvDashboard failed, trying raw fallback:', e.message);
+      try {
+        const rows = await getDb().execute(sql`
+          SELECT id, name, department_id, label_en, label_pt, is_active, created_at,
+                 show_video, video_position, video_size_percent, kpi_rotation_seconds,
+                 kpi_transition_style, shimmer_duration_seconds, kpis_per_page, kpi_font_scale,
+                 ticker_text, ticker_position, banner_text, banner_style, banner_font_size,
+                 banner_scroll_speed,
+                 COALESCE(display_mode, 'simultaneous') AS display_mode,
+                 COALESCE(sequential_video_seconds, 30) AS sequential_video_seconds
+          FROM tv_dashboards WHERE id = ${id}
+        `);
+        const row: any = (rows as any).rows?.[0] ?? (Array.isArray(rows) ? rows[0] : null);
+        if (!row) return null;
+        dashboard = {
+          id: row.id, name: row.name, departmentId: row.department_id,
+          labelEn: row.label_en, labelPt: row.label_pt, isActive: row.is_active,
+          createdAt: row.created_at, showVideo: row.show_video, videoPosition: row.video_position,
+          videoSizePercent: row.video_size_percent, kpiRotationSeconds: row.kpi_rotation_seconds,
+          kpiTransitionStyle: row.kpi_transition_style, shimmerDurationSeconds: row.shimmer_duration_seconds,
+          kpisPerPage: row.kpis_per_page, kpiFontScale: row.kpi_font_scale,
+          tickerText: row.ticker_text, tickerPosition: row.ticker_position,
+          bannerText: row.banner_text, bannerStyle: row.banner_style,
+          bannerFontSize: row.banner_font_size, bannerScrollSpeed: row.banner_scroll_speed,
+          displayMode: row.display_mode, sequentialVideoSeconds: row.sequential_video_seconds,
+        };
+      } catch (e2: any) {
+        console.error('[getTvDashboardDisplay] Raw fallback also failed:', e2.message);
+        return null;
+      }
+    }
     if (!dashboard) return null;
 
-    const kpis = await getDb().select().from(tvDashboardKpis)
-      .where(and(eq(tvDashboardKpis.dashboardId, id), eq(tvDashboardKpis.isActive, true)))
-      .orderBy(tvDashboardKpis.sortOrder);
-
-    const kpiIds = kpis.map(k => k.id);
-    let kpiValues: TvDashboardKpiValue[] = [];
-    if (kpiIds.length > 0) {
-      kpiValues = await getDb().select().from(tvDashboardKpiValues)
-        .where(sql`${tvDashboardKpiValues.kpiId} IN (${sql.join(kpiIds.map(id => sql`${id}`), sql`, `)})`);
+    // Fetch KPI definitions — wrap so a missing table doesn't kill the whole response
+    let kpis: any[] = [];
+    try {
+      kpis = await getDb().select().from(tvDashboardKpis)
+        .where(and(eq(tvDashboardKpis.dashboardId, id), eq(tvDashboardKpis.isActive, true)))
+        .orderBy(tvDashboardKpis.sortOrder);
+    } catch (e: any) {
+      console.warn('[getTvDashboardDisplay] KPI fetch failed:', e.message);
     }
 
-    const videos = await getDb().select().from(tvDashboardVideos)
-      .where(and(eq(tvDashboardVideos.dashboardId, id), eq(tvDashboardVideos.isActive, true)))
-      .orderBy(tvDashboardVideos.sortOrder);
+    // Fetch KPI values — wrap so a missing table doesn't kill the whole response
+    const kpiIds = kpis.map((k: any) => k.id);
+    let kpiValues: TvDashboardKpiValue[] = [];
+    try {
+      if (kpiIds.length > 0) {
+        kpiValues = await getDb().select().from(tvDashboardKpiValues)
+          .where(sql`${tvDashboardKpiValues.kpiId} IN (${sql.join(kpiIds.map((id: number) => sql`${id}`), sql`, `)})`);
+      }
+    } catch (e: any) {
+      console.warn('[getTvDashboardDisplay] KPI values fetch failed:', e.message);
+    }
 
+    // Fetch videos
+    let videos: any[] = [];
+    try {
+      videos = await getDb().select().from(tvDashboardVideos)
+        .where(and(eq(tvDashboardVideos.dashboardId, id), eq(tvDashboardVideos.isActive, true)))
+        .orderBy(tvDashboardVideos.sortOrder);
+    } catch (e: any) {
+      console.warn('[getTvDashboardDisplay] Video fetch failed:', e.message);
+    }
+
+    // Fetch KPI page video mappings (table may not exist on older deployments)
     let kpiPageVideos: { id: number; dashboardId: number; pageIndex: number; videoId: number | null }[] = [];
     try {
       kpiPageVideos = await this.getKpiPageVideos(id);
@@ -1011,9 +1065,13 @@ export class DatabaseStorage implements IStorage {
     }
 
     let department = null;
-    if (dashboard.departmentId) {
-      const [dept] = await getDb().select().from(departments).where(eq(departments.id, dashboard.departmentId));
-      department = dept || null;
+    try {
+      if (dashboard.departmentId) {
+        const [dept] = await getDb().select().from(departments).where(eq(departments.id, dashboard.departmentId));
+        department = dept || null;
+      }
+    } catch (e: any) {
+      console.warn('[getTvDashboardDisplay] Department fetch failed:', e.message);
     }
 
     return { ...dashboard, department, kpis, kpiValues, videos, kpiPageVideos };

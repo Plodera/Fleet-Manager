@@ -1713,10 +1713,15 @@ export async function registerRoutes(
   });
 
   app.get(api.tvDashboards.display.path.replace(':id', ':id(\\d+)'), async (req, res) => {
-    const id = parseInt(req.params.id);
-    const data = await storage.getTvDashboardDisplay(id);
-    if (!data) return res.status(404).json({ message: "Dashboard not found" });
-    res.json(data);
+    try {
+      const id = parseInt(req.params.id);
+      const data = await storage.getTvDashboardDisplay(id);
+      if (!data) return res.status(404).json({ message: "Dashboard not found" });
+      res.json(data);
+    } catch (e: any) {
+      console.error('[GET /display] Unhandled error:', e.message);
+      res.status(500).json({ message: "Failed to load dashboard", error: e.message });
+    }
   });
 
   app.get(api.tvDashboards.get.path.replace(':id', ':id(\\d+)'), async (req, res) => {
