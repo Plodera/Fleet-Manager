@@ -796,8 +796,7 @@ export default function TVDashboardConfig() {
                             <td className="p-3 text-sm text-muted-foreground">{kpi.unit || "-"}</td>
                             <td className="p-3">
                               <Input
-                                type="number"
-                                step="any"
+                                type="text"
                                 placeholder={t.tvDashboard.enterValue}
                                 value={kpiValues[kpi.id] ?? getExistingValue(kpi.id)}
                                 onChange={e => setKpiValues(prev => ({ ...prev, [kpi.id]: e.target.value }))}
