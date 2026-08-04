@@ -196,7 +196,7 @@ export interface IStorage {
   updateTvDashboardVideo(id: number, updates: Partial<InsertTvDashboardVideo>): Promise<TvDashboardVideo>;
   deleteTvDashboardVideo(id: number): Promise<void>;
   getKpiPageVideos(dashboardId: number): Promise<any[]>;
-  upsertKpiPageVideos(dashboardId: number, mappings: { pageIndex: number; videoId: number | null }[]): Promise<void>;
+  upsertKpiPageVideos(dashboardId: number, mappings: { pageIndex: number; videoIds: number[] }[]): Promise<void>;
   getTvDashboardDisplay(id: number): Promise<any>;
 
   // Status Trackers
@@ -971,12 +971,16 @@ export class DatabaseStorage implements IStorage {
       .orderBy(tvDashboardKpiPageVideos.pageIndex);
   }
 
-  async upsertKpiPageVideos(dashboardId: number, mappings: { pageIndex: number; videoId: number | null }[]): Promise<void> {
+  async upsertKpiPageVideos(dashboardId: number, mappings: { pageIndex: number; videoIds: number[] }[]): Promise<void> {
     await getDb().delete(tvDashboardKpiPageVideos).where(eq(tvDashboardKpiPageVideos.dashboardId, dashboardId));
-    if (mappings.length > 0) {
-      await getDb().insert(tvDashboardKpiPageVideos).values(
-        mappings.map(m => ({ dashboardId, pageIndex: m.pageIndex, videoId: m.videoId ?? null }))
-      );
+    const rows: { dashboardId: number; pageIndex: number; videoId: number }[] = [];
+    for (const m of mappings) {
+      for (const videoId of m.videoIds) {
+        rows.push({ dashboardId, pageIndex: m.pageIndex, videoId });
+      }
+    }
+    if (rows.length > 0) {
+      await getDb().insert(tvDashboardKpiPageVideos).values(rows);
     }
   }
 

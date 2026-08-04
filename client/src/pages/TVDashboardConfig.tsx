@@ -60,7 +60,7 @@ export default function TVDashboardConfig() {
   const [dashDialog, setDashDialog] = useState(false);
   const [editDash, setEditDash] = useState<Dashboard | null>(null);
   const [dashForm, setDashForm] = useState({ name: "", departmentId: "", labelEn: "", labelPt: "", isActive: true, showVideo: true, videoPosition: "bottom", videoSizePercent: "55", kpiRotationSeconds: "8", kpiTransitionStyle: "fade", shimmerDurationSeconds: "6", kpisPerPage: "6", kpiFontScale: "1.0", tickerText: "", tickerPosition: "off", bannerText: "", bannerStyle: "off", bannerFontSize: "36", bannerScrollSpeed: "5", displayMode: "simultaneous", sequentialVideoSeconds: "30" });
-  const [seqMappings, setSeqMappings] = useState<Record<number, number | null>>({});
+  const [seqMappings, setSeqMappings] = useState<Record<number, number[]>>({});
 
   const [kpiDialog, setKpiDialog] = useState(false);
   const [editKpi, setEditKpi] = useState<KPI | null>(null);
@@ -116,13 +116,18 @@ export default function TVDashboardConfig() {
     enabled: !!selectedDashboardId,
   });
   useEffect(() => {
-    const m: Record<number, number | null> = {};
-    kpiPageVideosData.forEach((pv: any) => { m[pv.pageIndex] = pv.videoId ?? null; });
+    const m: Record<number, number[]> = {};
+    kpiPageVideosData.forEach((pv: any) => {
+      if (pv.videoId != null) {
+        if (!m[pv.pageIndex]) m[pv.pageIndex] = [];
+        m[pv.pageIndex].push(pv.videoId);
+      }
+    });
     setSeqMappings(m);
   }, [JSON.stringify(kpiPageVideosData)]);
 
   const saveSeqMappingsMutation = useMutation({
-    mutationFn: (mappings: { pageIndex: number; videoId: number | null }[]) =>
+    mutationFn: (mappings: { pageIndex: number; videoIds: number[] }[]) =>
       apiRequest("PUT", `/api/tv-dashboards/${selectedDashboardId}/kpi-page-videos`, { mappings }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tv-dashboards", selectedDashboardId, "kpi-page-videos"] });
@@ -780,27 +785,64 @@ export default function TVDashboardConfig() {
                               <tbody>
                                 {Array.from({ length: totalPages }, (_, i) => {
                                   const pageKpis = activeKpis.slice(i * kpisPerPage, (i + 1) * kpisPerPage);
+                                  const pageVideoIds = seqMappings[i] || [];
+                                  const availableToAdd = activeVideos.filter(v => !pageVideoIds.includes(v.id));
                                   return (
                                     <tr key={i} className="border-t">
-                                      <td className="p-3 font-medium text-muted-foreground">Page {i + 1}</td>
+                                      <td className="p-3 font-medium text-muted-foreground whitespace-nowrap">Page {i + 1}</td>
                                       <td className="p-3 text-xs text-muted-foreground">
                                         {pageKpis.map(k => k.labelEn || k.name).join(", ")}
                                       </td>
                                       <td className="p-3">
-                                        <Select
-                                          value={seqMappings[i] != null ? String(seqMappings[i]) : "none"}
-                                          onValueChange={v => setSeqMappings(prev => ({ ...prev, [i]: v === "none" ? null : parseInt(v) }))}
-                                        >
-                                          <SelectTrigger className="w-56" data-testid={`select-seq-video-${i}`}>
-                                            <SelectValue placeholder="None (skip video)" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="none">— None (skip to next KPI page) —</SelectItem>
-                                            {activeVideos.map(v => (
-                                              <SelectItem key={v.id} value={String(v.id)}>{v.title}</SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
+                                        <div className="flex flex-col gap-2">
+                                          {/* Video chips */}
+                                          {pageVideoIds.length > 0 && (
+                                            <div className="flex flex-wrap gap-1">
+                                              {pageVideoIds.map((vidId, order) => {
+                                                const vid = activeVideos.find(v => v.id === vidId);
+                                                return vid ? (
+                                                  <span key={vidId} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 bg-primary/10 border border-primary/20 rounded text-xs">
+                                                    <span className="text-muted-foreground mr-0.5">{order + 1}.</span>
+                                                    {vid.title}
+                                                    <button
+                                                      type="button"
+                                                      className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
+                                                      onClick={() => setSeqMappings(prev => ({ ...prev, [i]: (prev[i] || []).filter(id => id !== vidId) }))}
+                                                    >×</button>
+                                                  </span>
+                                                ) : null;
+                                              })}
+                                            </div>
+                                          )}
+                                          {/* Add video dropdown */}
+                                          {availableToAdd.length > 0 && (
+                                            <Select
+                                              value="__add__"
+                                              onValueChange={v => {
+                                                if (v !== "__add__") {
+                                                  const vidId = parseInt(v);
+                                                  setSeqMappings(prev => ({ ...prev, [i]: [...(prev[i] || []), vidId] }));
+                                                }
+                                              }}
+                                            >
+                                              <SelectTrigger className="w-48 h-7 text-xs" data-testid={`select-seq-video-${i}`}>
+                                                <SelectValue placeholder="+ Add video…" />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="__add__" disabled>+ Add video…</SelectItem>
+                                                {availableToAdd.map(v => (
+                                                  <SelectItem key={v.id} value={String(v.id)}>{v.title}</SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          )}
+                                          {pageVideoIds.length === 0 && availableToAdd.length === 0 && (
+                                            <span className="text-xs text-muted-foreground italic">All videos added</span>
+                                          )}
+                                          {pageVideoIds.length === 0 && availableToAdd.length > 0 && (
+                                            <span className="text-xs text-muted-foreground">— skips to next KPI page —</span>
+                                          )}
+                                        </div>
                                       </td>
                                     </tr>
                                   );
@@ -811,9 +853,9 @@ export default function TVDashboardConfig() {
                           <div className="flex justify-end">
                             <Button
                               onClick={() => {
-                                const mappings = Object.entries(seqMappings).map(([pageIndex, videoId]) => ({
+                                const mappings = Object.entries(seqMappings).map(([pageIndex, videoIds]) => ({
                                   pageIndex: parseInt(pageIndex),
-                                  videoId: videoId ?? null,
+                                  videoIds: videoIds || [],
                                 }));
                                 saveSeqMappingsMutation.mutate(mappings);
                               }}
@@ -823,6 +865,7 @@ export default function TVDashboardConfig() {
                               <Save className="w-4 h-4 mr-2" />
                               {saveSeqMappingsMutation.isPending ? "Saving…" : "Save Sequential Mapping"}
                             </Button>
+                          
                           </div>
                         </>
                       )}

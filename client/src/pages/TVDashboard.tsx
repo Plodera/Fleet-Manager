@@ -697,6 +697,7 @@ export default function TVDashboard() {
   // Sequential mode state
   const [seqPhase, setSeqPhase] = useState<'kpi' | 'video'>('kpi');
   const [seqPageIdx, setSeqPageIdx] = useState(0);
+  const [seqVideoIdx, setSeqVideoIdx] = useState(0);
   const [seqFading, setSeqFading] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -768,6 +769,7 @@ export default function TVDashboard() {
   useEffect(() => {
     setSeqPhase('kpi');
     setSeqPageIdx(0);
+    setSeqVideoIdx(0);
   }, [displayMode]);
 
   // Keep page indices in bounds when kpisPerPage changes
@@ -785,6 +787,18 @@ export default function TVDashboard() {
     }
   }, [videos.length]);
   const kpiPageVideos: { pageIndex: number; videoId: number | null }[] = data?.kpiPageVideos || [];
+
+  // Group flat kpiPageVideos rows into a map: pageIndex → videoId[]
+  const kpiPageVideoMap = useMemo(() => {
+    const map: Record<number, number[]> = {};
+    for (const pv of kpiPageVideos) {
+      if (pv.videoId != null) {
+        if (!map[pv.pageIndex]) map[pv.pageIndex] = [];
+        map[pv.pageIndex].push(pv.videoId);
+      }
+    }
+    return map;
+  }, [kpiPageVideos]);
 
   useEffect(() => {
     if (isSequential || videos.length <= 1) return;
@@ -816,31 +830,41 @@ export default function TVDashboard() {
 
     if (seqPhase === 'kpi') {
       seqTimerRef.current = setTimeout(() => {
-        const mappedVideoId = kpiPageVideos.find((pv: { pageIndex: number; videoId: number | null }) => pv.pageIndex === seqPageIdx)?.videoId ?? null;
-        const mappedVideo = mappedVideoId ? videos.find((v: any) => v.id === mappedVideoId) : null;
-        if (mappedVideo) {
+        const pageVideoIds = kpiPageVideoMap[seqPageIdx] || [];
+        const firstVideo = pageVideoIds.length > 0 ? videos.find((v: any) => v.id === pageVideoIds[0]) : null;
+        if (firstVideo) {
           setSeqFading(true);
-          setTimeout(() => { setSeqPhase('video'); setSeqFading(false); }, 400);
+          setTimeout(() => { setSeqPhase('video'); setSeqVideoIdx(0); setSeqFading(false); }, 400);
         } else {
           setSeqFading(true);
           setTimeout(() => {
             setSeqPageIdx(prev => (prev + 1) % kpiPages);
+            setSeqVideoIdx(0);
             setSeqFading(false);
           }, 400);
         }
       }, kpiRotationMs);
     } else {
+      const pageVideoIds = kpiPageVideoMap[seqPageIdx] || [];
       seqTimerRef.current = setTimeout(() => {
         setSeqFading(true);
         setTimeout(() => {
-          setSeqPageIdx(prev => (prev + 1) % kpiPages);
-          setSeqPhase('kpi');
+          const nextVideoIdx = seqVideoIdx + 1;
+          if (nextVideoIdx < pageVideoIds.length && videos.find((v: any) => v.id === pageVideoIds[nextVideoIdx])) {
+            // Play next video in this page's sequence
+            setSeqVideoIdx(nextVideoIdx);
+          } else {
+            // All videos done for this page — advance to next KPI page
+            setSeqPageIdx(prev => (prev + 1) % kpiPages);
+            setSeqVideoIdx(0);
+            setSeqPhase('kpi');
+          }
           setSeqFading(false);
         }, 400);
       }, sequentialVideoSeconds * 1000);
     }
     return clearSeq;
-  }, [isSequential, seqPhase, seqPageIdx, kpiPages, kpiRotationMs, sequentialVideoSeconds, kpiPageVideos, videos]);
+  }, [isSequential, seqPhase, seqPageIdx, seqVideoIdx, kpiPages, kpiRotationMs, sequentialVideoSeconds, kpiPageVideoMap, videos]);
 
   const toggleFullScreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -956,8 +980,9 @@ export default function TVDashboard() {
         );
       }
 
-      const mappedVideoId = kpiPageVideos.find((pv: { pageIndex: number; videoId: number | null }) => pv.pageIndex === seqPageIdx)?.videoId ?? null;
-      const seqVideo = mappedVideoId ? videos.find((v: any) => v.id === mappedVideoId) || null : null;
+      const pageVideoIds = kpiPageVideoMap[seqPageIdx] || [];
+      const seqVideoId = pageVideoIds[seqVideoIdx] ?? null;
+      const seqVideo = seqVideoId ? videos.find((v: any) => v.id === seqVideoId) || null : null;
       const opacityStyle: React.CSSProperties = {
         opacity: seqFading ? 0 : 1,
         transition: "opacity 0.4s ease",
