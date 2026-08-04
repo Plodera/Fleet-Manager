@@ -750,6 +750,27 @@ export const api = {
     },
     delete: { method: 'DELETE' as const, path: '/api/tv-dashboards/:id', responses: { 204: z.void(), 404: errorSchemas.notFound } },
     display: { method: 'GET' as const, path: '/api/tv-dashboards/:id/display', responses: { 200: z.any(), 404: errorSchemas.notFound } },
+    bulkUpdate: {
+      method: 'POST' as const,
+      path: '/api/tv-dashboards/bulk-update',
+      input: z.object({
+        ids: z.array(z.number().int().positive()).min(1),
+        fields: z.object({
+          tickerText: z.string().optional(),
+          tickerPosition: z.enum(["off", "below", "above", "bottom-bar"]).optional(),
+          bannerText: z.string().optional(),
+          bannerStyle: z.enum(["off", "slide-fade", "marquee", "pulse", "typewriter"]).optional(),
+          bannerFontSize: z.coerce.number().int().min(16).max(120).optional(),
+          bannerScrollSpeed: z.coerce.number().int().min(1).max(10).optional(),
+          bannerVerticalPosition: z.coerce.number().int().min(0).max(100).optional(),
+          displayMode: z.enum(["simultaneous", "sequential"]).optional(),
+          sequentialVideoSeconds: z.coerce.number().int().min(5).max(300).optional(),
+          kpiRotationSeconds: z.coerce.number().int().min(1).max(300).optional(),
+          kpiTransitionStyle: z.enum(["fade", "slide-left", "slide-up", "zoom"]).optional(),
+        }),
+      }),
+      responses: { 200: z.object({ updated: z.number() }), 400: errorSchemas.validation },
+    },
   },
   tvDashboardKpis: {
     list: { method: 'GET' as const, path: '/api/tv-dashboards/:dashboardId/kpis', responses: { 200: z.array(z.any()) } },

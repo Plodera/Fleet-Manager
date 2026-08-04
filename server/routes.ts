@@ -1731,6 +1731,24 @@ export async function registerRoutes(
     res.json(dashboard);
   });
 
+  app.post(api.tvDashboards.bulkUpdate.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const { ids, fields } = api.tvDashboards.bulkUpdate.input.parse(req.body);
+      if (Object.keys(fields).length === 0) return res.status(400).json({ message: "No fields to update" });
+      let updated = 0;
+      for (const id of ids) {
+        try {
+          await storage.updateTvDashboard(id, fields);
+          updated++;
+        } catch (_) { /* skip missing dashboards */ }
+      }
+      res.json({ updated });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
   app.post(api.tvDashboards.create.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;

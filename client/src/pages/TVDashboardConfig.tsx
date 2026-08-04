@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Upload, X, Image, Film, Eye, RefreshCw, MessageSquare, CheckCircle, AlertCircle, Info } from "lucide-react";
+import { Monitor, Plus, Pencil, Trash2, Save, ExternalLink, Upload, X, Image, Film, Eye, RefreshCw, MessageSquare, CheckCircle, AlertCircle, Info, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +56,16 @@ export default function TVDashboardConfig() {
       setActiveTab(allowedTabs[0]);
     }
   }, [allowedTabs.join(","), activeTab]);
+
+  const [bulkDialog, setBulkDialog] = useState(false);
+  const [bulkSelectAll, setBulkSelectAll] = useState(true);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkGroups, setBulkGroups] = useState({ ticker: false, banner: false, display: false });
+  const [bulkForm, setBulkForm] = useState({
+    tickerPosition: "off", tickerText: "",
+    bannerStyle: "off", bannerText: "", bannerFontSize: "36", bannerScrollSpeed: "5", bannerVerticalPosition: "75",
+    displayMode: "simultaneous", sequentialVideoSeconds: "30", kpiRotationSeconds: "8", kpiTransitionStyle: "fade",
+  });
 
   const [dashDialog, setDashDialog] = useState(false);
   const [editDash, setEditDash] = useState<Dashboard | null>(null);
@@ -337,6 +347,44 @@ export default function TVDashboardConfig() {
     onError: (err: any) => { toast({ title: "Delete failed", description: err.message, variant: "destructive" }); },
   });
 
+  const bulkUpdateMutation = useMutation({
+    mutationFn: (body: { ids: number[]; fields: Record<string, any> }) =>
+      apiRequest("POST", "/api/tv-dashboards/bulk-update", body),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tv-dashboards"] });
+      setBulkDialog(false);
+      toast({ title: `Updated ${res.updated ?? "?"} dashboard${res.updated !== 1 ? "s" : ""}` });
+    },
+    onError: (err: any) => { toast({ title: "Bulk update failed", description: err.message, variant: "destructive" }); },
+  });
+
+  const submitBulkUpdate = () => {
+    const ids = bulkSelectAll ? dashboards.map((d: Dashboard) => d.id) : Array.from(bulkSelectedIds);
+    if (ids.length === 0) { toast({ title: "Select at least one dashboard", variant: "destructive" }); return; }
+    const fields: Record<string, any> = {};
+    if (bulkGroups.ticker) {
+      fields.tickerPosition = bulkForm.tickerPosition;
+      fields.tickerText = bulkForm.tickerText;
+    }
+    if (bulkGroups.banner) {
+      fields.bannerStyle = bulkForm.bannerStyle;
+      fields.bannerText = bulkForm.bannerText;
+      fields.bannerFontSize = parseInt(bulkForm.bannerFontSize) || 36;
+      fields.bannerScrollSpeed = parseInt(bulkForm.bannerScrollSpeed) || 5;
+      fields.bannerVerticalPosition = parseInt(bulkForm.bannerVerticalPosition) || 75;
+    }
+    if (bulkGroups.display) {
+      fields.displayMode = bulkForm.displayMode;
+      fields.sequentialVideoSeconds = parseInt(bulkForm.sequentialVideoSeconds) || 30;
+      fields.kpiRotationSeconds = parseInt(bulkForm.kpiRotationSeconds) || 8;
+      fields.kpiTransitionStyle = bulkForm.kpiTransitionStyle;
+    }
+    if (Object.keys(fields).length === 0) { toast({ title: "Enable at least one field group to apply", variant: "destructive" }); return; }
+    bulkUpdateMutation.mutate({ ids, fields });
+  };
+
+  const bulkTargetCount = bulkSelectAll ? dashboards.length : bulkSelectedIds.size;
+
   const normFontScale = (v: number) => {
     if (v >= 1.9) return "2.0";
     if (v >= 1.5) return "1.6";
@@ -497,7 +545,13 @@ export default function TVDashboardConfig() {
         </TabsList>
 
         <TabsContent value="dashboards" className="mt-4">
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end gap-2 mb-4">
+            {dashboards.length > 1 && (
+              <Button variant="outline" onClick={() => setBulkDialog(true)} data-testid="button-bulk-update">
+                <Layers className="w-4 h-4 mr-2" />
+                Bulk Update
+              </Button>
+            )}
             <Button onClick={() => openDashDialog()} data-testid="button-add-dashboard">
               <Plus className="w-4 h-4 mr-2" />
               {t.tvDashboard.addDashboard}
@@ -1592,6 +1646,204 @@ export default function TVDashboardConfig() {
           <DialogFooter>
             <Button onClick={submitVideo} disabled={createVideoMutation.isPending || updateVideoMutation.isPending || uploading} data-testid="button-submit-video">
               {(createVideoMutation.isPending || updateVideoMutation.isPending) ? t.tvDashboard.creating : t.buttons?.save || "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Bulk Update Dialog ─────────────────────────────────── */}
+      <Dialog open={bulkDialog} onOpenChange={setBulkDialog}>
+        <DialogContent className="max-h-[90vh] flex flex-col max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Layers className="w-4 h-4" /> Bulk Update Dashboards</DialogTitle>
+            <DialogDescription>Push shared settings to multiple dashboards at once. Only enabled groups are written.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 overflow-y-auto flex-1 pr-1">
+            {/* Dashboard selector */}
+            <div className="border rounded-lg p-3 space-y-2">
+              <p className="text-sm font-semibold">Apply to</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={bulkSelectAll}
+                  onChange={e => { setBulkSelectAll(e.target.checked); if (e.target.checked) setBulkSelectedIds(new Set()); }}
+                  className="h-4 w-4" />
+                <span className="text-sm font-medium">All dashboards ({dashboards.length})</span>
+              </label>
+              {!bulkSelectAll && (
+                <div className="ml-1 space-y-1 max-h-40 overflow-y-auto border rounded p-2 bg-muted/30">
+                  {(dashboards as Dashboard[]).map(d => (
+                    <label key={d.id} className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox"
+                        checked={bulkSelectedIds.has(d.id)}
+                        onChange={e => setBulkSelectedIds(prev => {
+                          const next = new Set(prev);
+                          e.target.checked ? next.add(d.id) : next.delete(d.id);
+                          return next;
+                        })}
+                        className="h-4 w-4" />
+                      <span className="text-sm">{d.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Ticker group */}
+            <div className="border rounded-lg p-3 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={bulkGroups.ticker}
+                  onChange={e => setBulkGroups(p => ({ ...p, ticker: e.target.checked }))}
+                  className="h-4 w-4" />
+                <span className="text-sm font-semibold">Scrolling Ticker</span>
+              </label>
+              {bulkGroups.ticker && (
+                <div className="space-y-2 ml-1">
+                  <div>
+                    <Label className="text-xs">Ticker Position</Label>
+                    <Select value={bulkForm.tickerPosition} onValueChange={v => setBulkForm(p => ({ ...p, tickerPosition: v }))}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="off">Off (disabled)</SelectItem>
+                        <SelectItem value="below">Below image / video</SelectItem>
+                        <SelectItem value="above">Above image / video</SelectItem>
+                        <SelectItem value="bottom-bar">Full-width bottom bar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {bulkForm.tickerPosition !== "off" && (
+                    <div>
+                      <Label className="text-xs">Ticker Text</Label>
+                      <Input className="mt-1" value={bulkForm.tickerText}
+                        onChange={e => setBulkForm(p => ({ ...p, tickerText: e.target.value }))}
+                        placeholder="Enter scrolling message..." />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Banner group */}
+            <div className="border rounded-lg p-3 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={bulkGroups.banner}
+                  onChange={e => setBulkGroups(p => ({ ...p, banner: e.target.checked }))}
+                  className="h-4 w-4" />
+                <span className="text-sm font-semibold">Banner Panel</span>
+              </label>
+              {bulkGroups.banner && (
+                <div className="space-y-3 ml-1">
+                  <div>
+                    <Label className="text-xs">Banner Style</Label>
+                    <Select value={bulkForm.bannerStyle} onValueChange={v => setBulkForm(p => ({ ...p, bannerStyle: v }))}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="off">Off (disabled)</SelectItem>
+                        <SelectItem value="slide-fade">Slide-up Fade</SelectItem>
+                        <SelectItem value="marquee">Scrolling Marquee</SelectItem>
+                        <SelectItem value="pulse">Pulsing Glow</SelectItem>
+                        <SelectItem value="typewriter">Typewriter</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {bulkForm.bannerStyle !== "off" && (
+                    <>
+                      <div>
+                        <Label className="text-xs">Banner Text</Label>
+                        <Input className="mt-1" value={bulkForm.bannerText}
+                          onChange={e => setBulkForm(p => ({ ...p, bannerText: e.target.value }))}
+                          placeholder="Enter banner message..." />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Font Size: {bulkForm.bannerFontSize}px</Label>
+                        <input type="range" min={16} max={120} step={2}
+                          value={bulkForm.bannerFontSize}
+                          onChange={e => setBulkForm(p => ({ ...p, bannerFontSize: e.target.value }))}
+                          className="w-full mt-1" />
+                      </div>
+                      {bulkForm.bannerStyle === "marquee" && (
+                        <div>
+                          <Label className="text-xs">Scroll Speed: {["","1–Very Slow","2–Slow","3–Moderate","4–Medium","5–Normal","6–Slightly Fast","7–Fast","8–Faster","9–Very Fast","10–Maximum"][parseInt(bulkForm.bannerScrollSpeed)||5]}</Label>
+                          <input type="range" min={1} max={10} step={1}
+                            value={bulkForm.bannerScrollSpeed}
+                            onChange={e => setBulkForm(p => ({ ...p, bannerScrollSpeed: e.target.value }))}
+                            className="w-full mt-1" />
+                        </div>
+                      )}
+                      <div>
+                        <Label className="text-xs">Vertical Position: {bulkForm.bannerVerticalPosition}% from top</Label>
+                        <input type="range" min={0} max={100} step={5}
+                          value={bulkForm.bannerVerticalPosition}
+                          onChange={e => setBulkForm(p => ({ ...p, bannerVerticalPosition: e.target.value }))}
+                          className="w-full mt-1" />
+                        <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
+                          <span>0% top</span><span>100% bottom</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Display behaviour group */}
+            <div className="border rounded-lg p-3 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={bulkGroups.display}
+                  onChange={e => setBulkGroups(p => ({ ...p, display: e.target.checked }))}
+                  className="h-4 w-4" />
+                <span className="text-sm font-semibold">Display Behaviour</span>
+              </label>
+              {bulkGroups.display && (
+                <div className="space-y-3 ml-1">
+                  <div>
+                    <Label className="text-xs">Display Mode</Label>
+                    <Select value={bulkForm.displayMode} onValueChange={v => setBulkForm(p => ({ ...p, displayMode: v }))}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="simultaneous">Simultaneous — KPIs and video share screen</SelectItem>
+                        <SelectItem value="sequential">Sequential — KPI page then full-screen video</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {bulkForm.displayMode === "sequential" && (
+                    <div>
+                      <Label className="text-xs">Video Duration per Page (seconds)</Label>
+                      <Input type="number" min="5" max="300" className="mt-1"
+                        value={bulkForm.sequentialVideoSeconds}
+                        onChange={e => setBulkForm(p => ({ ...p, sequentialVideoSeconds: e.target.value }))} />
+                    </div>
+                  )}
+                  <div>
+                    <Label className="text-xs">KPI Rotation (seconds)</Label>
+                    <Input type="number" min="1" className="mt-1"
+                      value={bulkForm.kpiRotationSeconds}
+                      onChange={e => setBulkForm(p => ({ ...p, kpiRotationSeconds: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">KPI Transition Style</Label>
+                    <Select value={bulkForm.kpiTransitionStyle} onValueChange={v => setBulkForm(p => ({ ...p, kpiTransitionStyle: v }))}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fade">Fade</SelectItem>
+                        <SelectItem value="slide-left">Slide Left</SelectItem>
+                        <SelectItem value="slide-up">Slide Up</SelectItem>
+                        <SelectItem value="zoom">Zoom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2 border-t">
+            <Button variant="outline" onClick={() => setBulkDialog(false)}>Cancel</Button>
+            <Button
+              onClick={submitBulkUpdate}
+              disabled={bulkUpdateMutation.isPending || bulkTargetCount === 0}
+              data-testid="button-bulk-update-submit"
+            >
+              {bulkUpdateMutation.isPending ? "Saving…" : `Save to ${bulkTargetCount} dashboard${bulkTargetCount !== 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>
