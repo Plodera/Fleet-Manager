@@ -767,6 +767,8 @@ export const api = {
           sequentialVideoSeconds: z.coerce.number().int().min(5).max(300).optional(),
           kpiRotationSeconds: z.coerce.number().int().min(1).max(300).optional(),
           kpiTransitionStyle: z.enum(["fade", "slide-left", "slide-up", "zoom"]).optional(),
+          videoPosition: z.enum(["bottom", "top", "left", "right", "center", "top-right", "top-left"]).optional(),
+          videoSizePercent: z.coerce.number().int().refine(v => [25, 40, 55, 65].includes(v)).optional(),
         }),
       }),
       responses: { 200: z.object({ updated: z.number() }), 400: errorSchemas.validation },

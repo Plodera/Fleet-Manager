@@ -61,11 +61,12 @@ export default function TVDashboardConfig() {
   const [bulkPreviewMode, setBulkPreviewMode] = useState(false);
   const [bulkSelectAll, setBulkSelectAll] = useState(true);
   const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<number>>(new Set());
-  const [bulkGroups, setBulkGroups] = useState({ ticker: false, banner: false, display: false });
+  const [bulkGroups, setBulkGroups] = useState({ ticker: false, banner: false, display: false, videoLayout: false });
   const [bulkForm, setBulkForm] = useState({
     tickerPosition: "off", tickerText: "",
     bannerStyle: "off", bannerText: "", bannerFontSize: "36", bannerScrollSpeed: "5", bannerVerticalPosition: "75",
     displayMode: "simultaneous", sequentialVideoSeconds: "30", kpiRotationSeconds: "8", kpiTransitionStyle: "fade",
+    videoPosition: "bottom", videoSizePercent: "55",
   });
 
   const [dashDialog, setDashDialog] = useState(false);
@@ -381,6 +382,10 @@ export default function TVDashboardConfig() {
       fields.kpiRotationSeconds = parseInt(bulkForm.kpiRotationSeconds) || 8;
       fields.kpiTransitionStyle = bulkForm.kpiTransitionStyle;
     }
+    if (bulkGroups.videoLayout) {
+      fields.videoPosition = bulkForm.videoPosition;
+      fields.videoSizePercent = parseInt(bulkForm.videoSizePercent) || 55;
+    }
     return fields;
   };
 
@@ -401,6 +406,8 @@ export default function TVDashboardConfig() {
       { key: "sequentialVideoSeconds", label: "Sequential Seconds", fmt: v => `${v}s` },
       { key: "kpiRotationSeconds", label: "KPI Rotation", fmt: v => `${v}s` },
       { key: "kpiTransitionStyle", label: "KPI Transition" },
+      { key: "videoPosition",  label: "Video Position" },
+      { key: "videoSizePercent", label: "Video Size", fmt: v => `${v}%` },
     ];
 
     return targetDashboards.map(d => {
@@ -1937,6 +1944,48 @@ export default function TVDashboardConfig() {
                         <SelectItem value="slide-left">Slide Left</SelectItem>
                         <SelectItem value="slide-up">Slide Up</SelectItem>
                         <SelectItem value="zoom">Zoom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Video Layout group */}
+            <div className="border rounded-lg p-3 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={bulkGroups.videoLayout}
+                  onChange={e => setBulkGroups(p => ({ ...p, videoLayout: e.target.checked }))}
+                  className="h-4 w-4" />
+                <span className="text-sm font-semibold">Video Layout</span>
+              </label>
+              <p className="text-xs text-muted-foreground -mt-1 ml-6">Only applies to dashboards in simultaneous display mode.</p>
+              {bulkGroups.videoLayout && (
+                <div className="space-y-3 ml-1">
+                  <div>
+                    <Label className="text-xs">Video Position</Label>
+                    <Select value={bulkForm.videoPosition} onValueChange={v => setBulkForm(p => ({ ...p, videoPosition: v }))}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bottom">Bottom</SelectItem>
+                        <SelectItem value="top">Top</SelectItem>
+                        <SelectItem value="right">Right</SelectItem>
+                        <SelectItem value="left">Left</SelectItem>
+                        <SelectItem value="center">Center</SelectItem>
+                        <SelectItem value="top-right">Top Right</SelectItem>
+                        <SelectItem value="top-left">Top Left</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Video Size</Label>
+                    <Select value={bulkForm.videoSizePercent} onValueChange={v => setBulkForm(p => ({ ...p, videoSizePercent: v }))}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="25">25% — Small</SelectItem>
+                        <SelectItem value="40">40% — Medium</SelectItem>
+                        <SelectItem value="55">55% — Large</SelectItem>
+                        <SelectItem value="65">65% — Extra Large</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
