@@ -580,9 +580,7 @@ function TickerBar({ text, speed = 5 }: { text: string; speed?: number }) {
     <div
       className="shrink-0 overflow-hidden"
       style={{
-        background: "rgba(0,0,0,0.7)",
-        borderTop: "1px solid rgba(255,255,255,0.08)",
-        borderBottom: "1px solid rgba(255,255,255,0.08)",
+        background: "transparent",
         height: "36px",
         display: "flex",
         alignItems: "center",
@@ -925,6 +923,7 @@ export default function TVDashboard() {
   const bannerStyle = data?.bannerStyle || "off";
   const bannerFontSize = data?.bannerFontSize ?? 36;
   const bannerScrollSpeed = data?.bannerScrollSpeed ?? 5;
+  const bannerVerticalPosition = data?.bannerVerticalPosition ?? 75; // 0=top … 100=bottom
   const showBanner = bannerStyle !== "off" && bannerText.trim().length > 0;
   const isCornerPosition = videoPosition === "top-right" || videoPosition === "top-left";
   const isSidePosition = videoPosition === "left" || videoPosition === "right";
@@ -1023,9 +1022,9 @@ export default function TVDashboard() {
               switchKpiPage={() => {}}
             />
           </div>
-          {/* Ticker + banner float over the bottom of the KPI grid — no height taken from grid */}
+          {/* Ticker + banner float over the KPI grid — no height taken from grid */}
           {hasOverlay && (
-            <div className="absolute bottom-0 left-0 right-0 flex flex-col gap-1 pointer-events-none">
+            <div className="absolute left-0 right-0 pointer-events-none" style={{ top: `${bannerVerticalPosition}%`, transform: "translateY(-50%)" }}>
               {seqInlineTicker && tickerPosition === "above" && <TickerBar text={tickerText} speed={bannerScrollSpeed} />}
               {showBanner && (
                 <div className="shrink-0">
