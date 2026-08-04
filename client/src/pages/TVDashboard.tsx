@@ -916,7 +916,25 @@ export default function TVDashboard() {
     }
 
     // ── Sequential mode ──
-    if (isSequential && hasKpis) {
+    if (isSequential) {
+      // No KPIs configured — fall back to video-only in sequential mode
+      if (!hasKpis) {
+        if (hasVideo) {
+          return (
+            <div className="flex-1 min-h-0">
+              <VideoPanel {...videoPanelProps} className="h-full" />
+            </div>
+          );
+        }
+        return (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ color: "rgba(255,255,255,0.15)" }}>
+            <BarChart3 className="w-16 h-16" />
+            <p className="text-lg font-medium">{t.tvDashboard.noData}</p>
+            <p className="text-sm">{t.tvDashboard.noDataMessage}</p>
+          </div>
+        );
+      }
+
       const mappedVideoId = kpiPageVideos.find((pv: { pageIndex: number; videoId: number | null }) => pv.pageIndex === seqPageIdx)?.videoId ?? null;
       const seqVideo = mappedVideoId ? videos.find((v: any) => v.id === mappedVideoId) || null : null;
       const opacityStyle: React.CSSProperties = {
