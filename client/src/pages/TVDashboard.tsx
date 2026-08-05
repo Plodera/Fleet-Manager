@@ -245,6 +245,7 @@ function KpiCardContent({
   kpi,
   allKpis,
   getDailyValue,
+  getDailyDate,
   getMonthlyValue,
   monthlyLabel,
   shimmerDuration,
@@ -253,6 +254,7 @@ function KpiCardContent({
   kpi: any;
   allKpis: any[];
   getDailyValue: (kpiId: number) => string;
+  getDailyDate: (kpiId: number) => string | null;
   getMonthlyValue: (kpiId: number) => string;
   monthlyLabel: string;
   shimmerDuration: number;
@@ -262,6 +264,10 @@ function KpiCardContent({
   const color = KPI_COLORS[globalIdx % KPI_COLORS.length];
   const IconComp = KPI_ICONS[globalIdx % KPI_ICONS.length];
   const dailyVal = getDailyValue(kpi.id);
+  const dailyDate = getDailyDate(kpi.id);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const yesterdayStr = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split("T")[0]; })();
+  const dailyLabel = !dailyDate || dailyDate === todayStr ? "TODAY" : dailyDate === yesterdayStr ? "YESTERDAY" : dailyDate;
   const monthlyVal = getMonthlyValue(kpi.id);
 
   const dailyNum = parseFloat(String(dailyVal));
@@ -295,10 +301,10 @@ function KpiCardContent({
         </div>
       </div>
 
-      {/* "TODAY" badge + big daily value */}
+      {/* "TODAY" / "YESTERDAY" badge + big daily value */}
       <div className="flex flex-col gap-0.5">
         <span className="font-black uppercase tracking-widest" style={{ color: color.topBar, fontSize: `calc(${s} * clamp(0.65rem, 0.95vw, 0.85rem))` }}>
-          TODAY
+          {dailyLabel}
         </span>
         <AnimatedValue value={dailyVal} unit={kpi.unit} testId={`text-daily-value-${kpi.id}`} fontScale={s} />
       </div>
@@ -343,6 +349,7 @@ interface KpiGridProps {
   currentKpiPage: number;
   switchKpiPage: (page: number) => void;
   getDailyValue: (kpiId: number) => string;
+  getDailyDate: (kpiId: number) => string | null;
   getMonthlyValue: (kpiId: number) => string;
   monthlyLabel: string;
   cols?: number;
@@ -360,6 +367,7 @@ const KpiGrid = memo(function KpiGrid({
   currentKpiPage,
   switchKpiPage,
   getDailyValue,
+  getDailyDate,
   getMonthlyValue,
   monthlyLabel,
   cols: colsProp,
@@ -419,6 +427,7 @@ const KpiGrid = memo(function KpiGrid({
             kpi={kpi}
             allKpis={allKpis}
             getDailyValue={getDailyValue}
+            getDailyDate={getDailyDate}
             getMonthlyValue={getMonthlyValue}
             monthlyLabel={monthlyLabel}
             shimmerDuration={shimmerDuration}
@@ -740,14 +749,23 @@ export default function TVDashboard() {
   const today = new Date().toISOString().split("T")[0];
   const currentMonth = today.substring(0, 7);
 
+  const getLatestDailyEntry = useCallback((kpiId: number) => {
+    return kpiValues
+      .filter((v: any) => v.kpiId === kpiId && v.periodType === "daily" && v.periodDate?.startsWith(currentMonth))
+      .sort((a: any, b: any) => b.periodDate.localeCompare(a.periodDate))[0] ?? null;
+  }, [kpiValues, currentMonth]);
+
   const getDailyValue = useCallback((kpiId: number) => {
     // Show the most recent daily entry available — today, yesterday, or the latest
     // record this month. This handles manual late entry and future Teams sync seamlessly.
-    const dailyEntries = kpiValues
-      .filter((v: any) => v.kpiId === kpiId && v.periodType === "daily" && v.periodDate?.startsWith(currentMonth))
-      .sort((a: any, b: any) => b.periodDate.localeCompare(a.periodDate));
-    return dailyEntries.length > 0 ? dailyEntries[0].value : "-";
-  }, [kpiValues, currentMonth]);
+    const entry = getLatestDailyEntry(kpiId);
+    return entry ? entry.value : "-";
+  }, [getLatestDailyEntry]);
+
+  const getDailyDate = useCallback((kpiId: number) => {
+    const entry = getLatestDailyEntry(kpiId);
+    return entry ? entry.periodDate : null;
+  }, [getLatestDailyEntry]);
 
   const getMonthlyValue = useCallback((kpiId: number) => {
     const dailyThisMonth = kpiValues.filter((v: any) =>
@@ -960,6 +978,7 @@ export default function TVDashboard() {
     currentKpiPage,
     switchKpiPage,
     getDailyValue,
+    getDailyDate,
     getMonthlyValue,
     monthlyLabel: "MTD",
     transitionStyle,
