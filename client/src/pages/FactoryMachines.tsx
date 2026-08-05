@@ -815,6 +815,37 @@ export default function FactoryMachines() {
                     <FormMessage />
                   </FormItem>
                 )} />
+                {dialogMachineSubEquipment.length > 0 ? (
+                  <FormItem>
+                    <FormLabel>Sub-Equipment</FormLabel>
+                    <Select
+                      onValueChange={v => (recordForm as any).setValue("subEquipmentId", v === "none" ? null : Number(v))}
+                      value={String((recordForm as any).watch("subEquipmentId") ?? "none")}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-record-sub-equipment">
+                          <SelectValue placeholder="None (whole machine)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None (whole machine)</SelectItem>
+                        {dialogMachineSubEquipment.map(se => (
+                          <SelectItem key={se.id} value={String(se.id)}>{se.labelEn || se.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                ) : (
+                  <FormField control={recordForm.control} name="date" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{fm.recordDate} *</FormLabel>
+                      <FormControl><Input type="date" {...field} data-testid="input-record-date" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
+              </div>
+              {dialogMachineSubEquipment.length > 0 && (
                 <FormField control={recordForm.control} name="date" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{fm.recordDate} *</FormLabel>
@@ -822,7 +853,7 @@ export default function FactoryMachines() {
                     <FormMessage />
                   </FormItem>
                 )} />
-              </div>
+              )}
               <FormField control={recordForm.control} name="description" render={({ field }) => (
                 <FormItem>
                   <FormLabel>{fm.recordDescription} *</FormLabel>
@@ -836,27 +867,6 @@ export default function FactoryMachines() {
                   <FormControl><Input {...field} value={field.value ?? ""} placeholder="Name or team..." data-testid="input-performed-by" /></FormControl>
                 </FormItem>
               )} />
-              {dialogMachineSubEquipment.length > 0 && (
-                <FormItem>
-                  <FormLabel>Sub-Equipment</FormLabel>
-                  <Select
-                    onValueChange={v => (recordForm as any).setValue("subEquipmentId", v === "none" ? null : Number(v))}
-                    value={String((recordForm as any).watch("subEquipmentId") ?? "none")}
-                  >
-                    <FormControl>
-                      <SelectTrigger data-testid="select-record-sub-equipment">
-                        <SelectValue placeholder="None (whole machine)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">None (whole machine)</SelectItem>
-                      {dialogMachineSubEquipment.map(se => (
-                        <SelectItem key={se.id} value={String(se.id)}>{se.labelEn || se.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
               {showNextDate && (
                 <FormField control={recordForm.control} name="nextMaintenanceDate" render={({ field }) => (
                   <FormItem>
