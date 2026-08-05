@@ -1022,9 +1022,17 @@ export const insertFactoryMachineSchema = createInsertSchema(factoryMachines).om
 export type FactoryMachine = typeof factoryMachines.$inferSelect;
 export type InsertFactoryMachine = z.infer<typeof insertFactoryMachineSchema>;
 
+// Junction table: one machine can belong to many machine types
+export const factoryMachineMachineTypes = pgTable("factory_machine_machine_types", {
+  id: serial("id").primaryKey(),
+  machineId: integer("machine_id").notNull().references(() => factoryMachines.id, { onDelete: "cascade" }),
+  machineTypeId: integer("machine_type_id").notNull().references(() => factoryMachineTypes.id, { onDelete: "cascade" }),
+});
+
 export const machineRecords = pgTable("machine_records", {
   id: serial("id").primaryKey(),
   machineId: integer("machine_id").notNull().references(() => factoryMachines.id, { onDelete: "cascade" }),
+  machineTypeId: integer("machine_type_id").references(() => factoryMachineTypes.id, { onDelete: "set null" }),
   recordType: text("record_type").notNull(), // 'maintenance' | 'breakdown' | 'scheduled'
   date: date("date").notNull(),
   description: text("description").notNull(),

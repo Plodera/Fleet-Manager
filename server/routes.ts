@@ -2792,11 +2792,15 @@ export async function registerRoutes(
       if (!existing) { qrSlug = candidate; break; }
     }
     if (!qrSlug) return res.status(500).json({ message: "Could not generate unique slug" });
-    const payload = { ...req.body, qrSlug };
+    const { machineTypeIds, ...bodyRest } = req.body;
+    const payload = { ...bodyRest, qrSlug };
     const { insertFactoryMachineSchema } = await import("@shared/schema");
     const parsed = insertFactoryMachineSchema.safeParse(payload);
     if (!parsed.success) return res.status(400).json(parsed.error);
     const created = await storage.createFactoryMachine(parsed.data);
+    if (Array.isArray(machineTypeIds) && machineTypeIds.length > 0) {
+      await storage.setFactoryMachineMachineTypes(created.id, machineTypeIds);
+    }
     res.status(201).json(created);
   });
 
@@ -2804,8 +2808,11 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
     if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
-    const { qrSlug, ...updates } = req.body;
+    const { qrSlug, machineTypeIds, ...updates } = req.body;
     const updated = await storage.updateFactoryMachine(Number(req.params.id), updates);
+    if (Array.isArray(machineTypeIds)) {
+      await storage.setFactoryMachineMachineTypes(Number(req.params.id), machineTypeIds);
+    }
     res.json(updated);
   });
 
@@ -2815,6 +2822,25 @@ export async function registerRoutes(
     if (user.role !== 'admin') return res.status(403).send("Forbidden");
     await storage.deleteFactoryMachine(Number(req.params.id));
     res.status(204).send();
+  });
+
+  // GET all machine-type mappings (optionally filter by ?machineId=X)
+  app.get("/api/factory-machine-machine-types", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const machineId = req.query.machineId ? Number(req.query.machineId) : undefined;
+    const rows = await storage.getFactoryMachineMachineTypes(machineId);
+    res.json(rows);
+  });
+
+  // PUT replaces all machine-type mappings for a machine
+  app.put("/api/factory-machines/:id/machine-types", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin' && !hasPermission(user, 'view_factory_machines')) return res.status(403).send("Forbidden");
+    const parsed = z.object({ machineTypeIds: z.array(z.number()) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+    await storage.setFactoryMachineMachineTypes(Number(req.params.id), parsed.data.machineTypeIds);
+    res.json({ ok: true });
   });
 
   app.patch("/api/factory-machines/:id/alert-recipients", async (req, res) => {

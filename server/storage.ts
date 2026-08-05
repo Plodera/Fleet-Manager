@@ -10,7 +10,7 @@ import {
   hikvisionNvrs, hikvisionGlobalSettings,
   fortigateSettings, fortigateBandwidth,
   teamsSettings, teamsKpiMappings,
-  factoryMachineTypes, factoryMachines, machineRecords,
+  factoryMachineTypes, factoryMachines, machineRecords, factoryMachineMachineTypes,
   type FactoryMachineType, type InsertFactoryMachineType,
   type FactoryMachine, type InsertFactoryMachine,
   type MachineRecord, type InsertMachineRecord,
@@ -253,6 +253,8 @@ export interface IStorage {
   createFactoryMachine(data: InsertFactoryMachine): Promise<FactoryMachine>;
   updateFactoryMachine(id: number, updates: Partial<InsertFactoryMachine>): Promise<FactoryMachine>;
   deleteFactoryMachine(id: number): Promise<void>;
+  getFactoryMachineMachineTypes(machineId?: number): Promise<{ id: number; machineId: number; machineTypeId: number }[]>;
+  setFactoryMachineMachineTypes(machineId: number, machineTypeIds: number[]): Promise<void>;
   getMachineRecords(machineId?: number): Promise<MachineRecord[]>;
   createMachineRecord(data: InsertMachineRecord): Promise<MachineRecord>;
   updateMachineRecord(id: number, updates: Partial<InsertMachineRecord>): Promise<MachineRecord>;
@@ -1534,6 +1536,19 @@ export class DatabaseStorage implements IStorage {
     await getDb().delete(factoryMachines).where(eq(factoryMachines.id, id));
   }
 
+  async getFactoryMachineMachineTypes(machineId?: number): Promise<{ id: number; machineId: number; machineTypeId: number }[]> {
+    const q = getDb().select().from(factoryMachineMachineTypes);
+    if (machineId) return q.where(eq(factoryMachineMachineTypes.machineId, machineId));
+    return q;
+  }
+
+  async setFactoryMachineMachineTypes(machineId: number, machineTypeIds: number[]): Promise<void> {
+    await getDb().delete(factoryMachineMachineTypes).where(eq(factoryMachineMachineTypes.machineId, machineId));
+    if (machineTypeIds.length > 0) {
+      await getDb().insert(factoryMachineMachineTypes).values(machineTypeIds.map(tid => ({ machineId, machineTypeId: tid })));
+    }
+  }
+
   async getMachineRecords(machineId?: number): Promise<MachineRecord[]> {
     const query = getDb().select().from(machineRecords);
     if (machineId) {
@@ -1820,6 +1835,8 @@ export const storage = {
   createMachineRecord: (...args: Parameters<DatabaseStorage['createMachineRecord']>) => getStorage().createMachineRecord(...args),
   updateMachineRecord: (...args: Parameters<DatabaseStorage['updateMachineRecord']>) => getStorage().updateMachineRecord(...args),
   deleteMachineRecord: (...args: Parameters<DatabaseStorage['deleteMachineRecord']>) => getStorage().deleteMachineRecord(...args),
+  getFactoryMachineMachineTypes: (...args: Parameters<DatabaseStorage['getFactoryMachineMachineTypes']>) => getStorage().getFactoryMachineMachineTypes(...args),
+  setFactoryMachineMachineTypes: (...args: Parameters<DatabaseStorage['setFactoryMachineMachineTypes']>) => getStorage().setFactoryMachineMachineTypes(...args),
   getMachineStatus: (...args: Parameters<DatabaseStorage['getMachineStatus']>) => getStorage().getMachineStatus(...args),
   getMachineTypeRecordTypeConfigs: (...args: Parameters<DatabaseStorage['getMachineTypeRecordTypeConfigs']>) => getStorage().getMachineTypeRecordTypeConfigs(...args),
   createMachineTypeRecordTypeConfig: (...args: Parameters<DatabaseStorage['createMachineTypeRecordTypeConfig']>) => getStorage().createMachineTypeRecordTypeConfig(...args),

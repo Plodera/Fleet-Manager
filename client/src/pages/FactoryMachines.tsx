@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -43,7 +44,7 @@ const REPORT_ACCESS_COLORS: Record<ReportAccessMode, string> = {
   login_required: "text-amber-500",
   disabled: "text-red-500",
 };
-type MachineRecord = { id: number; machineId: number; recordType: string; date: string; description: string; performedBy: string | null; nextMaintenanceDate: string | null; subEquipmentId: number | null; createdById: number | null; createdAt: string };
+type MachineRecord = { id: number; machineId: number; machineTypeId: number | null; recordType: string; date: string; description: string; performedBy: string | null; nextMaintenanceDate: string | null; subEquipmentId: number | null; createdById: number | null; createdAt: string };
 
 const machineFormSchema = insertFactoryMachineSchema.omit({ qrSlug: true }).extend({
   name: z.string().min(1, "Machine name is required"),
@@ -123,8 +124,16 @@ export default function FactoryMachines() {
     queryKey: ["/api/sub-equipment"],
   });
 
+  const { data: allMachineMachineTypes = [] } = useQuery<{ id: number; machineId: number; machineTypeId: number }[]>({
+    queryKey: ["/api/factory-machine-machine-types"],
+  });
+
   // Track the machine selected in the record dialog to derive its type configs
   const [dialogMachineId, setDialogMachineId] = useState<number | null>(null);
+  // Track selected machine type in the record dialog
+  const [selectedRecordMachineTypeId, setSelectedRecordMachineTypeId] = useState<number | null>(null);
+  // Machine form — selected machine type IDs (junction table)
+  const [machineFormTypeIds, setMachineFormTypeIds] = useState<number[]>([]);
 
   const machineForm = useForm<z.infer<typeof machineFormSchema>>({
     resolver: zodResolver(machineFormSchema),
@@ -138,13 +147,13 @@ export default function FactoryMachines() {
 
   const createMachineMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/factory-machines", data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/factory-machines"] }); toast({ title: "Machine added" }); setMachineDialogOpen(false); machineForm.reset(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/factory-machines"] }); queryClient.invalidateQueries({ queryKey: ["/api/factory-machine-machine-types"] }); toast({ title: "Machine added" }); setMachineDialogOpen(false); machineForm.reset(); setMachineFormTypeIds([]); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const updateMachineMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/factory-machines/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/factory-machines"] }); toast({ title: "Machine updated" }); setMachineDialogOpen(false); setEditingMachine(null); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/factory-machines"] }); queryClient.invalidateQueries({ queryKey: ["/api/factory-machine-machine-types"] }); toast({ title: "Machine updated" }); setMachineDialogOpen(false); setEditingMachine(null); setMachineFormTypeIds([]); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -196,12 +205,15 @@ export default function FactoryMachines() {
 
   function openAddMachine() {
     setEditingMachine(null);
+    setMachineFormTypeIds([]);
     machineForm.reset({ name: "", machineTypeId: null, manufacturer: "", model: "", serialNumber: "", location: "", department: "", description: "", isActive: true });
     setMachineDialogOpen(true);
   }
 
   function openEditMachine(m: Machine) {
     setEditingMachine(m);
+    const linkedTypeIds = allMachineMachineTypes.filter(mt => mt.machineId === m.id).map(mt => mt.machineTypeId);
+    setMachineFormTypeIds(linkedTypeIds);
     machineForm.reset({ name: m.name, machineTypeId: m.machineTypeId, manufacturer: m.manufacturer ?? "", model: m.model ?? "", serialNumber: m.serialNumber ?? "", location: m.location ?? "", department: m.department ?? "", description: m.description ?? "", isActive: m.isActive });
     setMachineDialogOpen(true);
   }
@@ -247,13 +259,15 @@ export default function FactoryMachines() {
   function openAddRecord(machineId?: number) {
     setEditingRecord(null);
     setDialogMachineId(machineId ?? null);
-    const machine = machineId ? machines.find(m => m.id === machineId) : null;
-    const typeConfigs = machine?.machineTypeId
-      ? allRecordTypeConfigs.filter(c => c.machineTypeId === machine.machineTypeId)
+    // Pick first linked machine type as default
+    const linkedTypeId = machineId
+      ? (allMachineMachineTypes.find(mt => mt.machineId === machineId)?.machineTypeId ?? null)
+      : null;
+    setSelectedRecordMachineTypeId(linkedTypeId);
+    const typeConfigs = linkedTypeId
+      ? allRecordTypeConfigs.filter(c => c.machineTypeId === linkedTypeId)
       : [];
-    const defaultType = typeConfigs.length > 0
-      ? typeConfigs[0].maintenanceTypeConfig.name
-      : "maintenance";
+    const defaultType = typeConfigs.length > 0 ? typeConfigs[0].maintenanceTypeConfig.name : "maintenance";
     recordForm.reset({ machineId: machineId as any, recordType: defaultType, date: new Date().toISOString().split("T")[0], description: "", performedBy: "", nextMaintenanceDate: null, subEquipmentId: null } as any);
     setRecordDialogOpen(true);
   }
@@ -261,19 +275,24 @@ export default function FactoryMachines() {
   function openEditRecord(r: MachineRecord) {
     setEditingRecord(r);
     setDialogMachineId(r.machineId);
+    setSelectedRecordMachineTypeId(r.machineTypeId ?? null);
     recordForm.reset({ machineId: r.machineId, recordType: r.recordType, date: r.date, description: r.description, performedBy: r.performedBy ?? "", nextMaintenanceDate: r.nextMaintenanceDate ?? null, subEquipmentId: r.subEquipmentId ?? null } as any);
     setRecordDialogOpen(true);
   }
 
   function onMachineSubmit(values: z.infer<typeof machineFormSchema>) {
-    const payload = { ...values, machineTypeId: values.machineTypeId || null };
+    // Keep first selected type as the primary machineTypeId for backwards compat;
+    // send full list so the server syncs the junction table too.
+    const primaryTypeId = machineFormTypeIds[0] ?? null;
+    const payload = { ...values, machineTypeId: primaryTypeId, machineTypeIds: machineFormTypeIds };
     if (editingMachine) updateMachineMutation.mutate({ id: editingMachine.id, data: payload });
     else createMachineMutation.mutate(payload);
   }
 
   function onRecordSubmit(values: z.infer<typeof recordFormSchema>) {
-    if (editingRecord) updateRecordMutation.mutate({ id: editingRecord.id, data: values });
-    else createRecordMutation.mutate(values);
+    const payload = { ...values, machineTypeId: selectedRecordMachineTypeId ?? null };
+    if (editingRecord) updateRecordMutation.mutate({ id: editingRecord.id, data: payload });
+    else createRecordMutation.mutate(payload);
   }
 
   const filteredRecords = recordFilter === "all" ? allRecords : allRecords.filter(r => r.machineId === Number(recordFilter));
@@ -286,22 +305,29 @@ export default function FactoryMachines() {
     ? allSubEquipment.filter(se => se.factoryMachineId === dialogMachineId)
     : [];
 
-  // Derive config-based record types for the currently selected machine in the dialog
+  // Derive config-based record types for the currently selected machine type in the dialog
   const dialogMachine = dialogMachineId ? machineMap[dialogMachineId] : null;
-  const dialogTypeConfigs = dialogMachine?.machineTypeId
-    ? allRecordTypeConfigs.filter(c => c.machineTypeId === dialogMachine.machineTypeId)
+  // Types linked to selected machine (from junction table)
+  const dialogLinkedTypeIds = dialogMachineId
+    ? allMachineMachineTypes.filter(mt => mt.machineId === dialogMachineId).map(mt => mt.machineTypeId)
+    : [];
+  const dialogTypeConfigs = selectedRecordMachineTypeId
+    ? allRecordTypeConfigs.filter(c => c.machineTypeId === selectedRecordMachineTypeId)
     : [];
   const hasConfiguredTypes = dialogTypeConfigs.length > 0;
 
-  // When machineId changes in dialog, reset recordType to first available
+  // When machineId changes in dialog, reset machine type to first linked type
   const watchedMachineId = recordForm.watch("machineId");
   useEffect(() => {
     if (!recordDialogOpen) return;
     const m = machines.find(m => m.id === watchedMachineId);
     if (!m) return;
     setDialogMachineId(m.id);
-    const typeConfigs = m.machineTypeId
-      ? allRecordTypeConfigs.filter(c => c.machineTypeId === m.machineTypeId)
+    const linkedTypeIds = allMachineMachineTypes.filter(mt => mt.machineId === m.id).map(mt => mt.machineTypeId);
+    const firstTypeId = linkedTypeIds[0] ?? null;
+    setSelectedRecordMachineTypeId(firstTypeId);
+    const typeConfigs = firstTypeId
+      ? allRecordTypeConfigs.filter(c => c.machineTypeId === firstTypeId)
       : [];
     if (typeConfigs.length > 0) {
       const currentType = recordForm.getValues("recordType");
@@ -543,25 +569,28 @@ export default function FactoryMachines() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={machineForm.control} name="machineTypeId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{fm.machineType}</FormLabel>
-                  <Select onValueChange={v => field.onChange(v === "none" ? null : Number(v))} value={field.value ? String(field.value) : "none"}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-machine-type">
-                        <SelectValue placeholder="Select type..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {machineTypes.filter(mt => mt.isActive).map(mt => (
-                        <SelectItem key={mt.id} value={String(mt.id)}>{mt.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <FormItem>
+                <FormLabel>{fm.machineType}</FormLabel>
+                <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+                  {machineTypes.filter(mt => mt.isActive).length === 0 && (
+                    <p className="text-sm text-muted-foreground">No machine types configured.</p>
+                  )}
+                  {machineTypes.filter(mt => mt.isActive).map(mt => (
+                    <div key={mt.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`mtype-${mt.id}`}
+                        checked={machineFormTypeIds.includes(mt.id)}
+                        onCheckedChange={checked => {
+                          setMachineFormTypeIds(prev =>
+                            checked ? [...prev, mt.id] : prev.filter(id => id !== mt.id)
+                          );
+                        }}
+                      />
+                      <label htmlFor={`mtype-${mt.id}`} className="text-sm cursor-pointer">{mt.name}</label>
+                    </div>
+                  ))}
+                </div>
+              </FormItem>
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={machineForm.control} name="manufacturer" render={({ field }) => (
                   <FormItem>
@@ -789,11 +818,27 @@ export default function FactoryMachines() {
                 )} />
                 <FormItem>
                   <FormLabel>Machine Type</FormLabel>
-                  <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground items-center">
-                    {dialogMachine?.machineTypeId
-                      ? (machineTypes.find(t => t.id === dialogMachine.machineTypeId)?.name ?? "—")
-                      : "—"}
-                  </div>
+                  <Select
+                    value={selectedRecordMachineTypeId ? String(selectedRecordMachineTypeId) : "none"}
+                    onValueChange={v => {
+                      const tid = v === "none" ? null : Number(v);
+                      setSelectedRecordMachineTypeId(tid);
+                      // reset recordType to first valid for new machine type
+                      const configs = tid ? allRecordTypeConfigs.filter(c => c.machineTypeId === tid) : [];
+                      if (configs.length > 0) recordForm.setValue("recordType", configs[0].maintenanceTypeConfig.name);
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-record-machine-type">
+                      <SelectValue placeholder="— None —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— None —</SelectItem>
+                      {dialogLinkedTypeIds.map(tid => {
+                        const mt = machineTypes.find(t => t.id === tid);
+                        return mt ? <SelectItem key={tid} value={String(tid)}>{mt.name}</SelectItem> : null;
+                      })}
+                    </SelectContent>
+                  </Select>
                 </FormItem>
               </div>
               <div className="grid grid-cols-2 gap-4">
