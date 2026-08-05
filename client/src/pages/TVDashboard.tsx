@@ -738,15 +738,16 @@ export default function TVDashboard() {
   const kpiPages = Math.ceil(kpis.length / kpisPerPage);
 
   const today = new Date().toISOString().split("T")[0];
-  const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split("T")[0]; })();
   const currentMonth = today.substring(0, 7);
 
   const getDailyValue = useCallback((kpiId: number) => {
-    const todayVal = kpiValues.find((v: any) => v.kpiId === kpiId && v.periodType === "daily" && v.periodDate === today);
-    if (todayVal) return todayVal.value;
-    const yesterdayVal = kpiValues.find((v: any) => v.kpiId === kpiId && v.periodType === "daily" && v.periodDate === yesterday);
-    return yesterdayVal ? yesterdayVal.value : "-";
-  }, [kpiValues, today, yesterday]);
+    // Show the most recent daily entry available — today, yesterday, or the latest
+    // record this month. This handles manual late entry and future Teams sync seamlessly.
+    const dailyEntries = kpiValues
+      .filter((v: any) => v.kpiId === kpiId && v.periodType === "daily" && v.periodDate?.startsWith(currentMonth))
+      .sort((a: any, b: any) => b.periodDate.localeCompare(a.periodDate));
+    return dailyEntries.length > 0 ? dailyEntries[0].value : "-";
+  }, [kpiValues, currentMonth]);
 
   const getMonthlyValue = useCallback((kpiId: number) => {
     const dailyThisMonth = kpiValues.filter((v: any) =>
