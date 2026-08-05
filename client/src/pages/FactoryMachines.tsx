@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -56,16 +56,29 @@ const recordFormSchema = insertMachineRecordSchema.extend({
   description: z.string().min(1, "Description is required"),
 });
 
-const RECORD_TYPE_COLORS: Record<string, string> = {
-  maintenance: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  breakdown: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  scheduled: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+type RecordTypeConfig = {
+  id: number; machineTypeId: number; maintenanceTypeConfigId: number;
+  color: string; triggersNextDate: boolean; sendAlert: boolean; sortOrder: number;
+  maintenanceTypeConfig: { id: number; name: string; labelEn: string; labelPt: string };
 };
 
-const RECORD_TYPE_ICONS: Record<string, any> = {
-  maintenance: Wrench,
-  breakdown: AlertTriangle,
-  scheduled: Clock,
+// Legacy fallbacks for records created before the config system
+const LEGACY_RECORD_TYPE_COLORS: Record<string, string> = {
+  maintenance: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  breakdown:   "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  scheduled:   "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+};
+const LEGACY_RECORD_TYPE_ICONS: Record<string, any> = {
+  maintenance: Wrench, breakdown: AlertTriangle, scheduled: Clock,
+};
+const CONFIG_COLOR_MAP: Record<string, string> = {
+  green:  "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  red:    "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  blue:   "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  yellow: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+  orange: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+  purple: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+  gray:   "bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400",
 };
 
 export default function FactoryMachines() {
@@ -101,6 +114,13 @@ export default function FactoryMachines() {
   const { data: allRecords = [], isLoading: recordsLoading } = useQuery<MachineRecord[]>({
     queryKey: ["/api/machine-records"],
   });
+
+  const { data: allRecordTypeConfigs = [] } = useQuery<RecordTypeConfig[]>({
+    queryKey: ["/api/machine-type-record-type-configs"],
+  });
+
+  // Track the machine selected in the record dialog to derive its type configs
+  const [dialogMachineId, setDialogMachineId] = useState<number | null>(null);
 
   const machineForm = useForm<z.infer<typeof machineFormSchema>>({
     resolver: zodResolver(machineFormSchema),
@@ -222,12 +242,21 @@ export default function FactoryMachines() {
 
   function openAddRecord(machineId?: number) {
     setEditingRecord(null);
-    recordForm.reset({ machineId: machineId as any, recordType: "maintenance", date: new Date().toISOString().split("T")[0], description: "", performedBy: "", nextMaintenanceDate: null });
+    setDialogMachineId(machineId ?? null);
+    const machine = machineId ? machines.find(m => m.id === machineId) : null;
+    const typeConfigs = machine?.machineTypeId
+      ? allRecordTypeConfigs.filter(c => c.machineTypeId === machine.machineTypeId)
+      : [];
+    const defaultType = typeConfigs.length > 0
+      ? typeConfigs[0].maintenanceTypeConfig.name
+      : "maintenance";
+    recordForm.reset({ machineId: machineId as any, recordType: defaultType, date: new Date().toISOString().split("T")[0], description: "", performedBy: "", nextMaintenanceDate: null });
     setRecordDialogOpen(true);
   }
 
   function openEditRecord(r: MachineRecord) {
     setEditingRecord(r);
+    setDialogMachineId(r.machineId);
     recordForm.reset({ machineId: r.machineId, recordType: r.recordType, date: r.date, description: r.description, performedBy: r.performedBy ?? "", nextMaintenanceDate: r.nextMaintenanceDate ?? null });
     setRecordDialogOpen(true);
   }
@@ -246,13 +275,71 @@ export default function FactoryMachines() {
   const filteredRecords = recordFilter === "all" ? allRecords : allRecords.filter(r => r.machineId === Number(recordFilter));
   const sortedRecords = [...filteredRecords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const recordTypeLabel = (type: string) => {
+  const machineMap = Object.fromEntries(machines.map(m => [m.id, m]));
+
+  // Derive config-based record types for the currently selected machine in the dialog
+  const dialogMachine = dialogMachineId ? machineMap[dialogMachineId] : null;
+  const dialogTypeConfigs = dialogMachine?.machineTypeId
+    ? allRecordTypeConfigs.filter(c => c.machineTypeId === dialogMachine.machineTypeId)
+    : [];
+  const hasConfiguredTypes = dialogTypeConfigs.length > 0;
+
+  // When machineId changes in dialog, reset recordType to first available
+  const watchedMachineId = recordForm.watch("machineId");
+  useEffect(() => {
+    if (!recordDialogOpen) return;
+    const m = machines.find(m => m.id === watchedMachineId);
+    if (!m) return;
+    setDialogMachineId(m.id);
+    const typeConfigs = m.machineTypeId
+      ? allRecordTypeConfigs.filter(c => c.machineTypeId === m.machineTypeId)
+      : [];
+    if (typeConfigs.length > 0) {
+      const currentType = recordForm.getValues("recordType");
+      const validTypes = typeConfigs.map(c => c.maintenanceTypeConfig.name);
+      if (!validTypes.includes(currentType)) {
+        recordForm.setValue("recordType", typeConfigs[0].maintenanceTypeConfig.name);
+      }
+    }
+  }, [watchedMachineId, recordDialogOpen]);
+
+  // Determine if "Next Maintenance Date" should show for selected record type
+  const watchedRecordType = recordForm.watch("recordType");
+  const selectedTypeConfig = dialogTypeConfigs.find(c => c.maintenanceTypeConfig.name === watchedRecordType);
+  const showNextDate = hasConfiguredTypes ? (selectedTypeConfig?.triggersNextDate ?? false) : true;
+
+  // Label + color + icon helpers — config-aware with legacy fallback
+  const recordTypeLabel = (type: string, machineId?: number) => {
+    const m = machineId ? machineMap[machineId] : null;
+    if (m?.machineTypeId) {
+      const cfg = allRecordTypeConfigs.find(c => c.machineTypeId === m.machineTypeId && c.maintenanceTypeConfig.name === type);
+      if (cfg) return cfg.maintenanceTypeConfig.labelEn || cfg.maintenanceTypeConfig.name;
+    }
     if (type === "maintenance") return fm.typeMaintenance;
     if (type === "breakdown") return fm.typeBreakdown;
     return fm.typeScheduled;
   };
 
-  const machineMap = Object.fromEntries(machines.map(m => [m.id, m]));
+  const recordTypeBadgeClass = (type: string, machineId?: number) => {
+    const m = machineId ? machineMap[machineId] : null;
+    if (m?.machineTypeId) {
+      const cfg = allRecordTypeConfigs.find(c => c.machineTypeId === m.machineTypeId && c.maintenanceTypeConfig.name === type);
+      if (cfg) return CONFIG_COLOR_MAP[cfg.color] ?? CONFIG_COLOR_MAP.gray;
+    }
+    return LEGACY_RECORD_TYPE_COLORS[type] ?? CONFIG_COLOR_MAP.gray;
+  };
+
+  const recordTypeIcon = (type: string, machineId?: number) => {
+    const m = machineId ? machineMap[machineId] : null;
+    if (m?.machineTypeId) {
+      const cfg = allRecordTypeConfigs.find(c => c.machineTypeId === m.machineTypeId && c.maintenanceTypeConfig.name === type);
+      if (cfg) {
+        const colorIconMap: Record<string, any> = { red: AlertTriangle, green: Wrench, blue: Clock, yellow: AlertTriangle, orange: AlertTriangle, purple: Wrench, gray: Wrench };
+        return colorIconMap[cfg.color] ?? Wrench;
+      }
+    }
+    return LEGACY_RECORD_TYPE_ICONS[type] ?? Wrench;
+  };
 
   return (
     <>
@@ -395,15 +482,15 @@ export default function FactoryMachines() {
               </TableHeader>
               <TableBody>
                 {sortedRecords.map(r => {
-                  const Icon = RECORD_TYPE_ICONS[r.recordType] ?? Wrench;
+                  const Icon = recordTypeIcon(r.recordType, r.machineId);
                   return (
                     <TableRow key={r.id} data-testid={`row-record-${r.id}`}>
                       <TableCell className="text-sm">{r.date}</TableCell>
                       <TableCell className="font-medium">{machineMap[r.machineId]?.name ?? `#${r.machineId}`}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${RECORD_TYPE_COLORS[r.recordType] ?? ""}`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${recordTypeBadgeClass(r.recordType, r.machineId)}`}>
                           <Icon className="w-3 h-3" />
-                          {recordTypeLabel(r.recordType)}
+                          {recordTypeLabel(r.recordType, r.machineId)}
                         </span>
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{r.description}</TableCell>
@@ -697,9 +784,19 @@ export default function FactoryMachines() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="maintenance">{fm.typeMaintenance}</SelectItem>
-                        <SelectItem value="breakdown">{fm.typeBreakdown}</SelectItem>
-                        <SelectItem value="scheduled">{fm.typeScheduled}</SelectItem>
+                        {hasConfiguredTypes ? (
+                          dialogTypeConfigs.map(c => (
+                            <SelectItem key={c.id} value={c.maintenanceTypeConfig.name}>
+                              {c.maintenanceTypeConfig.labelEn || c.maintenanceTypeConfig.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="maintenance">{fm.typeMaintenance}</SelectItem>
+                            <SelectItem value="breakdown">{fm.typeBreakdown}</SelectItem>
+                            <SelectItem value="scheduled">{fm.typeScheduled}</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -726,12 +823,14 @@ export default function FactoryMachines() {
                   <FormControl><Input {...field} value={field.value ?? ""} placeholder="Name or team..." data-testid="input-performed-by" /></FormControl>
                 </FormItem>
               )} />
-              <FormField control={recordForm.control} name="nextMaintenanceDate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{fm.nextMaintenanceDate}</FormLabel>
-                  <FormControl><Input type="date" {...field} value={field.value ?? ""} data-testid="input-next-maintenance-date" /></FormControl>
-                </FormItem>
-              )} />
+              {showNextDate && (
+                <FormField control={recordForm.control} name="nextMaintenanceDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{fm.nextMaintenanceDate}</FormLabel>
+                    <FormControl><Input type="date" {...field} value={field.value ?? ""} data-testid="input-next-maintenance-date" /></FormControl>
+                  </FormItem>
+                )} />
+              )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setRecordDialogOpen(false)}>{t.buttons.cancel}</Button>
                 <Button type="submit" disabled={createRecordMutation.isPending || updateRecordMutation.isPending} data-testid="button-save-record">

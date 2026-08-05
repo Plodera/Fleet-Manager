@@ -1036,3 +1036,18 @@ export const machineRecords = pgTable("machine_records", {
 export const insertMachineRecordSchema = createInsertSchema(machineRecords).omit({ id: true, createdAt: true });
 export type MachineRecord = typeof machineRecords.$inferSelect;
 export type InsertMachineRecord = z.infer<typeof insertMachineRecordSchema>;
+
+// Configures which MaintenanceTypeConfig entries apply to each machine type, with extras
+export const machineTypeRecordTypeConfigs = pgTable("machine_type_record_type_configs", {
+  id: serial("id").primaryKey(),
+  machineTypeId: integer("machine_type_id").notNull().references(() => factoryMachineTypes.id, { onDelete: "cascade" }),
+  maintenanceTypeConfigId: integer("maintenance_type_config_id").notNull().references(() => maintenanceTypeConfig.id, { onDelete: "cascade" }),
+  color: text("color").notNull().default("gray"),          // green | red | blue | yellow | orange | purple | gray
+  triggersNextDate: boolean("triggers_next_date").notNull().default(false),
+  sendAlert: boolean("send_alert").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const insertMachineTypeRecordTypeConfigSchema = createInsertSchema(machineTypeRecordTypeConfigs).omit({ id: true });
+export type MachineTypeRecordTypeConfig = typeof machineTypeRecordTypeConfigs.$inferSelect;
+export type InsertMachineTypeRecordTypeConfig = z.infer<typeof insertMachineTypeRecordTypeConfigSchema>;

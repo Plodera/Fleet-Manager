@@ -2839,6 +2839,41 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  // Machine Type Record Type Configs
+  app.get("/api/machine-type-record-type-configs", async (req, res) => {
+    const machineTypeId = req.query.machineTypeId ? Number(req.query.machineTypeId) : undefined;
+    const configs = await storage.getMachineTypeRecordTypeConfigs(machineTypeId);
+    res.json(configs);
+  });
+
+  app.post("/api/machine-type-record-type-configs", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const created = await storage.createMachineTypeRecordTypeConfig(req.body);
+      res.status(201).json(created);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.put("/api/machine-type-record-type-configs/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const updated = await storage.updateMachineTypeRecordTypeConfig(Number(req.params.id), req.body);
+      res.json(updated);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete("/api/machine-type-record-type-configs/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Forbidden");
+    await storage.deleteMachineTypeRecordTypeConfig(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // Machine Records
   app.get("/api/machine-records", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
@@ -2860,14 +2895,20 @@ export async function registerRoutes(
     const recordData = { ...parsed.data, createdById: (req.user as User).id };
     const created = await storage.createMachineRecord(recordData);
 
-    if (created.recordType === 'breakdown') {
-      const machine = await storage.getFactoryMachine(created.machineId);
-      if (machine && machine.breakdownAlertRecipients && machine.breakdownAlertRecipients.length > 0) {
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        sendBreakdownAlertEmail(machine, created, machine.breakdownAlertRecipients, baseUrl).catch(err =>
-          console.error("Failed to send breakdown alert email:", err)
-        );
-      }
+    // Determine if this record type should trigger an alert — check machine type config first,
+    // fall back to legacy hardcoded 'breakdown' check for backwards compatibility.
+    const machine = await storage.getFactoryMachine(created.machineId);
+    let shouldAlert = created.recordType === 'breakdown'; // legacy fallback
+    if (machine?.machineTypeId) {
+      const typeConfigs = await storage.getMachineTypeRecordTypeConfigs(machine.machineTypeId);
+      const matchedConfig = typeConfigs.find(c => c.maintenanceTypeConfig?.name === created.recordType);
+      if (matchedConfig) shouldAlert = matchedConfig.sendAlert;
+    }
+    if (shouldAlert && machine && machine.breakdownAlertRecipients && machine.breakdownAlertRecipients.length > 0) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      sendBreakdownAlertEmail(machine, created, machine.breakdownAlertRecipients, baseUrl).catch(err =>
+        console.error("Failed to send breakdown alert email:", err)
+      );
     }
 
     res.status(201).json(created);

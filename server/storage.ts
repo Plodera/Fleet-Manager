@@ -1,6 +1,7 @@
 import { 
   users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
+  machineTypeRecordTypeConfigs,
   indents, indentItems, indentApproverDepartments,
   tvDashboards, tvDashboardKpis, tvDashboardKpiValues, tvDashboardVideos, tvDashboardKpiPageVideos,
   trackers, trackerItems, trackerNotificationRules,
@@ -257,6 +258,10 @@ export interface IStorage {
   updateMachineRecord(id: number, updates: Partial<InsertMachineRecord>): Promise<MachineRecord>;
   deleteMachineRecord(id: number): Promise<void>;
   getMachineStatus(slug: string): Promise<any>;
+  getMachineTypeRecordTypeConfigs(machineTypeId?: number): Promise<any[]>;
+  createMachineTypeRecordTypeConfig(data: any): Promise<any>;
+  updateMachineTypeRecordTypeConfig(id: number, updates: any): Promise<any>;
+  deleteMachineTypeRecordTypeConfig(id: number): Promise<void>;
 
   sessionStore: session.Store;
 }
@@ -1551,6 +1556,32 @@ export class DatabaseStorage implements IStorage {
     await getDb().delete(machineRecords).where(eq(machineRecords.id, id));
   }
 
+  async getMachineTypeRecordTypeConfigs(machineTypeId?: number): Promise<any[]> {
+    const base = getDb()
+      .select()
+      .from(machineTypeRecordTypeConfigs)
+      .innerJoin(maintenanceTypeConfig, eq(machineTypeRecordTypeConfigs.maintenanceTypeConfigId, maintenanceTypeConfig.id))
+      .orderBy(machineTypeRecordTypeConfigs.sortOrder);
+    const rows = machineTypeId
+      ? await base.where(eq(machineTypeRecordTypeConfigs.machineTypeId, machineTypeId))
+      : await base;
+    return rows.map(r => ({ ...r.machine_type_record_type_configs, maintenanceTypeConfig: r.maintenance_type_config }));
+  }
+
+  async createMachineTypeRecordTypeConfig(data: any): Promise<any> {
+    const [row] = await getDb().insert(machineTypeRecordTypeConfigs).values(data).returning();
+    return row;
+  }
+
+  async updateMachineTypeRecordTypeConfig(id: number, updates: any): Promise<any> {
+    const [row] = await getDb().update(machineTypeRecordTypeConfigs).set(updates).where(eq(machineTypeRecordTypeConfigs.id, id)).returning();
+    return row;
+  }
+
+  async deleteMachineTypeRecordTypeConfig(id: number): Promise<void> {
+    await getDb().delete(machineTypeRecordTypeConfigs).where(eq(machineTypeRecordTypeConfigs.id, id));
+  }
+
   async getMachineStatus(slug: string): Promise<any> {
     const machine = await this.getFactoryMachineBySlug(slug);
     if (!machine) return null;
@@ -1790,4 +1821,8 @@ export const storage = {
   updateMachineRecord: (...args: Parameters<DatabaseStorage['updateMachineRecord']>) => getStorage().updateMachineRecord(...args),
   deleteMachineRecord: (...args: Parameters<DatabaseStorage['deleteMachineRecord']>) => getStorage().deleteMachineRecord(...args),
   getMachineStatus: (...args: Parameters<DatabaseStorage['getMachineStatus']>) => getStorage().getMachineStatus(...args),
+  getMachineTypeRecordTypeConfigs: (...args: Parameters<DatabaseStorage['getMachineTypeRecordTypeConfigs']>) => getStorage().getMachineTypeRecordTypeConfigs(...args),
+  createMachineTypeRecordTypeConfig: (...args: Parameters<DatabaseStorage['createMachineTypeRecordTypeConfig']>) => getStorage().createMachineTypeRecordTypeConfig(...args),
+  updateMachineTypeRecordTypeConfig: (...args: Parameters<DatabaseStorage['updateMachineTypeRecordTypeConfig']>) => getStorage().updateMachineTypeRecordTypeConfig(...args),
+  deleteMachineTypeRecordTypeConfig: (...args: Parameters<DatabaseStorage['deleteMachineTypeRecordTypeConfig']>) => getStorage().deleteMachineTypeRecordTypeConfig(...args),
 };

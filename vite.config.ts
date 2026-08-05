@@ -7,34 +7,6 @@ export default defineConfig({
   plugins: [
     react(),
     runtimeErrorOverlay(),
-    VitePWA({
-      registerType: "autoUpdate",
-      includeAssets: ["favicon.png", "pwa-192x192.png", "pwa-512x512.png"],
-      manifest: {
-        name: "AAMS - Aisco Automobile Management System",
-        short_name: "AAMS",
-        description: "Aisco Automobile Management System",
-        theme_color: "#0a0e14",
-        background_color: "#0a0e14",
-        display: "standalone",
-        start_url: "/",
-        icons: [
-          { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png" },
-          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
-        ],
-      },
-      workbox: {
-        // Cache the app shell and static assets
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        // Don't cache API calls — always fetch fresh data
-        runtimeCaching: [
-          {
-            urlPattern: /^\/api\//,
-            handler: "NetworkOnly",
-          },
-        ],
-      },
-    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
