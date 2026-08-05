@@ -738,12 +738,15 @@ export default function TVDashboard() {
   const kpiPages = Math.ceil(kpis.length / kpisPerPage);
 
   const today = new Date().toISOString().split("T")[0];
+  const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split("T")[0]; })();
   const currentMonth = today.substring(0, 7);
 
   const getDailyValue = useCallback((kpiId: number) => {
-    const val = kpiValues.find((v: any) => v.kpiId === kpiId && v.periodType === "daily" && v.periodDate === today);
-    return val ? val.value : "-";
-  }, [kpiValues, today]);
+    const todayVal = kpiValues.find((v: any) => v.kpiId === kpiId && v.periodType === "daily" && v.periodDate === today);
+    if (todayVal) return todayVal.value;
+    const yesterdayVal = kpiValues.find((v: any) => v.kpiId === kpiId && v.periodType === "daily" && v.periodDate === yesterday);
+    return yesterdayVal ? yesterdayVal.value : "-";
+  }, [kpiValues, today, yesterday]);
 
   const getMonthlyValue = useCallback((kpiId: number) => {
     const dailyThisMonth = kpiValues.filter((v: any) =>
