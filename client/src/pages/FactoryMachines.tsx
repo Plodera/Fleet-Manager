@@ -768,24 +768,34 @@ export default function FactoryMachines() {
           </DialogHeader>
           <Form {...recordForm}>
             <form onSubmit={recordForm.handleSubmit(onRecordSubmit)} className="space-y-4">
-              <FormField control={recordForm.control} name="machineId" render={({ field }) => (
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={recordForm.control} name="machineId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{fm.machineName} *</FormLabel>
+                    <Select onValueChange={v => field.onChange(Number(v))} value={field.value ? String(field.value) : undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-record-machine">
+                          <SelectValue placeholder="Select machine..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {machines.map(m => (
+                          <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <FormItem>
-                  <FormLabel>{fm.machineName} *</FormLabel>
-                  <Select onValueChange={v => field.onChange(Number(v))} value={field.value ? String(field.value) : undefined}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-record-machine">
-                        <SelectValue placeholder="Select machine..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {machines.map(m => (
-                        <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
+                  <FormLabel>Machine Type</FormLabel>
+                  <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground items-center">
+                    {dialogMachine?.machineTypeId
+                      ? (machineTypes.find(t => t.id === dialogMachine.machineTypeId)?.name ?? "—")
+                      : "—"}
+                  </div>
                 </FormItem>
-              )} />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={recordForm.control} name="recordType" render={({ field }) => (
                   <FormItem>
