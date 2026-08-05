@@ -306,6 +306,7 @@ export const subEquipment = pgTable("sub_equipment", {
   labelPt: text("label_pt").notNull(),
   maintenanceTypes: text("maintenance_types").array().default([]).notNull(),
   vehicleId: integer("vehicle_id").references(() => vehicles.id),
+  factoryMachineId: integer("factory_machine_id").references(() => factoryMachines.id, { onDelete: "set null" }),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -1029,6 +1030,7 @@ export const machineRecords = pgTable("machine_records", {
   description: text("description").notNull(),
   performedBy: text("performed_by"),
   nextMaintenanceDate: date("next_maintenance_date"),
+  subEquipmentId: integer("sub_equipment_id").references(() => subEquipment.id, { onDelete: "set null" }),
   createdById: integer("created_by_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });

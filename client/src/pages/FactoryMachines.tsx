@@ -43,7 +43,7 @@ const REPORT_ACCESS_COLORS: Record<ReportAccessMode, string> = {
   login_required: "text-amber-500",
   disabled: "text-red-500",
 };
-type MachineRecord = { id: number; machineId: number; recordType: string; date: string; description: string; performedBy: string | null; nextMaintenanceDate: string | null; createdById: number | null; createdAt: string };
+type MachineRecord = { id: number; machineId: number; recordType: string; date: string; description: string; performedBy: string | null; nextMaintenanceDate: string | null; subEquipmentId: number | null; createdById: number | null; createdAt: string };
 
 const machineFormSchema = insertFactoryMachineSchema.omit({ qrSlug: true }).extend({
   name: z.string().min(1, "Machine name is required"),
@@ -117,6 +117,10 @@ export default function FactoryMachines() {
 
   const { data: allRecordTypeConfigs = [] } = useQuery<RecordTypeConfig[]>({
     queryKey: ["/api/machine-type-record-type-configs"],
+  });
+
+  const { data: allSubEquipment = [] } = useQuery<{ id: number; name: string; labelEn: string; factoryMachineId: number | null }[]>({
+    queryKey: ["/api/sub-equipment"],
   });
 
   // Track the machine selected in the record dialog to derive its type configs
@@ -250,14 +254,14 @@ export default function FactoryMachines() {
     const defaultType = typeConfigs.length > 0
       ? typeConfigs[0].maintenanceTypeConfig.name
       : "maintenance";
-    recordForm.reset({ machineId: machineId as any, recordType: defaultType, date: new Date().toISOString().split("T")[0], description: "", performedBy: "", nextMaintenanceDate: null });
+    recordForm.reset({ machineId: machineId as any, recordType: defaultType, date: new Date().toISOString().split("T")[0], description: "", performedBy: "", nextMaintenanceDate: null, subEquipmentId: null } as any);
     setRecordDialogOpen(true);
   }
 
   function openEditRecord(r: MachineRecord) {
     setEditingRecord(r);
     setDialogMachineId(r.machineId);
-    recordForm.reset({ machineId: r.machineId, recordType: r.recordType, date: r.date, description: r.description, performedBy: r.performedBy ?? "", nextMaintenanceDate: r.nextMaintenanceDate ?? null });
+    recordForm.reset({ machineId: r.machineId, recordType: r.recordType, date: r.date, description: r.description, performedBy: r.performedBy ?? "", nextMaintenanceDate: r.nextMaintenanceDate ?? null, subEquipmentId: r.subEquipmentId ?? null } as any);
     setRecordDialogOpen(true);
   }
 
@@ -276,6 +280,11 @@ export default function FactoryMachines() {
   const sortedRecords = [...filteredRecords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const machineMap = Object.fromEntries(machines.map(m => [m.id, m]));
+
+  // Sub-equipment filtered to the selected machine
+  const dialogMachineSubEquipment = dialogMachineId
+    ? allSubEquipment.filter(se => se.factoryMachineId === dialogMachineId)
+    : [];
 
   // Derive config-based record types for the currently selected machine in the dialog
   const dialogMachine = dialogMachineId ? machineMap[dialogMachineId] : null;
@@ -475,6 +484,7 @@ export default function FactoryMachines() {
                   <TableHead>{fm.machineName}</TableHead>
                   <TableHead>{fm.recordType}</TableHead>
                   <TableHead>{fm.recordDescription}</TableHead>
+                  <TableHead>Sub-Equipment</TableHead>
                   <TableHead>{fm.performedBy}</TableHead>
                   <TableHead>{fm.nextMaintenanceDate}</TableHead>
                   <TableHead className="w-20"></TableHead>
@@ -494,6 +504,9 @@ export default function FactoryMachines() {
                         </span>
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{r.description}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {r.subEquipmentId ? (allSubEquipment.find(se => se.id === r.subEquipmentId)?.labelEn || allSubEquipment.find(se => se.id === r.subEquipmentId)?.name || "—") : "—"}
+                      </TableCell>
                       <TableCell>{r.performedBy ?? "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{r.nextMaintenanceDate ?? "—"}</TableCell>
                       <TableCell>
@@ -823,6 +836,27 @@ export default function FactoryMachines() {
                   <FormControl><Input {...field} value={field.value ?? ""} placeholder="Name or team..." data-testid="input-performed-by" /></FormControl>
                 </FormItem>
               )} />
+              {dialogMachineSubEquipment.length > 0 && (
+                <FormItem>
+                  <FormLabel>Sub-Equipment</FormLabel>
+                  <Select
+                    onValueChange={v => (recordForm as any).setValue("subEquipmentId", v === "none" ? null : Number(v))}
+                    value={String((recordForm as any).watch("subEquipmentId") ?? "none")}
+                  >
+                    <FormControl>
+                      <SelectTrigger data-testid="select-record-sub-equipment">
+                        <SelectValue placeholder="None (whole machine)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">None (whole machine)</SelectItem>
+                      {dialogMachineSubEquipment.map(se => (
+                        <SelectItem key={se.id} value={String(se.id)}>{se.labelEn || se.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )}
               {showNextDate && (
                 <FormField control={recordForm.control} name="nextMaintenanceDate" render={({ field }) => (
                   <FormItem>
