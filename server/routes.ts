@@ -9,6 +9,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { sendBookingNotification, sendBookingStatusUpdate, sendTripStatusToApprover, sendBreakdownAlertEmail } from "./email";
 import { scheduleTrackerNotifications, runChecksForTracker } from "./trackerNotifications";
+import { scheduleLicenseExpiryNotifications, runLicenseExpiryChecks } from "./licenseExpiryNotifications";
 import type { User } from "@shared/schema";
 import multer from "multer";
 import path from "path";
@@ -815,6 +816,16 @@ export async function registerRoutes(
       }
       res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  app.put('/api/users/:id/license-expiry', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).send("Admin access required");
+    const input = z.object({ licenseExpiryDate: z.string().date().nullable() }).parse(req.body);
+    const updatedUser = await storage.updateUserLicenseExpiry(Number(req.params.id), input.licenseExpiryDate);
+    if (!updatedUser) return res.status(404).json({ message: "User not found" });
+    res.json(updatedUser);
   });
 
   // Delete user (admin only)
@@ -2086,6 +2097,130 @@ export async function registerRoutes(
 
   // Schedule tracker notifications (startup + every 24h)
   scheduleTrackerNotifications();
+
+  // License expiry monitoring
+  const canViewLicenseExpiry = (user: User) => user.role === "admin" || hasPermission(user, "view_license_expiry");
+  const canViewCompanyDocuments = (user: User) => user.role === "admin" || hasPermission(user, "view_company_documents");
+
+  app.get('/api/license-expiry/overview', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!canViewLicenseExpiry(user)) return res.status(403).json({ message: "Forbidden" });
+    const [vehicles, drivers] = await Promise.all([storage.getVehicles(), storage.getDrivers()]);
+    res.json({
+      vehicles: vehicles.filter(vehicle => vehicle.licenseExpiryDate),
+      drivers: drivers.filter(driver => driver.licenseExpiryDate),
+    });
+  });
+
+  app.get('/api/company-documents', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (!canViewCompanyDocuments(user)) return res.status(403).json({ message: "Forbidden" });
+    if (user.role === "admin") return res.json(await storage.getCompanyDocuments());
+    res.json(await storage.getCompanyDocumentsForUser(user.id));
+  });
+
+  app.post('/api/company-documents', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const { insertCompanyDocumentSchema } = await import("@shared/schema");
+    const document = await storage.createCompanyDocument(insertCompanyDocumentSchema.parse(req.body));
+    res.status(201).json(document);
+  });
+
+  app.put('/api/company-documents/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const { insertCompanyDocumentSchema } = await import("@shared/schema");
+    const document = await storage.updateCompanyDocument(Number(req.params.id), insertCompanyDocumentSchema.partial().parse(req.body));
+    if (!document) return res.status(404).json({ message: "Company document not found" });
+    res.json(document);
+  });
+
+  app.delete('/api/company-documents/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    await storage.deleteCompanyDocument(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
+  app.put('/api/company-documents/:id/access', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const input = z.object({ userIds: z.array(z.coerce.number().int().positive()) }).parse(req.body);
+    await storage.setCompanyDocumentAccess(Number(req.params.id), input.userIds);
+    res.json({ success: true });
+  });
+
+  app.get('/api/expiry-notification-rules', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    res.json(await storage.getExpiryNotificationRules());
+  });
+
+  app.post('/api/expiry-notification-rules', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const { insertExpiryNotificationRuleSchema, expiryNotificationRecipientInputSchema } = await import("@shared/schema");
+    const input = z.object({ ...insertExpiryNotificationRuleSchema.shape, recipients: z.array(expiryNotificationRecipientInputSchema) }).parse(req.body);
+    const rule = await storage.createExpiryNotificationRule({
+      entityType: input.entityType,
+      triggerType: input.triggerType,
+      thresholdDays: input.triggerType === "expired" ? null : input.thresholdDays ?? 30,
+      sendEmail: input.sendEmail,
+      sendInApp: input.sendInApp,
+      isActive: input.isActive,
+    });
+    await storage.setExpiryNotificationRecipients(rule.id, input.recipients);
+    res.status(201).json(rule);
+  });
+
+  app.put('/api/expiry-notification-rules/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const { insertExpiryNotificationRuleSchema, expiryNotificationRecipientInputSchema } = await import("@shared/schema");
+    const input = z.object({ ...insertExpiryNotificationRuleSchema.partial().shape, recipients: z.array(expiryNotificationRecipientInputSchema).optional() }).parse(req.body);
+    const updates = { ...input };
+    delete (updates as any).recipients;
+    if (updates.triggerType === "expired") updates.thresholdDays = null;
+    const rule = await storage.updateExpiryNotificationRule(Number(req.params.id), updates);
+    if (!rule) return res.status(404).json({ message: "Rule not found" });
+    if (input.recipients) await storage.setExpiryNotificationRecipients(rule.id, input.recipients);
+    res.json(rule);
+  });
+
+  app.delete('/api/expiry-notification-rules/:id', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    await storage.deleteExpiryNotificationRule(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
+  app.post('/api/license-expiry/run-check', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const matchCount = await runLicenseExpiryChecks();
+    res.json({ success: true, matchCount });
+  });
+
+  app.get('/api/expiry-notifications/mine', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    res.json(await storage.getExpiryNotificationsForUser((req.user as User).id));
+  });
+
+  app.post('/api/expiry-notifications/:id/:action', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const action = z.enum(["acknowledge", "resolve"]).parse(req.params.action);
+    const currentUser = req.user as User;
+    const notification = await storage.getExpiryNotification(Number(req.params.id));
+    if (!notification) return res.status(404).json({ message: "Notification not found" });
+    if (currentUser.role !== "admin" && notification.userId !== currentUser.id) return res.status(403).json({ message: "Forbidden" });
+    res.json(await storage.updateExpiryNotificationStatus(notification.id, action === "acknowledge" ? "acknowledged" : "resolved"));
+  });
+
+  // Run independently from the Status Tracker scheduler.
+  scheduleLicenseExpiryNotifications();
 
   // IT Operations Monitor — Host Types (configurable)
   app.get('/api/it/host-types', async (req, res) => {

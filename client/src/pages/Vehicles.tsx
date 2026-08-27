@@ -19,6 +19,17 @@ import { useLanguage } from "@/lib/i18n";
 import { PageHeader } from "@/components/PageHeader";
 import { useQuery } from "@tanstack/react-query";
 
+function LicenseExpiryStatus({ date, labels }: { date: string | null | undefined; labels: any }) {
+  if (!date) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(`${date}T00:00:00`);
+  const days = Math.round((expiry.getTime() - today.getTime()) / 86400000);
+  const className = days < 0 ? "bg-red-100 text-red-700 border-red-200" : days <= 30 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-green-100 text-green-700 border-green-200";
+  const text = days < 0 ? `${labels.expired} · ${Math.abs(days)} ${labels.daysOverdue}` : days === 0 ? labels.expiresToday : days <= 30 ? `${labels.expiringSoon} · ${days} ${labels.daysRemaining}` : labels.valid;
+  return <Badge className={className}>{text}</Badge>;
+}
+
 export default function Vehicles() {
   const { vehicles, isLoading, createVehicle, updateVehicle, deleteVehicle } = useVehicles();
   const { user } = useAuth();
@@ -88,12 +99,13 @@ export default function Vehicles() {
       status: "available" as const,
       imageUrl: "",
       category: "car" as const,
-      capacity: 5
+      capacity: 5,
+      licenseExpiryDate: "",
     }
   });
 
   const onSubmit = (data: any) => {
-    createVehicle.mutate(data, {
+    createVehicle.mutate({ ...data, licenseExpiryDate: data.licenseExpiryDate || null }, {
       onSuccess: () => {
         setIsDialogOpen(false);
         form.reset();
@@ -113,7 +125,8 @@ export default function Vehicles() {
       status: "available" as const,
       imageUrl: "",
       category: "car" as const,
-      capacity: 5
+      capacity: 5,
+      licenseExpiryDate: "",
     }
   });
 
@@ -129,14 +142,15 @@ export default function Vehicles() {
         status: editingVehicle.status as any,
         imageUrl: editingVehicle.imageUrl || "",
         category: (editingVehicle as any).category || "car",
-        capacity: (editingVehicle as any).capacity || 5
+        capacity: (editingVehicle as any).capacity || 5,
+        licenseExpiryDate: (editingVehicle as any).licenseExpiryDate || "",
       });
     }
   }, [editingVehicle, editForm]);
 
   const onEditSubmit = (data: any) => {
     if (!editingVehicle) return;
-    updateVehicle.mutate({ id: editingVehicle.id, ...data }, {
+    updateVehicle.mutate({ id: editingVehicle.id, ...data, licenseExpiryDate: data.licenseExpiryDate || null }, {
       onSuccess: () => {
         setIsEditDialogOpen(false);
         setEditingVehicle(null);
@@ -224,6 +238,13 @@ export default function Vehicles() {
                   <FormItem>
                     <FormLabel>{t.vehicles.vin} <span className="text-muted-foreground font-normal">({t.labels.optional})</span></FormLabel>
                     <FormControl><Input placeholder={t.vehicles.vinPlaceholder} {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="licenseExpiryDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.vehicles.licenseExpiry}</FormLabel>
+                    <FormControl><Input type="date" {...field} value={field.value || ""} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -380,6 +401,13 @@ export default function Vehicles() {
                     <FormMessage />
                   </FormItem>
                 )} />
+                <FormField control={editForm.control} name="licenseExpiryDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t.vehicles.licenseExpiry}</FormLabel>
+                    <FormControl><Input type="date" {...field} value={field.value || ""} data-testid="input-edit-license-expiry" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <FormField control={editForm.control} name="capacity" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t.vehicles.passengerCapacity}</FormLabel>
@@ -525,6 +553,12 @@ export default function Vehicles() {
                     <Gauge className="w-4 h-4" />
                     <span>{vehicle.currentMileage.toLocaleString()} km</span>
                   </div>
+                  {(vehicle as any).licenseExpiryDate && (
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                      <span className="text-sm text-muted-foreground">{t.vehicles.licenseExpiry}: {(vehicle as any).licenseExpiryDate}</span>
+                      <LicenseExpiryStatus date={(vehicle as any).licenseExpiryDate} labels={t.licenseExpiry} />
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5">
                     <Users className="w-4 h-4" />
                     <span>{(vehicle as any).capacity || 5} {t.vehicles.seats}</span>

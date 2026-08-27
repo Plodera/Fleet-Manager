@@ -199,6 +199,28 @@ export function useUsers() {
     },
   });
 
+  const updateLicenseExpiryMutation = useMutation({
+    mutationFn: async ({ userId, licenseExpiryDate }: { userId: number; licenseExpiryDate: string | null }) => {
+      const res = await fetch(`/api/users/${userId}/license-expiry`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ licenseExpiryDate }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update license expiry date");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      toast({ title: "License expiry updated" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to update license expiry", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     users,
     isLoading,
@@ -220,5 +242,7 @@ export function useUsers() {
     isDeletingUser: deleteUserMutation.isPending,
     updateProfile: updateProfileMutation.mutate,
     isUpdatingProfile: updateProfileMutation.isPending,
+    updateLicenseExpiry: updateLicenseExpiryMutation.mutate,
+    isUpdatingLicenseExpiry: updateLicenseExpiryMutation.isPending,
   };
 }

@@ -26,6 +26,7 @@ import {
   Network,
   Activity,
   Factory,
+  CalendarClock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -154,6 +155,7 @@ export function Sidebar() {
         { href: "/fuel", label: t.nav.fuel, icon: Fuel, permission: "view_fuel", hideFromDriver: true },
         { href: "/indents", label: t.nav.indents, icon: PackageSearch, permission: "view_indents", hideFromDriver: true },
         { href: "/status-tracker", label: t.nav.statusTracker, icon: ShieldCheck, permission: "view_trackers", hideFromDriver: true },
+        { href: "/license-expiry", label: t.nav.licenseExpiry, icon: CalendarClock, permission: "view_license_expiry", anyPermissions: ["view_license_expiry", "view_company_documents"], hideFromDriver: true },
         { href: "/factory-machines", label: t.nav.factoryMachines, icon: Factory, permission: "view_factory_machines", hideFromDriver: true },
         { href: "/reports", label: t.nav.reports, icon: FileText, permission: "view_reports", hideFromDriver: true },
       ],

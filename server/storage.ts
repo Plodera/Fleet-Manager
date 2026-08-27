@@ -5,6 +5,8 @@ import {
   indents, indentItems, indentApproverDepartments,
   tvDashboards, tvDashboardKpis, tvDashboardKpiValues, tvDashboardVideos, tvDashboardKpiPageVideos,
   trackers, trackerItems, trackerNotificationRules,
+  companyDocuments, companyDocumentAccess, expiryNotificationRules, expiryNotificationRecipients,
+  expiryNotifications, expiryNotificationDeliveries,
   itHostTypes, itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
   glpiSettings,
   hikvisionNvrs, hikvisionGlobalSettings,
@@ -39,6 +41,9 @@ import {
   type Tracker, type InsertTracker,
   type TrackerItem, type InsertTrackerItem,
   type TrackerNotificationRule, type InsertTrackerNotificationRule,
+  type CompanyDocument, type InsertCompanyDocument, type CompanyDocumentAccess,
+  type ExpiryNotificationRule, type InsertExpiryNotificationRule,
+  type ExpiryNotificationRecipient, type ExpiryNotification,
   type GlpiSettings, type InsertGlpiSettings,
   type HikvisionNvr, type InsertHikvisionNvr,
   type HikvisionGlobalSettings, type InsertHikvisionGlobalSettings,
@@ -47,7 +52,7 @@ import {
   type TeamsKpiMapping, type InsertTeamsKpiMapping,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
-import { eq, desc, sql, and, gte, lt } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lt, ne } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -88,6 +93,7 @@ export interface IStorage {
   updateUserSession(id: number, sessionId: string | null): Promise<void>;
   updateUserEmail(id: number, email: string): Promise<User | undefined>;
   updateUserProfile(id: number, data: { username?: string; fullName?: string }): Promise<User | undefined>;
+  updateUserLicenseExpiry(id: number, licenseExpiryDate: string | null): Promise<User | undefined>;
   deleteUser(id: number): Promise<void>;
 
   getEmailSettings(): Promise<EmailSettings | undefined>;
@@ -215,6 +221,28 @@ export interface IStorage {
   createTrackerNotificationRule(data: InsertTrackerNotificationRule): Promise<TrackerNotificationRule>;
   updateTrackerNotificationRule(id: number, updates: Partial<TrackerNotificationRule>): Promise<TrackerNotificationRule>;
   deleteTrackerNotificationRule(id: number): Promise<void>;
+
+  // License expiry monitoring
+  getCompanyDocuments(): Promise<(CompanyDocument & { accessUserIds: number[] })[]>;
+  getCompanyDocumentsForUser(userId: number): Promise<CompanyDocument[]>;
+  createCompanyDocument(data: InsertCompanyDocument): Promise<CompanyDocument>;
+  updateCompanyDocument(id: number, updates: Partial<InsertCompanyDocument>): Promise<CompanyDocument>;
+  deleteCompanyDocument(id: number): Promise<void>;
+  getCompanyDocumentAccess(documentId: number): Promise<number[]>;
+  setCompanyDocumentAccess(documentId: number, userIds: number[]): Promise<void>;
+  getExpiryNotificationRules(): Promise<(ExpiryNotificationRule & { recipients: ExpiryNotificationRecipient[] })[]>;
+  createExpiryNotificationRule(data: InsertExpiryNotificationRule): Promise<ExpiryNotificationRule>;
+  updateExpiryNotificationRule(id: number, updates: Partial<InsertExpiryNotificationRule>): Promise<ExpiryNotificationRule>;
+  deleteExpiryNotificationRule(id: number): Promise<void>;
+  setExpiryNotificationRecipients(ruleId: number, recipients: Array<{ userId?: number; email?: string }>): Promise<void>;
+  hasExpiryNotificationDelivery(data: { ruleId: number; entityType: string; entityId: number; recipientKey: string; channel: string; deliveryDate: string }): Promise<boolean>;
+  createExpiryNotificationDelivery(data: { ruleId: number; entityType: string; entityId: number; recipientKey: string; channel: string; deliveryDate: string; success: boolean }): Promise<void>;
+  getExpiryNotificationForAlert(data: { userId: number; ruleId: number; entityType: string; entityId: number; expiryDate: string }): Promise<ExpiryNotification | undefined>;
+  createExpiryNotification(data: { userId: number; ruleId: number; entityType: string; entityId: number; entityName: string; expiryDate: string }): Promise<ExpiryNotification>;
+  getExpiryNotificationsForUser(userId: number): Promise<ExpiryNotification[]>;
+  getExpiryNotification(id: number): Promise<ExpiryNotification | undefined>;
+  updateExpiryNotificationStatus(id: number, status: "acknowledged" | "resolved"): Promise<ExpiryNotification>;
+  resolveObsoleteExpiryNotifications(entityType: string, entityId: number, currentExpiryDate: string): Promise<void>;
 
   // Teams Sync Settings
   getTeamsSettings(): Promise<TeamsSettings | undefined>;
@@ -436,6 +464,11 @@ export class DatabaseStorage implements IStorage {
     if (data.fullName) updateData.fullName = data.fullName;
     if (Object.keys(updateData).length === 0) return this.getUser(id);
     const [user] = await getDb().update(users).set(updateData).where(eq(users.id, id)).returning();
+    return user;
+  }
+
+  async updateUserLicenseExpiry(id: number, licenseExpiryDate: string | null): Promise<User | undefined> {
+    const [user] = await getDb().update(users).set({ licenseExpiryDate }).where(eq(users.id, id)).returning();
     return user;
   }
 
@@ -1173,6 +1206,175 @@ export class DatabaseStorage implements IStorage {
     await getDb().delete(trackerNotificationRules).where(eq(trackerNotificationRules.id, id));
   }
 
+  // License expiry monitoring
+  async getCompanyDocuments(): Promise<(CompanyDocument & { accessUserIds: number[] })[]> {
+    const documents: CompanyDocument[] = await getDb().select().from(companyDocuments).orderBy(companyDocuments.name);
+    const accessRows: CompanyDocumentAccess[] = await getDb().select().from(companyDocumentAccess);
+    return documents.map((document: CompanyDocument) => ({
+      ...document,
+      accessUserIds: accessRows
+        .filter((access: CompanyDocumentAccess) => access.companyDocumentId === document.id)
+        .map((access: CompanyDocumentAccess) => access.userId),
+    }));
+  }
+
+  async getCompanyDocumentsForUser(userId: number): Promise<CompanyDocument[]> {
+    const accessRows: CompanyDocumentAccess[] = await getDb().select().from(companyDocumentAccess).where(eq(companyDocumentAccess.userId, userId));
+    if (accessRows.length === 0) return [];
+    const ids: number[] = accessRows.map((row: CompanyDocumentAccess) => row.companyDocumentId);
+    return getDb().select().from(companyDocuments)
+      .where(and(
+        eq(companyDocuments.isActive, true),
+        sql`${companyDocuments.id} IN (${sql.join(ids.map((id: number) => sql`${id}`), sql`, `)})`,
+      ))
+      .orderBy(companyDocuments.name);
+  }
+
+  async createCompanyDocument(data: InsertCompanyDocument): Promise<CompanyDocument> {
+    const [document] = await getDb().insert(companyDocuments).values(data).returning();
+    return document;
+  }
+
+  async updateCompanyDocument(id: number, updates: Partial<InsertCompanyDocument>): Promise<CompanyDocument> {
+    const [document] = await getDb().update(companyDocuments).set(updates).where(eq(companyDocuments.id, id)).returning();
+    return document;
+  }
+
+  async deleteCompanyDocument(id: number): Promise<void> {
+    await getDb().delete(companyDocuments).where(eq(companyDocuments.id, id));
+  }
+
+  async getCompanyDocumentAccess(documentId: number): Promise<number[]> {
+    const rows: CompanyDocumentAccess[] = await getDb().select().from(companyDocumentAccess)
+      .where(eq(companyDocumentAccess.companyDocumentId, documentId));
+    return rows.map((row: CompanyDocumentAccess) => row.userId);
+  }
+
+  async setCompanyDocumentAccess(documentId: number, userIds: number[]): Promise<void> {
+    await getDb().delete(companyDocumentAccess)
+      .where(eq(companyDocumentAccess.companyDocumentId, documentId));
+    const uniqueUserIds = Array.from(new Set(userIds));
+    if (uniqueUserIds.length > 0) {
+      await getDb().insert(companyDocumentAccess).values(
+        uniqueUserIds.map(userId => ({ companyDocumentId: documentId, userId })),
+      );
+    }
+  }
+
+  async getExpiryNotificationRules(): Promise<(ExpiryNotificationRule & { recipients: ExpiryNotificationRecipient[] })[]> {
+    const rules: ExpiryNotificationRule[] = await getDb().select().from(expiryNotificationRules).orderBy(expiryNotificationRules.entityType, expiryNotificationRules.thresholdDays);
+    const recipients: ExpiryNotificationRecipient[] = await getDb().select().from(expiryNotificationRecipients);
+    return rules.map((rule: ExpiryNotificationRule) => ({
+      ...rule,
+      recipients: recipients.filter((recipient: ExpiryNotificationRecipient) => recipient.ruleId === rule.id),
+    }));
+  }
+
+  async createExpiryNotificationRule(data: InsertExpiryNotificationRule): Promise<ExpiryNotificationRule> {
+    const [rule] = await getDb().insert(expiryNotificationRules).values(data).returning();
+    return rule;
+  }
+
+  async updateExpiryNotificationRule(id: number, updates: Partial<InsertExpiryNotificationRule>): Promise<ExpiryNotificationRule> {
+    const [rule] = await getDb().update(expiryNotificationRules).set(updates).where(eq(expiryNotificationRules.id, id)).returning();
+    return rule;
+  }
+
+  async deleteExpiryNotificationRule(id: number): Promise<void> {
+    await getDb().delete(expiryNotificationRules).where(eq(expiryNotificationRules.id, id));
+  }
+
+  async setExpiryNotificationRecipients(ruleId: number, recipients: Array<{ userId?: number; email?: string }>): Promise<void> {
+    await getDb().delete(expiryNotificationRecipients).where(eq(expiryNotificationRecipients.ruleId, ruleId));
+    const uniqueRecipients = recipients.filter((recipient, index, values) =>
+      (recipient.userId || recipient.email) &&
+      values.findIndex(value => value.userId === recipient.userId && value.email === recipient.email) === index,
+    );
+    if (uniqueRecipients.length > 0) {
+      await getDb().insert(expiryNotificationRecipients).values(
+        uniqueRecipients.map(recipient => ({
+          ruleId,
+          userId: recipient.userId ?? null,
+          email: recipient.email?.trim().toLowerCase() || null,
+        })),
+      );
+    }
+  }
+
+  async hasExpiryNotificationDelivery(data: { ruleId: number; entityType: string; entityId: number; recipientKey: string; channel: string; deliveryDate: string }): Promise<boolean> {
+    const [delivery] = await getDb().select({ id: expiryNotificationDeliveries.id })
+      .from(expiryNotificationDeliveries)
+      .where(and(
+        eq(expiryNotificationDeliveries.ruleId, data.ruleId),
+        eq(expiryNotificationDeliveries.entityType, data.entityType),
+        eq(expiryNotificationDeliveries.entityId, data.entityId),
+        eq(expiryNotificationDeliveries.recipientKey, data.recipientKey),
+        eq(expiryNotificationDeliveries.channel, data.channel),
+        eq(expiryNotificationDeliveries.deliveryDate, data.deliveryDate),
+      ))
+      .limit(1);
+    return Boolean(delivery);
+  }
+
+  async createExpiryNotificationDelivery(data: { ruleId: number; entityType: string; entityId: number; recipientKey: string; channel: string; deliveryDate: string; success: boolean }): Promise<void> {
+    await getDb().insert(expiryNotificationDeliveries).values(data).onConflictDoNothing();
+  }
+
+  async getExpiryNotificationForAlert(data: { userId: number; ruleId: number; entityType: string; entityId: number; expiryDate: string }): Promise<ExpiryNotification | undefined> {
+    const [notification] = await getDb().select().from(expiryNotifications)
+      .where(and(
+        eq(expiryNotifications.userId, data.userId),
+        eq(expiryNotifications.ruleId, data.ruleId),
+        eq(expiryNotifications.entityType, data.entityType),
+        eq(expiryNotifications.entityId, data.entityId),
+        eq(expiryNotifications.expiryDate, data.expiryDate),
+      ))
+      .limit(1);
+    return notification;
+  }
+
+  async createExpiryNotification(data: { userId: number; ruleId: number; entityType: string; entityId: number; entityName: string; expiryDate: string }): Promise<ExpiryNotification> {
+    const [notification] = await getDb().insert(expiryNotifications).values({
+      ...data,
+      status: "open",
+    }).returning();
+    return notification;
+  }
+
+  async getExpiryNotificationsForUser(userId: number): Promise<ExpiryNotification[]> {
+    return getDb().select().from(expiryNotifications)
+      .where(eq(expiryNotifications.userId, userId))
+      .orderBy(desc(expiryNotifications.createdAt));
+  }
+
+  async getExpiryNotification(id: number): Promise<ExpiryNotification | undefined> {
+    const [notification] = await getDb().select().from(expiryNotifications)
+      .where(eq(expiryNotifications.id, id));
+    return notification;
+  }
+
+  async updateExpiryNotificationStatus(id: number, status: "acknowledged" | "resolved"): Promise<ExpiryNotification> {
+    const now = new Date();
+    const [notification] = await getDb().update(expiryNotifications).set({
+      status,
+      acknowledgedAt: status === "acknowledged" ? now : undefined,
+      resolvedAt: status === "resolved" ? now : undefined,
+    }).where(eq(expiryNotifications.id, id)).returning();
+    return notification;
+  }
+
+  async resolveObsoleteExpiryNotifications(entityType: string, entityId: number, currentExpiryDate: string): Promise<void> {
+    await getDb().update(expiryNotifications).set({
+      status: "resolved",
+      resolvedAt: new Date(),
+    }).where(and(
+      eq(expiryNotifications.entityType, entityType),
+      eq(expiryNotifications.entityId, entityId),
+      ne(expiryNotifications.expiryDate, currentExpiryDate),
+      ne(expiryNotifications.status, "resolved"),
+    ));
+  }
+
   // IT Operations Monitor
   async getItHostTypes(): Promise<ItHostType[]> {
     return getDb().select().from(itHostTypes).orderBy(itHostTypes.sortOrder, itHostTypes.slug);
@@ -1683,6 +1885,7 @@ export const storage = {
   updateUserSession: (...args: Parameters<DatabaseStorage['updateUserSession']>) => getStorage().updateUserSession(...args),
   updateUserEmail: (...args: Parameters<DatabaseStorage['updateUserEmail']>) => getStorage().updateUserEmail(...args),
   updateUserProfile: (...args: Parameters<DatabaseStorage['updateUserProfile']>) => getStorage().updateUserProfile(...args),
+  updateUserLicenseExpiry: (...args: Parameters<DatabaseStorage['updateUserLicenseExpiry']>) => getStorage().updateUserLicenseExpiry(...args),
   deleteUser: (...args: Parameters<DatabaseStorage['deleteUser']>) => getStorage().deleteUser(...args),
   getEmailSettings: () => getStorage().getEmailSettings(),
   upsertEmailSettings: (...args: Parameters<DatabaseStorage['upsertEmailSettings']>) => getStorage().upsertEmailSettings(...args),
@@ -1780,6 +1983,26 @@ export const storage = {
   createTrackerNotificationRule: (...args: Parameters<DatabaseStorage['createTrackerNotificationRule']>) => getStorage().createTrackerNotificationRule(...args),
   updateTrackerNotificationRule: (...args: Parameters<DatabaseStorage['updateTrackerNotificationRule']>) => getStorage().updateTrackerNotificationRule(...args),
   deleteTrackerNotificationRule: (...args: Parameters<DatabaseStorage['deleteTrackerNotificationRule']>) => getStorage().deleteTrackerNotificationRule(...args),
+  getCompanyDocuments: () => getStorage().getCompanyDocuments(),
+  getCompanyDocumentsForUser: (...args: Parameters<DatabaseStorage['getCompanyDocumentsForUser']>) => getStorage().getCompanyDocumentsForUser(...args),
+  createCompanyDocument: (...args: Parameters<DatabaseStorage['createCompanyDocument']>) => getStorage().createCompanyDocument(...args),
+  updateCompanyDocument: (...args: Parameters<DatabaseStorage['updateCompanyDocument']>) => getStorage().updateCompanyDocument(...args),
+  deleteCompanyDocument: (...args: Parameters<DatabaseStorage['deleteCompanyDocument']>) => getStorage().deleteCompanyDocument(...args),
+  getCompanyDocumentAccess: (...args: Parameters<DatabaseStorage['getCompanyDocumentAccess']>) => getStorage().getCompanyDocumentAccess(...args),
+  setCompanyDocumentAccess: (...args: Parameters<DatabaseStorage['setCompanyDocumentAccess']>) => getStorage().setCompanyDocumentAccess(...args),
+  getExpiryNotificationRules: () => getStorage().getExpiryNotificationRules(),
+  createExpiryNotificationRule: (...args: Parameters<DatabaseStorage['createExpiryNotificationRule']>) => getStorage().createExpiryNotificationRule(...args),
+  updateExpiryNotificationRule: (...args: Parameters<DatabaseStorage['updateExpiryNotificationRule']>) => getStorage().updateExpiryNotificationRule(...args),
+  deleteExpiryNotificationRule: (...args: Parameters<DatabaseStorage['deleteExpiryNotificationRule']>) => getStorage().deleteExpiryNotificationRule(...args),
+  setExpiryNotificationRecipients: (...args: Parameters<DatabaseStorage['setExpiryNotificationRecipients']>) => getStorage().setExpiryNotificationRecipients(...args),
+  hasExpiryNotificationDelivery: (...args: Parameters<DatabaseStorage['hasExpiryNotificationDelivery']>) => getStorage().hasExpiryNotificationDelivery(...args),
+  createExpiryNotificationDelivery: (...args: Parameters<DatabaseStorage['createExpiryNotificationDelivery']>) => getStorage().createExpiryNotificationDelivery(...args),
+  getExpiryNotificationForAlert: (...args: Parameters<DatabaseStorage['getExpiryNotificationForAlert']>) => getStorage().getExpiryNotificationForAlert(...args),
+  createExpiryNotification: (...args: Parameters<DatabaseStorage['createExpiryNotification']>) => getStorage().createExpiryNotification(...args),
+  getExpiryNotificationsForUser: (...args: Parameters<DatabaseStorage['getExpiryNotificationsForUser']>) => getStorage().getExpiryNotificationsForUser(...args),
+  getExpiryNotification: (...args: Parameters<DatabaseStorage['getExpiryNotification']>) => getStorage().getExpiryNotification(...args),
+  updateExpiryNotificationStatus: (...args: Parameters<DatabaseStorage['updateExpiryNotificationStatus']>) => getStorage().updateExpiryNotificationStatus(...args),
+  resolveObsoleteExpiryNotifications: (...args: Parameters<DatabaseStorage['resolveObsoleteExpiryNotifications']>) => getStorage().resolveObsoleteExpiryNotifications(...args),
   getItHostTypes: () => getStorage().getItHostTypes(),
   createItHostType: (...args: Parameters<DatabaseStorage['createItHostType']>) => getStorage().createItHostType(...args),
   updateItHostType: (...args: Parameters<DatabaseStorage['updateItHostType']>) => getStorage().updateItHostType(...args),

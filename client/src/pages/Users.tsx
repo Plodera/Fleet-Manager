@@ -21,8 +21,18 @@ import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
 import { Label } from "@/components/ui/label";
 
+function DriverExpiryBadge({ date, labels }: { date: string | null | undefined; labels: any }) {
+  if (!date) return <span className="text-xs text-muted-foreground">-</span>;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(`${date}T00:00:00`);
+  const days = Math.round((expiry.getTime() - today.getTime()) / 86400000);
+  const className = days < 0 ? "bg-red-100 text-red-700 border-red-200" : days <= 30 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-green-100 text-green-700 border-green-200";
+  return <Badge className={className}>{days < 0 ? `${labels.expired} · ${Math.abs(days)} ${labels.daysOverdue}` : days === 0 ? labels.expiresToday : days <= 30 ? `${labels.expiringSoon} · ${days} ${labels.daysRemaining}` : labels.valid}</Badge>;
+}
+
 export default function Users() {
-  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updateDriver, isUpdatingDriver, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser, updateProfile, isUpdatingProfile } = useUsers();
+  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updateDriver, isUpdatingDriver, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser, updateProfile, isUpdatingProfile, updateLicenseExpiry, isUpdatingLicenseExpiry } = useUsers();
   const { user: currentUser } = useAuth();
   const { language } = useLanguage();
   const { toast } = useToast();
@@ -111,13 +121,14 @@ export default function Users() {
       email: "",
       role: "customer" as const,
       licenseNumber: "",
+      licenseExpiryDate: "",
       department: "",
       permissions: ["view_dashboard", "view_vehicles", "view_bookings"],
     }
   });
 
   const onSubmit = (data: any) => {
-    createUser(data, {
+    createUser({ ...data, licenseExpiryDate: data.licenseExpiryDate || null }, {
       onSuccess: () => {
         setIsDialogOpen(false);
         form.reset();
@@ -249,6 +260,15 @@ export default function Users() {
                       <FormMessage />
                     </FormItem>
                   )} />
+                  <FormField control={form.control} name="licenseExpiryDate" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t.licenseExpiry.expiryDate}</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
 
                   <FormField control={form.control} name="permissions" render={({ field }) => (
                     <FormItem>
@@ -347,6 +367,7 @@ export default function Users() {
                   </div>
                   <span className="text-xs font-normal text-muted-foreground">{um.approverDesc}</span>
                 </TableHead>
+                <TableHead>{t.licenseExpiry.expiryDate}</TableHead>
                 <TableHead>
                   <div className="flex items-center gap-1">
                     <Car className="w-3.5 h-3.5 text-blue-600" />
@@ -367,7 +388,7 @@ export default function Users() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={currentUser?.role === 'admin' ? 7 : 6} className="h-24 text-center">{t.labels.loading}</TableCell>
+                  <TableCell colSpan={currentUser?.role === 'admin' ? 8 : 7} className="h-24 text-center">{t.labels.loading}</TableCell>
                 </TableRow>
               ) : users?.map((user) => {
                 const userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions || [];
@@ -378,6 +399,30 @@ export default function Users() {
                       <div className="font-medium">{user.fullName}</div>
                       <div className="text-xs text-muted-foreground">{user.username}{user.email ? ` · ${user.email}` : ''}</div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {(user as any).isDriver ? (
+                      currentUser?.role === "admin" ? (
+                        <div className="space-y-1.5">
+                          <Input
+                            type="date"
+                            className="min-w-36"
+                            defaultValue={(user as any).licenseExpiryDate || ""}
+                            onBlur={(event) => {
+                              const value = event.target.value || null;
+                              if (value !== ((user as any).licenseExpiryDate || null)) {
+                                updateLicenseExpiry({ userId: user.id, licenseExpiryDate: value });
+                              }
+                            }}
+                            disabled={isUpdatingLicenseExpiry}
+                            data-testid={`input-license-expiry-${user.id}`}
+                          />
+                          <DriverExpiryBadge date={(user as any).licenseExpiryDate} labels={t.licenseExpiry} />
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5"><span className="text-sm">{(user as any).licenseExpiryDate || "-"}</span><DriverExpiryBadge date={(user as any).licenseExpiryDate} labels={t.licenseExpiry} /></div>
+                      )
+                    ) : <span className="text-xs text-muted-foreground">-</span>}
                   </TableCell>
                   <TableCell>
                     {currentUser?.role === 'admin' && editingUserId !== user.id ? (

@@ -39,6 +39,7 @@ import ITDashboard from "@/pages/ITDashboard";
 import FactoryMachines from "@/pages/FactoryMachines";
 import FactoryMachineTypeConfig from "@/pages/FactoryMachineTypeConfig";
 import MachineStatus from "@/pages/MachineStatus";
+import LicenseExpiry from "@/pages/LicenseExpiry";
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, anyPermission, driverOnly = false, noShell = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, anyPermission?: string[], driverOnly?: boolean, noShell?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -171,6 +172,9 @@ function Router() {
       <Route path="/status-tracker">
         <PrivateRoute component={StatusTracker} requiredPermission="view_trackers" />
       </Route>
+      <Route path="/license-expiry">
+        <PrivateRoute component={LicenseExpiry} anyPermission={["view_license_expiry", "view_company_documents"]} />
+      </Route>
       <Route path="/tv-dashboard-config">
         <PrivateRoute component={TVDashboardConfig} anyPermission={["manage_tv_dashboards","manage_tv_kpis","tv_data_entry","manage_tv_videos"]} />
       </Route>
@@ -222,12 +226,42 @@ function SessionInvalidationListener() {
   return null;
 }
 
+function ExpiryLoginAlerts() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    if (!user) return;
+    const key = `expiry-login-alerts-${user.id}-${new Date().toISOString().slice(0, 10)}`;
+    if (sessionStorage.getItem(key)) return;
+    fetch("/api/expiry-notifications/mine")
+      .then(response => response.ok ? response.json() : [])
+      .then((notifications: Array<{ id: number; entityName: string; expiryDate: string; status: string }>) => {
+        const openNotifications = notifications.filter(notification => notification.status === "open").slice(0, 5);
+        if (openNotifications.length > 0) {
+          openNotifications.forEach(notification => toast({
+            title: t.licenseExpiry.myAlerts,
+            description: `${notification.entityName} — ${t.licenseExpiry.expiryDate}: ${notification.expiryDate}`,
+            variant: "destructive",
+            duration: 8000,
+          }));
+          sessionStorage.setItem(key, "shown");
+        }
+      })
+      .catch(() => undefined);
+  }, [user, toast, t]);
+
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <TooltipProvider>
           <SessionInvalidationListener />
+          <ExpiryLoginAlerts />
           <Toaster />
           <Router />
         </TooltipProvider>

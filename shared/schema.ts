@@ -17,6 +17,8 @@ export const PERMISSIONS = {
   MANAGE_USERS: 'manage_users',
   MANAGE_VEHICLES: 'manage_vehicles',
   VIEW_TRACKERS: 'view_trackers',
+  VIEW_LICENSE_EXPIRY: 'view_license_expiry',
+  VIEW_COMPANY_DOCUMENTS: 'view_company_documents',
   VIEW_IT_DASHBOARD: 'view_it_dashboard',
   VIEW_TV_DASHBOARD: 'view_tv_dashboard',
   VIEW_IT_MONITOR: 'view_it_monitor',
@@ -42,6 +44,8 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'view_indents', label: 'Indents', labelPt: 'Requisições' },
   { id: 'approve_indents', label: 'Approve Indents', labelPt: 'Aprovar Requisições' },
   { id: 'view_trackers', label: 'Status Tracker', labelPt: 'Rastreador de Estado' },
+  { id: 'view_license_expiry', label: 'License Expiry Monitoring', labelPt: 'Monitorização de Validade de Licenças' },
+  { id: 'view_company_documents', label: 'Company Documents', labelPt: 'Documentos da Empresa' },
   { id: 'view_it_dashboard', label: 'IT Operations Dashboard', labelPt: 'Painel de Operações de TI' },
   { id: 'view_tv_dashboard', label: 'TV Dashboards', labelPt: 'Painéis de TV' },
   { id: 'view_it_monitor', label: 'IT Monitor', labelPt: 'Monitor IT' },
@@ -66,6 +70,7 @@ export const users = pgTable("users", {
   fullName: text("full_name").notNull(),
   email: text("email"),
   licenseNumber: text("license_number"),
+  licenseExpiryDate: date("license_expiry_date"),
   department: text("department"),
   permissions: text("permissions").default('["view_dashboard","view_vehicles","view_bookings"]').notNull(),
   isApprover: boolean("is_approver").default(false).notNull(),
@@ -82,6 +87,7 @@ export const vehicles = pgTable("vehicles", {
   model: text("model").notNull(),
   year: integer("year").notNull(),
   licensePlate: text("license_plate").notNull().unique(),
+  licenseExpiryDate: date("license_expiry_date"),
   vin: text("vin").unique(),
   status: vehicleStatusEnum("status").default("available").notNull(),
   currentMileage: integer("current_mileage").default(0).notNull(),
@@ -772,6 +778,101 @@ export type TrackerItem = typeof trackerItems.$inferSelect;
 export type InsertTrackerItem = z.infer<typeof insertTrackerItemSchema>;
 export type TrackerNotificationRule = typeof trackerNotificationRules.$inferSelect;
 export type InsertTrackerNotificationRule = z.infer<typeof insertTrackerNotificationRuleSchema>;
+
+// License expiry monitoring
+export const EXPIRY_ENTITY_TYPES = ["vehicle_license", "driver_license", "company_document"] as const;
+export type ExpiryEntityType = typeof EXPIRY_ENTITY_TYPES[number];
+export const EXPIRY_TRIGGER_TYPES = ["expiry_approaching", "expired"] as const;
+export type ExpiryTriggerType = typeof EXPIRY_TRIGGER_TYPES[number];
+export const EXPIRY_NOTIFICATION_STATUSES = ["open", "acknowledged", "resolved"] as const;
+export type ExpiryNotificationStatus = typeof EXPIRY_NOTIFICATION_STATUSES[number];
+
+export const companyDocuments = pgTable("company_documents", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  documentType: text("document_type"),
+  expiryDate: date("expiry_date").notNull(),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const companyDocumentAccess = pgTable("company_document_access", {
+  id: serial("id").primaryKey(),
+  companyDocumentId: integer("company_document_id").references(() => companyDocuments.id, { onDelete: "cascade" }).notNull(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+}, (table) => ({
+  companyDocumentUserUnique: uniqueIndex("company_document_access_document_user_unique").on(table.companyDocumentId, table.userId),
+}));
+
+export const expiryNotificationRules = pgTable("expiry_notification_rules", {
+  id: serial("id").primaryKey(),
+  entityType: text("entity_type").notNull(),
+  triggerType: text("trigger_type").notNull(),
+  thresholdDays: integer("threshold_days"),
+  sendEmail: boolean("send_email").notNull().default(true),
+  sendInApp: boolean("send_in_app").notNull().default(true),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const expiryNotificationRecipients = pgTable("expiry_notification_recipients", {
+  id: serial("id").primaryKey(),
+  ruleId: integer("rule_id").references(() => expiryNotificationRules.id, { onDelete: "cascade" }).notNull(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  email: text("email"),
+});
+
+export const expiryNotifications = pgTable("expiry_notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  ruleId: integer("rule_id").references(() => expiryNotificationRules.id, { onDelete: "set null" }),
+  entityType: text("entity_type").notNull(),
+  entityId: integer("entity_id").notNull(),
+  entityName: text("entity_name").notNull(),
+  expiryDate: date("expiry_date").notNull(),
+  status: text("status").notNull().default("open"),
+  createdAt: timestamp("created_at").defaultNow(),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const expiryNotificationDeliveries = pgTable("expiry_notification_deliveries", {
+  id: serial("id").primaryKey(),
+  ruleId: integer("rule_id").references(() => expiryNotificationRules.id, { onDelete: "cascade" }).notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: integer("entity_id").notNull(),
+  recipientKey: text("recipient_key").notNull(),
+  channel: text("channel").notNull(),
+  deliveryDate: date("delivery_date").notNull(),
+  success: boolean("success").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  expiryDeliveryDayUnique: uniqueIndex("expiry_notification_delivery_day_unique").on(
+    table.ruleId, table.entityType, table.entityId, table.recipientKey, table.channel, table.deliveryDate,
+  ),
+}));
+
+export const insertCompanyDocumentSchema = createInsertSchema(companyDocuments).omit({ id: true, createdAt: true });
+export const insertExpiryNotificationRuleSchema = createInsertSchema(expiryNotificationRules)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    entityType: z.enum(EXPIRY_ENTITY_TYPES),
+    triggerType: z.enum(EXPIRY_TRIGGER_TYPES),
+    thresholdDays: z.coerce.number().int().min(0).optional().nullable(),
+  });
+export const expiryNotificationRecipientInputSchema = z.object({
+  userId: z.coerce.number().int().positive().optional(),
+  email: z.string().email().optional(),
+}).refine((value) => value.userId || value.email, { message: "Choose a system user or enter an email address" });
+
+export type CompanyDocument = typeof companyDocuments.$inferSelect;
+export type InsertCompanyDocument = z.infer<typeof insertCompanyDocumentSchema>;
+export type CompanyDocumentAccess = typeof companyDocumentAccess.$inferSelect;
+export type ExpiryNotificationRule = typeof expiryNotificationRules.$inferSelect;
+export type InsertExpiryNotificationRule = z.infer<typeof insertExpiryNotificationRuleSchema>;
+export type ExpiryNotificationRecipient = typeof expiryNotificationRecipients.$inferSelect;
+export type ExpiryNotification = typeof expiryNotifications.$inferSelect;
 
 // IT Operations Monitor
 
