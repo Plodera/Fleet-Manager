@@ -57,6 +57,19 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 
 const PostgresSessionStore = connectPg(session);
+// Delivery claims are leases so a crashed worker cannot suppress an alert all day.
+// SMTP has no idempotency key, so a crash after provider acceptance but before
+// completion can still cause an at-least-once retry after the lease expires.
+const EXPIRY_DELIVERY_CLAIM_LEASE_MS = 15 * 60 * 1000;
+
+type ExpiryNotificationDeliveryKey = {
+  ruleId: number;
+  entityType: string;
+  entityId: number;
+  recipientKey: string;
+  channel: string;
+  deliveryDate: string;
+};
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -235,14 +248,14 @@ export interface IStorage {
   updateExpiryNotificationRule(id: number, updates: Partial<InsertExpiryNotificationRule>): Promise<ExpiryNotificationRule>;
   deleteExpiryNotificationRule(id: number): Promise<void>;
   setExpiryNotificationRecipients(ruleId: number, recipients: Array<{ userId?: number; email?: string }>): Promise<void>;
-  hasExpiryNotificationDelivery(data: { ruleId: number; entityType: string; entityId: number; recipientKey: string; channel: string; deliveryDate: string }): Promise<boolean>;
-  createExpiryNotificationDelivery(data: { ruleId: number; entityType: string; entityId: number; recipientKey: string; channel: string; deliveryDate: string; success: boolean }): Promise<void>;
+  claimExpiryNotificationDelivery(data: ExpiryNotificationDeliveryKey): Promise<Date | null>;
+  completeExpiryNotificationDelivery(data: ExpiryNotificationDeliveryKey, claimedAt: Date, success: boolean): Promise<void>;
   getExpiryNotificationForAlert(data: { userId: number; ruleId: number; entityType: string; entityId: number; expiryDate: string }): Promise<ExpiryNotification | undefined>;
   createExpiryNotification(data: { userId: number; ruleId: number; entityType: string; entityId: number; entityName: string; expiryDate: string }): Promise<ExpiryNotification>;
   getExpiryNotificationsForUser(userId: number): Promise<ExpiryNotification[]>;
   getExpiryNotification(id: number): Promise<ExpiryNotification | undefined>;
   updateExpiryNotificationStatus(id: number, status: "acknowledged" | "resolved"): Promise<ExpiryNotification>;
-  resolveObsoleteExpiryNotifications(entityType: string, entityId: number, currentExpiryDate: string): Promise<void>;
+  resolveObsoleteExpiryNotifications(entityType: string, entityId: number, currentExpiryDate: string | null, entityIsActive?: boolean): Promise<void>;
 
   // Teams Sync Settings
   getTeamsSettings(): Promise<TeamsSettings | undefined>;
@@ -1301,23 +1314,52 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async hasExpiryNotificationDelivery(data: { ruleId: number; entityType: string; entityId: number; recipientKey: string; channel: string; deliveryDate: string }): Promise<boolean> {
-    const [delivery] = await getDb().select({ id: expiryNotificationDeliveries.id })
-      .from(expiryNotificationDeliveries)
-      .where(and(
-        eq(expiryNotificationDeliveries.ruleId, data.ruleId),
-        eq(expiryNotificationDeliveries.entityType, data.entityType),
-        eq(expiryNotificationDeliveries.entityId, data.entityId),
-        eq(expiryNotificationDeliveries.recipientKey, data.recipientKey),
-        eq(expiryNotificationDeliveries.channel, data.channel),
-        eq(expiryNotificationDeliveries.deliveryDate, data.deliveryDate),
-      ))
-      .limit(1);
-    return Boolean(delivery);
+  async claimExpiryNotificationDelivery(data: ExpiryNotificationDeliveryKey): Promise<Date | null> {
+    const claimedAt = new Date();
+    const staleBefore = new Date(claimedAt.getTime() - EXPIRY_DELIVERY_CLAIM_LEASE_MS);
+    const claimed = await getDb().insert(expiryNotificationDeliveries)
+      .values({ ...data, success: false, createdAt: claimedAt })
+      .onConflictDoUpdate({
+        target: [
+          expiryNotificationDeliveries.ruleId,
+          expiryNotificationDeliveries.entityType,
+          expiryNotificationDeliveries.entityId,
+          expiryNotificationDeliveries.recipientKey,
+          expiryNotificationDeliveries.channel,
+          expiryNotificationDeliveries.deliveryDate,
+        ],
+        set: { success: false, createdAt: claimedAt },
+        setWhere: and(
+          eq(expiryNotificationDeliveries.success, false),
+          lt(expiryNotificationDeliveries.createdAt, staleBefore),
+        ),
+      })
+      .returning({ claimedAt: expiryNotificationDeliveries.createdAt });
+    return claimed[0]?.claimedAt ?? null;
   }
 
-  async createExpiryNotificationDelivery(data: { ruleId: number; entityType: string; entityId: number; recipientKey: string; channel: string; deliveryDate: string; success: boolean }): Promise<void> {
-    await getDb().insert(expiryNotificationDeliveries).values(data).onConflictDoNothing();
+  async completeExpiryNotificationDelivery(
+    data: ExpiryNotificationDeliveryKey,
+    claimedAt: Date,
+    success: boolean,
+  ): Promise<void> {
+    const delivery = and(
+      eq(expiryNotificationDeliveries.ruleId, data.ruleId),
+      eq(expiryNotificationDeliveries.entityType, data.entityType),
+      eq(expiryNotificationDeliveries.entityId, data.entityId),
+      eq(expiryNotificationDeliveries.recipientKey, data.recipientKey),
+      eq(expiryNotificationDeliveries.channel, data.channel),
+      eq(expiryNotificationDeliveries.deliveryDate, data.deliveryDate),
+      eq(expiryNotificationDeliveries.createdAt, claimedAt),
+    );
+    if (success) {
+      await getDb().update(expiryNotificationDeliveries)
+        .set({ success: true })
+        .where(delivery);
+      return;
+    }
+    await getDb().delete(expiryNotificationDeliveries)
+      .where(and(delivery, eq(expiryNotificationDeliveries.success, false)));
   }
 
   async getExpiryNotificationForAlert(data: { userId: number; ruleId: number; entityType: string; entityId: number; expiryDate: string }): Promise<ExpiryNotification | undefined> {
@@ -1363,14 +1405,21 @@ export class DatabaseStorage implements IStorage {
     return notification;
   }
 
-  async resolveObsoleteExpiryNotifications(entityType: string, entityId: number, currentExpiryDate: string): Promise<void> {
+  async resolveObsoleteExpiryNotifications(
+    entityType: string,
+    entityId: number,
+    currentExpiryDate: string | null,
+    entityIsActive = true,
+  ): Promise<void> {
     await getDb().update(expiryNotifications).set({
       status: "resolved",
       resolvedAt: new Date(),
     }).where(and(
       eq(expiryNotifications.entityType, entityType),
       eq(expiryNotifications.entityId, entityId),
-      ne(expiryNotifications.expiryDate, currentExpiryDate),
+      entityIsActive && currentExpiryDate
+        ? ne(expiryNotifications.expiryDate, currentExpiryDate)
+        : sql`TRUE`,
       ne(expiryNotifications.status, "resolved"),
     ));
   }
@@ -1995,8 +2044,8 @@ export const storage = {
   updateExpiryNotificationRule: (...args: Parameters<DatabaseStorage['updateExpiryNotificationRule']>) => getStorage().updateExpiryNotificationRule(...args),
   deleteExpiryNotificationRule: (...args: Parameters<DatabaseStorage['deleteExpiryNotificationRule']>) => getStorage().deleteExpiryNotificationRule(...args),
   setExpiryNotificationRecipients: (...args: Parameters<DatabaseStorage['setExpiryNotificationRecipients']>) => getStorage().setExpiryNotificationRecipients(...args),
-  hasExpiryNotificationDelivery: (...args: Parameters<DatabaseStorage['hasExpiryNotificationDelivery']>) => getStorage().hasExpiryNotificationDelivery(...args),
-  createExpiryNotificationDelivery: (...args: Parameters<DatabaseStorage['createExpiryNotificationDelivery']>) => getStorage().createExpiryNotificationDelivery(...args),
+  claimExpiryNotificationDelivery: (...args: Parameters<DatabaseStorage['claimExpiryNotificationDelivery']>) => getStorage().claimExpiryNotificationDelivery(...args),
+  completeExpiryNotificationDelivery: (...args: Parameters<DatabaseStorage['completeExpiryNotificationDelivery']>) => getStorage().completeExpiryNotificationDelivery(...args),
   getExpiryNotificationForAlert: (...args: Parameters<DatabaseStorage['getExpiryNotificationForAlert']>) => getStorage().getExpiryNotificationForAlert(...args),
   createExpiryNotification: (...args: Parameters<DatabaseStorage['createExpiryNotification']>) => getStorage().createExpiryNotification(...args),
   getExpiryNotificationsForUser: (...args: Parameters<DatabaseStorage['getExpiryNotificationsForUser']>) => getStorage().getExpiryNotificationsForUser(...args),

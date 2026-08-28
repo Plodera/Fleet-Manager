@@ -5,7 +5,7 @@ type ExpiryEntity = {
   entityType: "vehicle_license" | "driver_license" | "company_document";
   id: number;
   name: string;
-  expiryDate: string;
+  expiryDate: string | null;
   isActive?: boolean;
   accessUserIds?: number[];
 };
@@ -49,20 +49,18 @@ async function getEntities(): Promise<ExpiryEntity[]> {
 
   return [
     ...vehicles
-      .filter(vehicle => vehicle.licenseExpiryDate)
       .map(vehicle => ({
         entityType: "vehicle_license" as const,
         id: vehicle.id,
         name: `${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})`,
-        expiryDate: vehicle.licenseExpiryDate!,
+        expiryDate: vehicle.licenseExpiryDate,
       })),
     ...drivers
-      .filter(driver => driver.licenseExpiryDate)
       .map(driver => ({
         entityType: "driver_license" as const,
         id: driver.id,
         name: `${driver.fullName}${driver.licenseNumber ? ` (${driver.licenseNumber})` : ""}`,
-        expiryDate: driver.licenseExpiryDate!,
+        expiryDate: driver.licenseExpiryDate,
       })),
     ...companyDocuments
       .map(document => ({
@@ -76,22 +74,32 @@ async function getEntities(): Promise<ExpiryEntity[]> {
   ];
 }
 
-async function recordDelivery(
+async function deliverOnce(
   ruleId: number,
-  entity: ExpiryEntity,
+  entity: ExpiryEntity & { expiryDate: string },
   recipientKey: string,
   channel: "email" | "in_app",
-  success: boolean,
+  deliver: () => Promise<boolean>,
 ): Promise<void> {
-  await storage.createExpiryNotificationDelivery({
+  const delivery = {
     ruleId,
     entityType: entity.entityType,
     entityId: entity.id,
     recipientKey,
     channel,
     deliveryDate: dateKey(),
-    success,
-  });
+  };
+  const claimedAt = await storage.claimExpiryNotificationDelivery(delivery);
+  if (!claimedAt) return;
+
+  let success = false;
+  try {
+    success = await deliver();
+  } catch (error) {
+    await storage.completeExpiryNotificationDelivery(delivery, claimedAt, false);
+    throw error;
+  }
+  await storage.completeExpiryNotificationDelivery(delivery, claimedAt, success);
 }
 
 export async function runLicenseExpiryChecks(): Promise<number> {
@@ -104,11 +112,17 @@ export async function runLicenseExpiryChecks(): Promise<number> {
   let matches = 0;
 
   for (const entity of entities) {
-    await storage.resolveObsoleteExpiryNotifications(entity.entityType, entity.id, entity.expiryDate);
+    await storage.resolveObsoleteExpiryNotifications(
+      entity.entityType,
+      entity.id,
+      entity.expiryDate,
+      entity.isActive !== false,
+    );
   }
 
   for (const rule of rules.filter(rule => rule.isActive)) {
-    const matched = entities.filter(entity =>
+    const matched = entities.filter((entity): entity is ExpiryEntity & { expiryDate: string } =>
+      entity.expiryDate !== null &&
       entity.isActive !== false &&
       entity.entityType === rule.entityType &&
       matchesRule(rule, entity.expiryDate),
@@ -134,42 +148,43 @@ export async function runLicenseExpiryChecks(): Promise<number> {
           if (entity.entityType === "company_document" && !entity.accessUserIds?.includes(recipientUser.id)) continue;
           const userKey = `user:${recipientUser.id}`;
 
-          if (rule.sendInApp && !(await storage.hasExpiryNotificationDelivery({
-            ruleId: rule.id, entityType: entity.entityType, entityId: entity.id,
-            recipientKey: userKey, channel: "in_app", deliveryDate: dateKey(),
-          }))) {
-            const existing = await storage.getExpiryNotificationForAlert({
-              userId: recipientUser.id, ruleId: rule.id, entityType: entity.entityType,
-              entityId: entity.id, expiryDate: entity.expiryDate,
-            });
-            if (!existing) {
-              await storage.createExpiryNotification({
+          if (rule.sendInApp) {
+            await deliverOnce(rule.id, entity, userKey, "in_app", async () => {
+              const existing = await storage.getExpiryNotificationForAlert({
                 userId: recipientUser.id, ruleId: rule.id, entityType: entity.entityType,
-                entityId: entity.id, entityName: entity.name, expiryDate: entity.expiryDate,
+                entityId: entity.id, expiryDate: entity.expiryDate,
               });
-            }
-            await recordDelivery(rule.id, entity, userKey, "in_app", true);
+              if (!existing) {
+                await storage.createExpiryNotification({
+                  userId: recipientUser.id, ruleId: rule.id, entityType: entity.entityType,
+                  entityId: entity.id, entityName: entity.name, expiryDate: entity.expiryDate,
+                });
+              }
+              return true;
+            });
           }
 
-          if (rule.sendEmail && recipientUser.email && !(await storage.hasExpiryNotificationDelivery({
-            ruleId: rule.id, entityType: entity.entityType, entityId: entity.id,
-            recipientKey: userKey, channel: "email", deliveryDate: dateKey(),
-          }))) {
-            const success = await sendEmail({ to: recipientUser.email, subject, body });
-            await recordDelivery(rule.id, entity, userKey, "email", success);
+          if (rule.sendEmail && recipientUser.email) {
+            await deliverOnce(
+              rule.id,
+              entity,
+              userKey,
+              "email",
+              () => sendEmail({ to: recipientUser.email!, subject, body }),
+            );
           }
         }
 
         if (rule.sendEmail && recipient.email) {
           const email = recipient.email.trim().toLowerCase();
           const emailKey = `email:${email}`;
-          if (!(await storage.hasExpiryNotificationDelivery({
-            ruleId: rule.id, entityType: entity.entityType, entityId: entity.id,
-            recipientKey: emailKey, channel: "email", deliveryDate: dateKey(),
-          }))) {
-            const success = await sendEmail({ to: email, subject, body });
-            await recordDelivery(rule.id, entity, emailKey, "email", success);
-          }
+          await deliverOnce(
+            rule.id,
+            entity,
+            emailKey,
+            "email",
+            () => sendEmail({ to: email, subject, body }),
+          );
         }
       }
     }
