@@ -2370,6 +2370,16 @@ export async function registerRoutes(
     return Number.isNaN(parsed.getTime()) ? fallback : parsed;
   };
 
+  app.get('/api/it/issue-assignees', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      res.json(await storage.getItIssueAssignees());
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch issue assignees" });
+    }
+  });
+
   app.get('/api/it/monitoring/summary', async (req, res) => {
     const user = requireItOperations(req, res);
     if (!user) return;
@@ -2428,6 +2438,17 @@ export async function registerRoutes(
       const allowed = ["title", "severity", "status", "resolvedAt", "assignedToId", "targetDate", "investigationNotes", "correctiveAction", "resolutionDetails"];
       const updates: Record<string, unknown> = {};
       for (const key of allowed) if (req.body[key] !== undefined) updates[key] = req.body[key];
+      if (Object.prototype.hasOwnProperty.call(updates, "assignedToId") && updates.assignedToId !== null) {
+        const assignedToId = Number(updates.assignedToId);
+        if (!Number.isInteger(assignedToId) || assignedToId <= 0) {
+          return res.status(400).json({ message: "A valid issue owner is required" });
+        }
+        const assignee = await storage.getUser(assignedToId);
+        if (!assignee || !assignee.isActive) {
+          return res.status(400).json({ message: "Issue owner must be an active user" });
+        }
+        updates.assignedToId = assignedToId;
+      }
       if (updates.status === "resolved" && updates.resolvedAt === undefined) updates.resolvedAt = new Date();
       const issue = await storage.updateItNetworkIssue(Number(req.params.id), updates);
       await storage.addItNetworkIssueUpdate({

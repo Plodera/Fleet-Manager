@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
-import type { ItHostWithStatus } from "@shared/schema";
+import type { ItHostWithStatus, ItIssueAssignee } from "@shared/schema";
 
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 const rangeQuery = (fromDay: string, toDay: string) => {
@@ -55,6 +55,7 @@ export default function ITNetworkOperations() {
   const [settings, setSettings] = useState<any>({ reportsEnabled: true, reportDayOfWeek: 1, reportHour: 8, reportRecipients: [], emailReports: false });
 
   const { data: hosts = [] } = useQuery<ItHostWithStatus[]>({ queryKey: ["/api/it/hosts"], queryFn: async () => (await fetch("/api/it/hosts")).json(), refetchInterval: 30000 });
+  const { data: issueAssignees = [] } = useQuery<ItIssueAssignee[]>({ queryKey: ["/api/it/issue-assignees"], queryFn: async () => { const res = await fetch("/api/it/issue-assignees"); return res.ok ? res.json() : []; } });
   const { data: summary = [], isFetching: summaryFetching } = useQuery<any[]>({ queryKey: ["/api/it/monitoring/summary", fromDay, toDay], queryFn: async () => (await fetch(`/api/it/monitoring/summary?${rangeQuery(fromDay, toDay)}`)).json(), refetchInterval: 60000 });
   const issueQuery = new URLSearchParams({ status: issueStatus, severity: issueSeverity, hostId: issueHostId });
   if (issueOwnerId) issueQuery.set("assignedToId", issueOwnerId);
@@ -142,7 +143,7 @@ export default function ITNetworkOperations() {
           <div><Label>{it.hostName}</Label><select className="h-10 w-full rounded-md border bg-background px-2 text-sm" value={issueHostId} onChange={event => setIssueHostId(event.target.value)}><option value="all">{t.labels.all}</option>{hosts.map(host => <option key={host.id} value={host.id}>{host.name}</option>)}</select></div>
           <div><Label>{it.status}</Label><select className="h-10 w-full rounded-md border bg-background px-2 text-sm" value={issueStatus} onChange={event => setIssueStatus(event.target.value)}><option value="all">{t.labels.all}</option><option value="open">open</option><option value="investigating">investigating</option><option value="resolved">{it.resolved}</option></select></div>
           <div><Label>{it.severity}</Label><select className="h-10 w-full rounded-md border bg-background px-2 text-sm" value={issueSeverity} onChange={event => setIssueSeverity(event.target.value)}><option value="all">{t.labels.all}</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="critical">critical</option></select></div>
-          <div className="col-span-2 md:col-span-5 md:w-56"><Label>{it.owner}</Label><Input type="number" min="1" placeholder={it.owner} value={issueOwnerId} onChange={event => setIssueOwnerId(event.target.value)} /></div>
+          <div className="col-span-2 md:col-span-5 md:w-56"><Label>{it.owner}</Label><select className="h-10 w-full rounded-md border bg-background px-2 text-sm" value={issueOwnerId} onChange={event => setIssueOwnerId(event.target.value)}><option value="">{it.unassigned}</option>{issueAssignees.map(assignee => <option key={assignee.id} value={assignee.id}>{assignee.fullName}</option>)}</select></div>
         </CardContent>
       </Card>
 
@@ -183,10 +184,11 @@ export default function ITNetworkOperations() {
             {issues.map(issue => <button key={issue.id} onClick={() => setSelectedIssue({ ...issue })} className={`w-full text-left rounded-lg border p-3 hover:bg-muted/50 ${selectedIssue?.id === issue.id ? "border-primary" : ""}`}>
               <div className="flex items-center justify-between gap-2"><span className="font-medium">{issue.title}</span><Badge variant={issue.status === "resolved" ? "secondary" : issue.severity === "critical" || issue.severity === "high" ? "destructive" : "outline"}>{issue.status}</Badge></div>
               <p className="text-xs text-muted-foreground mt-1">{issue.hostName || "Network"} · {issue.issueType} · {new Date(issue.startedAt).toLocaleString(language === "pt" ? "pt-PT" : "en-US")}</p>
+              <p className="text-xs text-muted-foreground">{it.owner}: {issue.assigneeName || it.unassigned}</p>
             </button>)}
             {issues.length === 0 && <p className="p-6 text-center text-muted-foreground">{it.noIssues}</p>}
           </CardContent></Card>
-          {selectedIssue ? <IssueEditor issue={selectedIssue} updates={issueUpdates} it={it} onSave={(payload: any) => saveIssue.mutate(payload)} onFollowUp={(payload: any) => addFollowUp.mutate(payload)} saving={saveIssue.isPending || addFollowUp.isPending} /> :
+          {selectedIssue ? <IssueEditor issue={selectedIssue} updates={issueUpdates} assignees={issueAssignees} it={it} onSave={(payload: any) => saveIssue.mutate(payload)} onFollowUp={(payload: any) => addFollowUp.mutate(payload)} saving={saveIssue.isPending || addFollowUp.isPending} /> :
             <Card><CardContent className="p-8 text-center text-muted-foreground"><AlertTriangle className="w-8 h-8 mx-auto mb-2" />{it.viewDetails}</CardContent></Card>}
         </TabsContent>
 
@@ -213,19 +215,19 @@ export default function ITNetworkOperations() {
   );
 }
 
-function IssueEditor({ issue, updates, it, onSave, onFollowUp, saving }: { issue: any; updates: any[]; it: any; onSave: (payload: any) => void; onFollowUp: (payload: any) => void; saving: boolean }) {
+function IssueEditor({ issue, updates, assignees, it, onSave, onFollowUp, saving }: { issue: any; updates: any[]; assignees: ItIssueAssignee[]; it: any; onSave: (payload: any) => void; onFollowUp: (payload: any) => void; saving: boolean }) {
   const [form, setForm] = useState(issue);
   const [updateNote, setUpdateNote] = useState("");
   useEffect(() => setForm(issue), [issue]);
   const set = (key: string, value: unknown) => setForm((current: any) => ({ ...current, [key]: value }));
   return <Card><CardHeader><CardTitle className="text-base">{issue.title}</CardTitle></CardHeader><CardContent className="space-y-3">
     <div className="grid grid-cols-2 gap-3"><div><Label>{it.severity}</Label><select className="mt-1 h-10 w-full rounded-md border bg-background px-2 text-sm" value={form.severity} onChange={event => set("severity", event.target.value)}><option>low</option><option>medium</option><option>high</option><option>critical</option></select></div><div><Label>{it.status}</Label><select className="mt-1 h-10 w-full rounded-md border bg-background px-2 text-sm" value={form.status} onChange={event => set("status", event.target.value)}><option>open</option><option>investigating</option><option>resolved</option></select></div></div>
-    <div className="grid grid-cols-2 gap-3"><div><Label>{it.owner}</Label><Input className="mt-1" value={form.assignedToId || ""} onChange={event => set("assignedToId", event.target.value ? Number(event.target.value) : null)} /></div><div><Label>{it.targetDate}</Label><Input className="mt-1" type="date" value={form.targetDate || ""} onChange={event => set("targetDate", event.target.value || null)} /></div></div>
+    <div className="grid grid-cols-2 gap-3"><div><Label>{it.owner}</Label><select className="mt-1 h-10 w-full rounded-md border bg-background px-2 text-sm" value={form.assignedToId?.toString() || ""} onChange={event => set("assignedToId", event.target.value ? Number(event.target.value) : null)}><option value="">{it.unassigned}</option>{assignees.map(assignee => <option key={assignee.id} value={assignee.id}>{assignee.fullName}</option>)}</select></div><div><Label>{it.targetDate}</Label><Input className="mt-1" type="date" value={form.targetDate || ""} onChange={event => set("targetDate", event.target.value || null)} /></div></div>
     <div><Label>{it.investigation}</Label><textarea className="mt-1 min-h-20 w-full rounded-md border bg-background p-2 text-sm" value={form.investigationNotes || ""} onChange={event => set("investigationNotes", event.target.value)} /></div>
     <div><Label>{it.correctiveAction}</Label><textarea className="mt-1 min-h-20 w-full rounded-md border bg-background p-2 text-sm" value={form.correctiveAction || ""} onChange={event => set("correctiveAction", event.target.value)} /></div>
     <div><Label>{it.resolution}</Label><textarea className="mt-1 min-h-20 w-full rounded-md border bg-background p-2 text-sm" value={form.resolutionDetails || ""} onChange={event => set("resolutionDetails", event.target.value)} /></div>
     <Button onClick={() => onSave({ ...form, updateNote })} disabled={saving}><Save className="w-4 h-4 mr-2" />{it.saveIssue}</Button>
     <div className="border-t pt-3"><Label>{it.updateNote}</Label><textarea className="mt-1 min-h-16 w-full rounded-md border bg-background p-2 text-sm" value={updateNote} onChange={event => setUpdateNote(event.target.value)} /><Button className="mt-2" variant="outline" onClick={() => { onFollowUp({ note: updateNote, status: form.status }); setUpdateNote(""); }} disabled={saving || !updateNote.trim()}><Clock3 className="w-4 h-4 mr-2" />{it.addFollowUp}</Button></div>
-    {updates.length > 0 && <div className="border-t pt-3 space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{it.history}</p>{updates.map(update => <div key={update.id} className="text-xs rounded bg-muted/40 p-2"><div className="flex justify-between gap-2"><span>{update.status || it.updateNote}</span><span className="text-muted-foreground">{new Date(update.createdAt).toLocaleString()}</span></div><p className="mt-1">{update.note || update.correctiveAction || update.resolutionDetails}</p></div>)}</div>}
+    {updates.length > 0 && <div className="border-t pt-3 space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{it.history}</p>{updates.map(update => <div key={update.id} className="text-xs rounded bg-muted/40 p-2"><div className="flex justify-between gap-2"><span>{update.status || it.updateNote}</span><span className="text-muted-foreground">{new Date(update.createdAt).toLocaleString()}</span></div><p className="mt-1">{update.note || update.correctiveAction || update.resolutionDetails}</p><p className="mt-1 text-muted-foreground">{it.updatedBy}: {update.createdByName || it.unknownUser}</p></div>)}</div>}
   </CardContent></Card>;
 }

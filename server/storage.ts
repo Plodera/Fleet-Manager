@@ -17,7 +17,7 @@ import {
   type FactoryMachineType, type InsertFactoryMachineType,
   type FactoryMachine, type InsertFactoryMachine,
   type MachineRecord, type InsertMachineRecord,
-  type User, type InsertUser, type Vehicle, type InsertVehicle,
+  type User, type InsertUser, type ItIssueAssignee, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
@@ -54,7 +54,7 @@ import {
   type TeamsKpiMapping, type InsertTeamsKpiMapping,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
-import { eq, desc, sql, and, gte, lt, ne } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lt, ne, asc } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -98,6 +98,7 @@ export interface IStorage {
   createFuelRecord(record: InsertFuel): Promise<FuelRecord>;
   
   getUsers(): Promise<User[]>;
+  getItIssueAssignees(): Promise<ItIssueAssignee[]>;
   getApprovers(): Promise<User[]>;
   getDrivers(): Promise<User[]>;
   updateUserRole(id: number, role: string): Promise<User>;
@@ -456,6 +457,14 @@ export class DatabaseStorage implements IStorage {
 
   async getUsers(): Promise<User[]> {
     return await getDb().select().from(users);
+  }
+
+  async getItIssueAssignees(): Promise<ItIssueAssignee[]> {
+    return await getDb()
+      .select({ id: users.id, fullName: users.fullName })
+      .from(users)
+      .where(eq(users.isActive, true))
+      .orderBy(asc(users.fullName), asc(users.id));
   }
 
   async getApprovers(): Promise<User[]> {
@@ -1726,11 +1735,14 @@ export class DatabaseStorage implements IStorage {
     const result = await getPool().query({
       text: `SELECT id, issue_id AS "issueId", status, note,
         corrective_action AS "correctiveAction", resolution_details AS "resolutionDetails",
-        created_by_id AS "createdById", created_at AS "createdAt"
-        FROM it_network_issue_updates WHERE issue_id = $1 ORDER BY created_at DESC`,
+        created_by_id AS "createdById", created_at AS "createdAt",
+        u.full_name AS created_by_name
+        FROM it_network_issue_updates
+        LEFT JOIN users u ON u.id = it_network_issue_updates.created_by_id
+        WHERE issue_id = $1 ORDER BY created_at DESC`,
       values: [issueId],
     });
-    return result.rows;
+    return result.rows.map((row: any) => ({ ...row, createdByName: row.created_by_name }));
   }
 
   async getItMonthlyBandwidth(from: Date, to: Date, interfaceName?: string): Promise<any[]> {
@@ -2161,6 +2173,7 @@ export const storage = {
   getFuelRecords: () => getStorage().getFuelRecords(),
   createFuelRecord: (...args: Parameters<DatabaseStorage['createFuelRecord']>) => getStorage().createFuelRecord(...args),
   getUsers: () => getStorage().getUsers(),
+  getItIssueAssignees: () => getStorage().getItIssueAssignees(),
   getApprovers: () => getStorage().getApprovers(),
   getDrivers: () => getStorage().getDrivers(),
   updateUserRole: (...args: Parameters<DatabaseStorage['updateUserRole']>) => getStorage().updateUserRole(...args),

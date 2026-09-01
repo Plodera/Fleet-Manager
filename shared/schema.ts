@@ -69,6 +69,7 @@ export const users = pgTable("users", {
   role: roleEnum("role").default("customer").notNull(),
   fullName: text("full_name").notNull(),
   email: text("email"),
+  isActive: boolean("is_active").notNull().default(true),
   licenseNumber: text("license_number"),
   licenseExpiryDate: date("license_expiry_date"),
   department: text("department"),
@@ -482,6 +483,7 @@ export const insertWorkOrderItemSchema = createInsertSchema(workOrderItems)
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type ItIssueAssignee = Pick<User, "id" | "fullName">;
 export type UserPermissions = typeof PERMISSIONS[keyof typeof PERMISSIONS];
 export type Vehicle = typeof vehicles.$inferSelect;
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;

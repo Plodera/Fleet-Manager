@@ -149,6 +149,9 @@ export async function initDatabase() {
     await _pool.query(`ALTER TABLE factory_machines ADD COLUMN IF NOT EXISTS breakdown_alert_recipients TEXT[] NOT NULL DEFAULT '{}'`).catch(() => {});
     // Add report access mode to factory_machines if not present (public | login_required | disabled)
     await _pool.query(`ALTER TABLE factory_machines ADD COLUMN IF NOT EXISTS report_access_mode TEXT NOT NULL DEFAULT 'public'`).catch(() => {});
+    // User assignment lists need an explicit active flag. Existing installations
+    // receive the same default as newly-created users.
+    await _pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`).catch(() => {});
     // License expiry monitoring columns and tables are created here as well as in the
     // on-prem migration so existing installations can start safely after an upgrade.
     await _pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS license_expiry_date DATE`).catch(() => {});
