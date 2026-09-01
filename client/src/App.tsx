@@ -209,12 +209,11 @@ function Router() {
 
 function SessionInvalidationListener() {
   const { toast } = useToast();
-  const { t } = useLanguage();
 
   useEffect(() => {
     const handleSessionInvalidated = (event: CustomEvent<{ message: string }>) => {
       toast({
-        title: t.labels?.sessionExpired || "Session Expired",
+        title: "Session Expired",
         description: event.detail.message,
         variant: "destructive",
         duration: 5000,
@@ -225,15 +224,14 @@ function SessionInvalidationListener() {
     return () => {
       window.removeEventListener(SESSION_INVALIDATED_EVENT, handleSessionInvalidated as EventListener);
     };
-  }, [toast, t]);
+  }, [toast]);
 
   return null;
 }
 
-function ExpiryLoginAlerts() {
+function ExpiryLoginAlerts({ alertTitle, expiryDateLabel }: { alertTitle: string; expiryDateLabel: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { t } = useLanguage();
 
   useEffect(() => {
     if (!user) return;
@@ -245,8 +243,8 @@ function ExpiryLoginAlerts() {
         const openNotifications = notifications.filter(notification => notification.status === "open").slice(0, 5);
         if (openNotifications.length > 0) {
           openNotifications.forEach(notification => toast({
-            title: t.licenseExpiry.myAlerts,
-            description: `${notification.entityName} — ${t.licenseExpiry.expiryDate}: ${notification.expiryDate}`,
+            title: alertTitle,
+            description: `${notification.entityName} — ${expiryDateLabel}: ${notification.expiryDate}`,
             variant: "destructive",
             duration: 8000,
           }));
@@ -254,9 +252,23 @@ function ExpiryLoginAlerts() {
         }
       })
       .catch(() => undefined);
-  }, [user, toast, t]);
+  }, [user, toast, alertTitle, expiryDateLabel]);
 
   return null;
+}
+
+function AppServices() {
+  const { t } = useLanguage();
+
+  return (
+    <>
+      <SessionInvalidationListener />
+      <ExpiryLoginAlerts
+        alertTitle={t.licenseExpiry.myAlerts}
+        expiryDateLabel={t.licenseExpiry.expiryDate}
+      />
+    </>
+  );
 }
 
 function App() {
@@ -264,8 +276,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <TooltipProvider>
-          <SessionInvalidationListener />
-          <ExpiryLoginAlerts />
+          <AppServices />
           <Toaster />
           <Router />
         </TooltipProvider>
