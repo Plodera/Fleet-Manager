@@ -96,6 +96,24 @@ const KPI_COLORS = [
   { bg: "bg-teal-500/15",    icon: "text-teal-400",    border: "border-teal-500/20",    accent: "text-teal-400" },
 ];
 
+type DashboardDisplaySettings = {
+  visibleSections: Record<string, boolean>;
+  visibleMetrics: Record<string, boolean>;
+  selectedHostIds: number[];
+  selectedInterfaces: string[];
+  interfaceCapacities: Record<string, number>;
+  chartStyle: "line" | "area" | "bar";
+};
+
+const DEFAULT_DASHBOARD_DISPLAY: DashboardDisplaySettings = {
+  visibleSections: { summary: true, internetLinks: true, fortigateLinks: true, bandwidth: true, devices: true, kpis: true },
+  visibleMetrics: { onlineCounts: true, historyAvailability: true, packetLoss: true, hostLatency: true, hostLastChecked: true, fortigateRates: true, fortigateLastChecked: true, fortigateUtilization: true, lowBandwidth: true, deviceOfflineList: true, kpiMonthly: true },
+  selectedHostIds: [],
+  selectedInterfaces: [],
+  interfaceCapacities: {},
+  chartStyle: "line",
+};
+
 const PAGE_CSS = `
 /* === Scan line === */
 @keyframes itScanLine {
@@ -267,7 +285,7 @@ function AnimatedBar({ pct, allOnline, allOffline }: { pct: number; allOnline: b
 }
 
 /* ─── Internet link card — large and glowing ─── */
-function HostStatusCard({ host, idx }: { host: ItHostWithStatus; idx: number }) {
+function HostStatusCard({ host, idx, showLatency, showLastChecked }: { host: ItHostWithStatus; idx: number; showLatency: boolean; showLastChecked: boolean }) {
   const isOnline = host.status?.isOnline;
   const neverChecked = !host.status;
 
@@ -305,21 +323,27 @@ function HostStatusCard({ host, idx }: { host: ItHostWithStatus; idx: number }) 
         </span>
       </div>
 
-      {/* Bottom row: IP + response time */}
-      <div className="flex items-center justify-between text-xs">
+      {/* Bottom row: IP + selected live metrics */}
+      <div className="flex items-center justify-between text-xs gap-2">
         <span className="font-mono text-gray-500">{host.ipAddress}</span>
-        {isOnline && host.status?.responseTimeMs != null && (
-          <span className="text-green-500 font-semibold">{host.status.responseTimeMs} ms</span>
-        )}
+        <div className="flex items-center gap-2 text-right">
+        {showLatency && isOnline && host.status?.responseTimeMs != null && <span className="text-green-500 font-semibold">{host.status.responseTimeMs} ms</span>}
+        {showLatency && isOnline && host.status?.responseTimeMs == null && <span className="text-gray-600">—</span>}
         {!isOnline && !neverChecked && (
           <span className="text-red-500 font-semibold it-offline-pulse">OFFLINE</span>
         )}
+        </div>
       </div>
+      {showLastChecked && (
+        <div className="text-[11px] text-gray-600">
+          Last checked: {host.status?.checkedAt ? new Date(host.status.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Unavailable — not configured"}
+        </div>
+      )}
     </div>
   );
 }
 
-function FortigateLinkCard({ link, idx, thresholdMbps }: { link: any; idx: number; thresholdMbps: number }) {
+function FortigateLinkCard({ link, idx, thresholdMbps, showRates, showLastChecked, showLowBandwidth, showUtilization, capacityMbps }: { link: any; idx: number; thresholdMbps: number; showRates: boolean; showLastChecked: boolean; showLowBandwidth: boolean; showUtilization: boolean; capacityMbps?: number }) {
   const isLow = !!link.isLowBandwidth;
   const isUp = !!link.isUp;
   const cardGlow = !isUp ? "it-pill-down bg-red-900/20 border-red-700/40" : isLow ? "bg-amber-900/20 border-amber-700/40" : "it-pill-up bg-green-900/20 border-green-700/40";
@@ -339,25 +363,30 @@ function FortigateLinkCard({ link, idx, thresholdMbps }: { link: any; idx: numbe
           {isUp ? "UP" : "DOWN"}
         </span>
       </div>
-      <div className="flex items-center justify-between text-xs">
-        <span className={isLow ? "text-amber-400 font-semibold" : "text-gray-500"}>
-          {isLow ? `LOW BANDWIDTH · ${durationMinutes} min` : `${totalMbps.toFixed(2)} Mbps`}
+      {showRates && <div className="flex items-center justify-between text-xs">
+        <span className={isLow && showLowBandwidth ? "text-amber-400 font-semibold" : "text-gray-500"}>
+          {isLow && showLowBandwidth ? `LOW BANDWIDTH · ${durationMinutes} min` : `${totalMbps.toFixed(2)} Mbps`}
         </span>
-        <span className="text-gray-500">{Number(link.rxKbps || 0) / 1000 >= 0 ? `RX ${(Number(link.rxKbps || 0) / 1000).toFixed(2)}` : ""} · TX {(Number(link.txKbps || 0) / 1000).toFixed(2)}</span>
-      </div>
-      {isLow && <div className="text-[11px] text-amber-300">Below {thresholdMbps} Mbps sustained</div>}
+        <span className="text-gray-500">RX {(Number(link.rxKbps || 0) / 1000).toFixed(2)} · TX {(Number(link.txKbps || 0) / 1000).toFixed(2)}</span>
+      </div>}
+      {showLowBandwidth && isLow && <div className="text-[11px] text-amber-300">Below {thresholdMbps} Mbps sustained</div>}
+      {capacityMbps && capacityMbps > 0 && showRates && showUtilization && (
+        <div className="text-[11px] text-gray-500">Utilization: {Math.min(100, (totalMbps / capacityMbps) * 100).toFixed(1)}% of {capacityMbps} Mbps</div>
+      )}
+      {showLastChecked && <div className="text-[11px] text-gray-600">Last checked: {link.lastCheckedAt ? new Date(link.lastCheckedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Unavailable — not configured"}</div>}
     </div>
   );
 }
 
 /* ─── Device type summary card ─── */
 function DeviceTypeSummaryCard({
-  hosts, hostType, lang, idx,
+  hosts, hostType, lang, idx, showOfflineList,
 }: {
   hosts: ItHostWithStatus[];
   hostType: ItHostType;
   lang: string;
   idx: number;
+  showOfflineList: boolean;
 }) {
   const total = hosts.length;
   const online = hosts.filter(h => h.status?.isOnline).length;
@@ -418,7 +447,7 @@ function DeviceTypeSummaryCard({
       <AnimatedBar pct={pct} allOnline={allOnline} allOffline={allOffline} />
 
       {/* ── Offline device list ── */}
-      {offlineHosts.length > 0 && (
+      {showOfflineList && offlineHosts.length > 0 && (
         <div className="border border-red-900/40 bg-red-950/30 rounded-lg px-3 py-2 space-y-1.5"
           data-testid={`offline-list-${hostType.slug}`}>
           <div className="flex items-center gap-1.5 text-xs font-bold text-red-400 uppercase tracking-wide it-offline-pulse">
@@ -464,7 +493,7 @@ function AnimatedKpiValue({ value, unit }: { value: string; unit?: string | null
   );
 }
 
-function KpiCard({ kpi, values, idx }: { kpi: ItKpi; values: ItKpiValue[]; idx: number }) {
+function KpiCard({ kpi, values, idx, showMonthly }: { kpi: ItKpi; values: ItKpiValue[]; idx: number; showMonthly: boolean }) {
   const color = KPI_COLORS[idx % KPI_COLORS.length];
   const IconComp = KPI_ICONS[idx % KPI_ICONS.length];
   const today = new Date().toISOString().split("T")[0];
@@ -484,11 +513,52 @@ function KpiCard({ kpi, values, idx }: { kpi: ItKpi; values: ItKpiValue[]; idx: 
         </div>
       </div>
       <AnimatedKpiValue value={dailyVal ? dailyVal.value : "-"} unit={kpi.unit} />
-      <div className="mt-1">
+      {showMonthly && <div className="mt-1">
         <span className={`text-xs font-medium ${color.accent}`}>
-          MTD: {monthlyVal ? monthlyVal.value : "-"}{kpi.unit ? ` ${kpi.unit}` : ""}
+          MTD: {monthlyVal ? monthlyVal.value : "Unavailable — not configured"}{kpi.unit ? ` ${kpi.unit}` : ""}
         </span>
+      </div>}
+    </div>
+  );
+}
+
+function NetworkSummaryCard({ hosts, summaryRows, label, visibleMetrics }: { hosts: ItHostWithStatus[]; summaryRows: any[]; label: string; visibleMetrics: Record<string, boolean> }) {
+  const checked = summaryRows.filter(row => Number(row.checks) > 0);
+  const totalChecks = checked.reduce((sum, row) => sum + Number(row.checks || 0), 0);
+  const onlineChecks = checked.reduce((sum, row) => sum + Number(row.onlineChecks || 0), 0);
+  const failedChecks = checked.reduce((sum, row) => sum + Number(row.failedChecks || 0), 0);
+  const latencyRows = checked.filter(row => row.averageLatencyMs != null);
+  const averageLatency = latencyRows.length
+    ? latencyRows.reduce((sum, row) => sum + Number(row.averageLatencyMs), 0) / latencyRows.length
+    : null;
+  const availability = totalChecks ? (onlineChecks / totalChecks) * 100 : null;
+  const packetLoss = totalChecks ? (failedChecks / totalChecks) * 100 : null;
+  const onlineNow = hosts.filter(host => host.status?.isOnline).length;
+
+  const metrics = [
+    visibleMetrics.onlineCounts !== false && { label: "Online now", value: hosts.length ? `${onlineNow}/${hosts.length}` : "Unavailable — not configured", color: "text-green-400" },
+    visibleMetrics.historyAvailability !== false && { label: "24h availability", value: availability == null ? "Unavailable — not configured" : `${availability.toFixed(2)}%`, color: availability != null && availability < 99 ? "text-amber-400" : "text-cyan-400" },
+    visibleMetrics.packetLoss !== false && { label: "Packet loss", value: packetLoss == null ? "Unavailable — not configured" : `${packetLoss.toFixed(2)}%`, color: packetLoss != null && packetLoss > 1 ? "text-amber-400" : "text-cyan-400" },
+    visibleMetrics.hostLatency !== false && { label: "Average latency", value: averageLatency == null ? "Unavailable — not configured" : `${averageLatency.toFixed(1)} ms`, color: "text-purple-400" },
+  ].filter(Boolean) as { label: string; value: string; color: string }[];
+
+  return (
+    <div className="bg-[#111827] rounded-xl border border-gray-800/60 p-4 it-card-enter" data-testid="section-network-summary">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="it-dot it-dot-blink bg-cyan-400" />
+        <Gauge className="w-3.5 h-3.5 text-gray-500" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</span>
+        <span className="ml-auto text-[11px] text-gray-600">{checked.length ? "last 24 hours" : "No history available"}</span>
       </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {metrics.map(metric => (
+          <div key={metric.label} className="rounded-lg bg-gray-900/70 border border-gray-800 p-3">
+            <div className="text-[10px] uppercase tracking-wider text-gray-600">{metric.label}</div>
+            <div className={`mt-1 text-lg font-bold ${metric.color}`}>{metric.value}</div>
+          </div>
+        ))}
+      </div>
+      {checked.length === 0 && <div className="mt-3 text-xs text-gray-600">Monitoring history will appear after the first completed checks.</div>}
     </div>
   );
 }
@@ -514,9 +584,10 @@ function buildChartData(rows: FortigateBandwidth[]): { time: string; [key: strin
   return Object.entries(byTime).map(([time, vals]) => ({ time, ...vals }));
 }
 
-const BandwidthChart = memo(function BandwidthChart({ rows, label }: { rows: FortigateBandwidth[]; label: string }) {
+const BandwidthChart = memo(function BandwidthChart({ rows, label, initialStyle }: { rows: FortigateBandwidth[]; label: string; initialStyle: "line" | "area" | "bar" }) {
   const isEmpty = rows.length === 0;
-  const [chartStyle, setChartStyle] = useState<"line" | "area" | "bar">("line");
+  const [chartStyle, setChartStyle] = useState<"line" | "area" | "bar">(initialStyle);
+  useEffect(() => setChartStyle(initialStyle), [initialStyle]);
 
   const interfaces = Array.from(new Set(rows.map(r => r.interfaceName)));
   const chartData = buildChartData(rows);
@@ -624,11 +695,41 @@ export default function ITDashboard() {
   const prevHostsRef = useRef<ItHostWithStatus[]>([]);
   const prevKpisRef = useRef<ItKpi[]>([]);
 
+  const { data: dashboardDisplay = DEFAULT_DASHBOARD_DISPLAY } = useQuery<DashboardDisplaySettings>({
+    queryKey: ["/api/it/dashboard-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/it/dashboard-settings");
+      if (!res.ok) throw new Error("Failed");
+      const saved = await res.json();
+      return {
+        ...DEFAULT_DASHBOARD_DISPLAY,
+        ...saved,
+        visibleSections: { ...DEFAULT_DASHBOARD_DISPLAY.visibleSections, ...(saved.visibleSections || {}) },
+        visibleMetrics: { ...DEFAULT_DASHBOARD_DISPLAY.visibleMetrics, ...(saved.visibleMetrics || {}) },
+        selectedHostIds: Array.isArray(saved.selectedHostIds) ? saved.selectedHostIds : [],
+        selectedInterfaces: Array.isArray(saved.selectedInterfaces) ? saved.selectedInterfaces : [],
+        interfaceCapacities: saved.interfaceCapacities || {},
+        chartStyle: ["line", "area", "bar"].includes(saved.chartStyle) ? saved.chartStyle : "line",
+      };
+    },
+    refetchInterval: 60000,
+  });
+
   const { data: hosts = [] } = useQuery<ItHostWithStatus[]>({
     queryKey: ["/api/it/hosts"],
     queryFn: async () => {
       const res = await fetch("/api/it/hosts");
       if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const { data: monitoringSummary = [] } = useQuery<any[]>({
+    queryKey: ["/api/it/dashboard/summary"],
+    queryFn: async () => {
+      const res = await fetch("/api/it/dashboard/summary");
+      if (!res.ok) return [];
       return res.json();
     },
     refetchInterval: 30000,
@@ -746,6 +847,10 @@ export default function ITDashboard() {
   });
 
   const activeHosts = hosts.filter(h => h.isActive);
+  const selectedHostIds = dashboardDisplay.selectedHostIds || [];
+  const displayedHosts = selectedHostIds.length > 0
+    ? activeHosts.filter(host => selectedHostIds.includes(host.id))
+    : activeHosts;
   const activeKpis = kpis.filter(k => k.isActive);
 
   // Determine internet link slugs dynamically from configured types
@@ -753,25 +858,25 @@ export default function ITDashboard() {
     hostTypes.filter(t => t.isInternetLink && t.isActive).map(t => t.slug)
   );
 
-  const internetLinks = activeHosts.filter(h => internetLinkSlugs.has(h.hostType));
+  const internetLinks = displayedHosts.filter(h => internetLinkSlugs.has(h.hostType));
 
   // Build device groups from all active non-internet-link host types that have hosts
   const deviceTypeGroups = hostTypes
     .filter(ht => ht.isActive && !ht.isInternetLink)
     .map(ht => ({
       hostType: ht,
-      hosts: activeHosts.filter(h => h.hostType === ht.slug),
+       hosts: displayedHosts.filter(h => h.hostType === ht.slug),
     }))
     .filter(g => g.hosts.length > 0);
 
   // Catch hosts whose type doesn't match any configured type (safety net)
   const knownSlugs = new Set(hostTypes.map(t => t.slug));
-  const unknownTypeHosts = activeHosts.filter(
+  const unknownTypeHosts = displayedHosts.filter(
     h => !knownSlugs.has(h.hostType) && !internetLinkSlugs.has(h.hostType)
   );
 
-  const totalDevices = activeHosts.filter(h => !internetLinkSlugs.has(h.hostType)).length;
-  const totalOnline = activeHosts.filter(h => !internetLinkSlugs.has(h.hostType) && h.status?.isOnline).length;
+  const totalDevices = displayedHosts.filter(h => !internetLinkSlugs.has(h.hostType)).length;
+  const totalOnline = displayedHosts.filter(h => !internetLinkSlugs.has(h.hostType) && h.status?.isOnline).length;
   const linksOnline = internetLinks.filter(h => h.status?.isOnline).length;
   const allLinksUp = linksOnline === internetLinks.length && internetLinks.length > 0;
   const anyLinkDown = linksOnline < internetLinks.length && internetLinks.length > 0;
@@ -779,6 +884,18 @@ export default function ITDashboard() {
   const anyDeviceOffline = totalOnline < totalDevices && totalDevices > 0;
 
   const it = t.itMonitor;
+  const visibleSections = dashboardDisplay.visibleSections || DEFAULT_DASHBOARD_DISPLAY.visibleSections;
+  const visibleMetrics = dashboardDisplay.visibleMetrics || DEFAULT_DASHBOARD_DISPLAY.visibleMetrics;
+  const selectedInterfaces = dashboardDisplay.selectedInterfaces || [];
+  const displayedFortigateInterfaces = (fortigateStatus?.interfaces || []).filter(link =>
+    selectedInterfaces.length === 0 || selectedInterfaces.includes(link.interfaceName)
+  );
+  const displayedBandwidthRows = bandwidthRows.filter(row =>
+    selectedInterfaces.length === 0 || selectedInterfaces.includes(row.interfaceName)
+  );
+  const displayedSummary = monitoringSummary.filter(row =>
+    displayedHosts.some(host => host.id === Number(row.id))
+  );
 
   return (
     <div
@@ -810,7 +927,7 @@ export default function ITDashboard() {
 
         <div className="flex items-center gap-5">
           <div className="flex items-center gap-4 text-xs text-gray-400">
-            {internetLinks.length > 0 && (
+             {visibleSections.internetLinks && internetLinks.length > 0 && (
               <div className="flex items-center gap-1.5" data-testid="text-links-summary">
                 <Globe className="w-3.5 h-3.5" />
                 <span className={linksOnline === internetLinks.length ? "text-green-400 font-bold" : "text-red-400 font-bold"}>{linksOnline}</span>
@@ -819,7 +936,7 @@ export default function ITDashboard() {
                 <span>{it.linksUp || "links"}</span>
               </div>
             )}
-            {deviceTypeGroups.map(({ hostType: ht, hosts: g }) => {
+             {visibleSections.devices && deviceTypeGroups.map(({ hostType: ht, hosts: g }) => {
               const on = g.filter(h => h.status?.isOnline).length;
               const Icon = getIcon(ht.icon);
               return (
@@ -831,7 +948,7 @@ export default function ITDashboard() {
                 </div>
               );
             })}
-            {totalDevices > 0 && (
+            {visibleSections.devices && totalDevices > 0 && (
               <div className="flex items-center gap-1 pl-2 border-l border-gray-700">
                 <span className={totalOnline === totalDevices ? "text-green-400 font-bold" : "text-amber-400 font-bold"}>{totalOnline}</span>
                 <span className="text-gray-600">/ {totalDevices}</span>
@@ -847,10 +964,14 @@ export default function ITDashboard() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col min-h-0 p-4 gap-4 overflow-hidden relative z-10">
+        <main className="flex-1 flex flex-col min-h-0 p-4 gap-4 overflow-auto relative z-10">
+
+        {/* Aggregate health stays separate from the collection cards so hiding
+            another section never leaves an artificial empty grid column. */}
+        {visibleSections.summary && <NetworkSummaryCard hosts={displayedHosts} summaryRows={displayedSummary} label={it.summary || "Network health summary"} visibleMetrics={visibleMetrics} />}
 
         {/* Internet Links — large cards */}
-        {internetLinks.length > 0 && (
+        {visibleSections.internetLinks && internetLinks.length > 0 && (
           <div data-testid="section-internet-links">
             <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-2">
               <LiveDot allGood={allLinksUp} anyBad={anyLinkDown} />
@@ -862,37 +983,37 @@ export default function ITDashboard() {
               style={{ gridTemplateColumns: `repeat(${Math.min(internetLinks.length, 4)}, minmax(0, 1fr))` }}
             >
               {internetLinks.map((host, i) => (
-                <HostStatusCard key={`${host.id}-v${hostsVersion}`} host={host} idx={i} />
+                <HostStatusCard key={`${host.id}-v${hostsVersion}`} host={host} idx={i} showLatency={visibleMetrics.hostLatency !== false} showLastChecked={visibleMetrics.hostLastChecked !== false} />
               ))}
             </div>
           </div>
         )}
 
-        {fortigateStatus?.enabled && fortigateStatus.interfaces.length > 0 && (
+        {visibleSections.fortigateLinks && fortigateStatus?.enabled && displayedFortigateInterfaces.length > 0 && (
           <div data-testid="section-fortigate-links">
             <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-2">
-              <LiveDot allGood={fortigateStatus.interfaces.every(link => link.isUp && !link.isLowBandwidth)} anyBad={fortigateStatus.interfaces.some(link => !link.isUp || link.isLowBandwidth)} />
+              <LiveDot allGood={displayedFortigateInterfaces.every(link => link.isUp && !link.isLowBandwidth)} anyBad={displayedFortigateInterfaces.some(link => !link.isUp || link.isLowBandwidth)} />
               <Router className="w-3.5 h-3.5" />
               FortiGate WAN links
             </div>
-            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(fortigateStatus.interfaces.length, 4)}, minmax(0, 1fr))` }}>
-              {fortigateStatus.interfaces.map((link, i) => (
-                <FortigateLinkCard key={`${link.interfaceName}-${link.lastCheckedAt}`} link={link} idx={i} thresholdMbps={fortigateStatus.thresholdMbps} />
+            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(displayedFortigateInterfaces.length, 4)}, minmax(0, 1fr))` }}>
+              {displayedFortigateInterfaces.map((link, i) => (
+                <FortigateLinkCard key={`${link.interfaceName}-${link.lastCheckedAt}`} link={link} idx={i} thresholdMbps={fortigateStatus.thresholdMbps} showRates={visibleMetrics.fortigateRates !== false} showLastChecked={visibleMetrics.fortigateLastChecked !== false} showLowBandwidth={visibleMetrics.lowBandwidth !== false} showUtilization={visibleMetrics.fortigateUtilization !== false} capacityMbps={dashboardDisplay.interfaceCapacities?.[link.interfaceName]} />
               ))}
             </div>
           </div>
         )}
 
         {/* FortiGate bandwidth chart — shown whenever enabled+configured (hides only when disabled/unconfigured) */}
-        {fortigateEnabled && (
-          <BandwidthChart rows={bandwidthRows} label={it.sectionBandwidth || "FortiGate Bandwidth (Mbps)"} />
+        {visibleSections.bandwidth && fortigateEnabled && (
+          <BandwidthChart rows={displayedBandwidthRows} label={it.sectionBandwidth || "FortiGate Bandwidth (Mbps)"} initialStyle={dashboardDisplay.chartStyle || "line"} />
         )}
 
         {/* Device summary cards + KPIs */}
-        <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
+        <div className="flex flex-wrap gap-4 min-h-0">
 
-          {deviceTypeGroups.length > 0 && (
-            <div className="flex-1 min-w-0 flex flex-col" data-testid="section-devices">
+          {visibleSections.devices && deviceTypeGroups.length > 0 && (
+            <div className="flex-1 min-w-[min(100%,36rem)] flex flex-col" data-testid="section-devices">
               <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-2">
                 <LiveDot allGood={allDevicesOnline} anyBad={anyDeviceOffline} />
                 <Monitor className="w-3.5 h-3.5" />
@@ -911,13 +1032,14 @@ export default function ITDashboard() {
                     hostType={g.hostType}
                     lang={language}
                     idx={i}
+                    showOfflineList={visibleMetrics.deviceOfflineList !== false}
                   />
                 ))}
               </div>
             </div>
           )}
 
-          {activeKpis.length > 0 && (
+          {visibleSections.kpis && activeKpis.length > 0 && (
             <div
               className={`shrink-0 flex flex-col ${activeKpis.length > 4 ? "w-[36rem]" : "w-72"}`}
               data-testid="section-kpis"
@@ -939,7 +1061,7 @@ export default function ITDashboard() {
                     }}
                   >
                     {activeKpis.map((kpi, i) => (
-                      <KpiCard key={`${kpi.id}-v${kpisVersion}`} kpi={kpi} values={allKpiValues} idx={i} />
+                       <KpiCard key={`${kpi.id}-v${kpisVersion}`} kpi={kpi} values={allKpiValues} idx={i} showMonthly={visibleMetrics.kpiMonthly !== false} />
                     ))}
                   </div>
                 );

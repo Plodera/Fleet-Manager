@@ -9,6 +9,7 @@ import {
   expiryNotifications, expiryNotificationDeliveries,
   itHostTypes, itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
   itHostChecks, itNetworkIssues, itNetworkIssueUpdates, itMonitoringSettings, itMonitoringReports, itMonthlyNetworkReports,
+  itDashboardSettings,
   glpiSettings,
   hikvisionNvrs, hikvisionGlobalSettings,
   fortigateSettings, fortigateBandwidth, fortigateInterfaceStatus,
@@ -23,6 +24,7 @@ import {
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
   type ItHostType, type InsertItHostType, type ItMonitoredHost, type InsertItMonitoredHost, type ItHostStatus, type ItKpi, type InsertItKpi, type ItKpiValue, type InsertItKpiValue, type ItHostWithStatus,
   type ItHostCheck, type ItNetworkIssue, type ItNetworkIssueUpdate, type ItMonitoringSettings, type ItMonitoringReport, type ItMonthlyNetworkReport, type FortigateInterfaceStatus,
+  type ItDashboardSettings,
   type VehicleInspection, type InsertVehicleInspection,
   type EquipmentType, type InsertEquipmentType,
   type EquipmentChecklistItem, type InsertEquipmentChecklistItem,
@@ -299,6 +301,8 @@ export interface IStorage {
   getItMonthlyBandwidth(from: Date, to: Date, interfaceName?: string): Promise<any[]>;
   getItMonitoringSettings(): Promise<ItMonitoringSettings | undefined>;
   upsertItMonitoringSettings(data: Partial<ItMonitoringSettings>): Promise<ItMonitoringSettings>;
+  getItDashboardSettings(): Promise<ItDashboardSettings | undefined>;
+  upsertItDashboardSettings(data: Partial<ItDashboardSettings>): Promise<ItDashboardSettings>;
   createItMonitoringReport(data: { weekStart: string; weekEnd: string; reportJson: Record<string, unknown> }): Promise<ItMonitoringReport>;
   getItMonitoringReports(limit?: number): Promise<ItMonitoringReport[]>;
   markItMonitoringReportEmailed(id: number): Promise<void>;
@@ -1668,6 +1672,25 @@ export class DatabaseStorage implements IStorage {
     return result.rows;
   }
 
+  async getItDashboardSettings(): Promise<ItDashboardSettings | undefined> {
+    const [row] = await getDb().select().from(itDashboardSettings).limit(1);
+    return row;
+  }
+
+  async upsertItDashboardSettings(data: Partial<ItDashboardSettings>): Promise<ItDashboardSettings> {
+    const existing = await this.getItDashboardSettings();
+    if (existing) {
+      const [row] = await getDb()
+        .update(itDashboardSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(itDashboardSettings.id, existing.id))
+        .returning();
+      return row;
+    }
+    const [row] = await getDb().insert(itDashboardSettings).values(data as any).returning();
+    return row;
+  }
+
   async getItOpenIssue(hostId: number, issueType: string): Promise<ItNetworkIssue | undefined> {
     const result = await getPool().query({
       text: `SELECT * FROM it_network_issues
@@ -2427,6 +2450,8 @@ export const storage = {
   getItHostStatus: (...args: Parameters<DatabaseStorage['getItHostStatus']>) => getStorage().getItHostStatus(...args),
   getItHostHistory: (...args: Parameters<DatabaseStorage['getItHostHistory']>) => getStorage().getItHostHistory(...args),
   getItMonitoringSummary: (...args: Parameters<DatabaseStorage['getItMonitoringSummary']>) => getStorage().getItMonitoringSummary(...args),
+  getItDashboardSettings: () => getStorage().getItDashboardSettings(),
+  upsertItDashboardSettings: (...args: Parameters<DatabaseStorage['upsertItDashboardSettings']>) => getStorage().upsertItDashboardSettings(...args),
   getItOpenIssue: (...args: Parameters<DatabaseStorage['getItOpenIssue']>) => getStorage().getItOpenIssue(...args),
   createItNetworkIssue: (...args: Parameters<DatabaseStorage['createItNetworkIssue']>) => getStorage().createItNetworkIssue(...args),
   updateItNetworkIssue: (...args: Parameters<DatabaseStorage['updateItNetworkIssue']>) => getStorage().updateItNetworkIssue(...args),

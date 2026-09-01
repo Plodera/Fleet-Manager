@@ -50,6 +50,17 @@ CREATE TABLE IF NOT EXISTS it_monitoring_settings (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS it_dashboard_settings (
+  id SERIAL PRIMARY KEY,
+  visible_sections TEXT NOT NULL DEFAULT '{"summary":true,"internetLinks":true,"fortigateLinks":true,"bandwidth":true,"devices":true,"kpis":true}',
+  visible_metrics TEXT NOT NULL DEFAULT '{"onlineCounts":true,"historyAvailability":true,"packetLoss":true,"hostLatency":true,"hostLastChecked":true,"fortigateRates":true,"fortigateLastChecked":true,"fortigateUtilization":true,"lowBandwidth":true,"deviceOfflineList":true,"kpiMonthly":true}',
+  selected_host_ids TEXT NOT NULL DEFAULT '[]',
+  selected_interfaces TEXT NOT NULL DEFAULT '[]',
+  interface_capacities TEXT NOT NULL DEFAULT '{}',
+  chart_style TEXT NOT NULL DEFAULT 'line',
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS it_monitoring_reports (
   id SERIAL PRIMARY KEY,
   week_start DATE NOT NULL UNIQUE,

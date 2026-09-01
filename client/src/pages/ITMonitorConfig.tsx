@@ -121,6 +121,15 @@ const BLANK_HOST_TYPE = {
   color: "blue", isInternetLink: false, isActive: true, sortOrder: "0",
 };
 
+const DEFAULT_DASHBOARD_DISPLAY = {
+  visibleSections: { summary: true, internetLinks: true, fortigateLinks: true, bandwidth: true, devices: true, kpis: true },
+  visibleMetrics: { onlineCounts: true, historyAvailability: true, packetLoss: true, hostLatency: true, hostLastChecked: true, fortigateRates: true, fortigateLastChecked: true, fortigateUtilization: true, lowBandwidth: true, deviceOfflineList: true, kpiMonthly: true },
+  selectedHostIds: [] as number[],
+  selectedInterfaces: [] as string[],
+  interfaceCapacities: {} as Record<string, number>,
+  chartStyle: "line" as "line" | "area" | "bar",
+};
+
 function StatusBadge({ status }: { status: Host["status"] }) {
   if (!status) return <Badge variant="secondary">Never checked</Badge>;
   if (status.isOnline) {
@@ -199,6 +208,7 @@ export default function ITMonitorConfig() {
   const [fortigateInterfaceLabels, setFortigateInterfaceLabels] = useState<Record<string, string>>({});
   const [availableInterfaces, setAvailableInterfaces] = useState<string[]>([]); // from test connection
   const [testingFortigate, setTestingFortigate] = useState(false);
+  const [dashboardDisplay, setDashboardDisplay] = useState(DEFAULT_DASHBOARD_DISPLAY);
 
   // CSV Import state
   const csvFileRef = useRef<HTMLInputElement>(null);
@@ -214,6 +224,7 @@ export default function ITMonitorConfig() {
   const { data: hostTypes = [] } = useQuery<ItHostType[]>({ queryKey: ["/api/it/host-types"] });
   const { data: hosts = [] } = useQuery<Host[]>({ queryKey: ["/api/it/hosts"], refetchInterval: 30000 });
   const { data: kpis = [] } = useQuery<Kpi[]>({ queryKey: ["/api/it/kpis"] });
+  const { data: savedDashboardDisplay } = useQuery<any>({ queryKey: ["/api/it/dashboard-settings"] });
   const { data: existingValues = [] } = useQuery<ItKpiValue[]>({
     queryKey: ["/api/it/kpi-values", dataEntryPeriodType, dataEntryDate],
     queryFn: async () => {
@@ -223,6 +234,18 @@ export default function ITMonitorConfig() {
   });
 
   useEffect(() => { setKpiValues({}); }, [dataEntryDate, dataEntryPeriodType]);
+
+  useEffect(() => {
+    if (!savedDashboardDisplay) return;
+    setDashboardDisplay({
+      visibleSections: { ...DEFAULT_DASHBOARD_DISPLAY.visibleSections, ...(savedDashboardDisplay.visibleSections || {}) },
+      visibleMetrics: { ...DEFAULT_DASHBOARD_DISPLAY.visibleMetrics, ...(savedDashboardDisplay.visibleMetrics || {}) },
+      selectedHostIds: Array.isArray(savedDashboardDisplay.selectedHostIds) ? savedDashboardDisplay.selectedHostIds : [],
+      selectedInterfaces: Array.isArray(savedDashboardDisplay.selectedInterfaces) ? savedDashboardDisplay.selectedInterfaces : [],
+      interfaceCapacities: savedDashboardDisplay.interfaceCapacities || {},
+      chartStyle: ["line", "area", "bar"].includes(savedDashboardDisplay.chartStyle) ? savedDashboardDisplay.chartStyle : "line",
+    });
+  }, [savedDashboardDisplay]);
 
   // Host type mutations
   const createTypeMutation = useMutation({
@@ -488,6 +511,15 @@ export default function ITMonitorConfig() {
     onError: (err: any) => { refetchFortigate(); toast({ title: err?.message || "FortiGate sync failed", variant: "destructive" }); },
   });
 
+  const saveDashboardDisplayMutation = useMutation({
+    mutationFn: (data: object) => apiRequest("PUT", "/api/it/dashboard-settings", data),
+    onSuccess: (saved: any) => {
+      queryClient.setQueryData(["/api/it/dashboard-settings"], saved);
+      toast({ title: t.itMonitor?.dashboardDisplaySaved || "Dashboard display saved" });
+    },
+    onError: () => toast({ title: "Failed to save dashboard display", variant: "destructive" }),
+  });
+
   const testFortigateConnection = async () => {
     setTestingFortigate(true);
     try {
@@ -631,6 +663,18 @@ export default function ITMonitorConfig() {
     return ht ? ht.labelEn : slug;
   };
 
+  const dashboardInterfaces = Array.from(new Set([...fortigateInterfaces, ...availableInterfaces]));
+  const activeDashboardHosts = hosts.filter(host => host.isActive);
+  const toggleDashboardOption = (group: "visibleSections" | "visibleMetrics", key: string, checked: boolean) => {
+    setDashboardDisplay(prev => ({
+      ...prev,
+      [group]: { ...prev[group], [key]: checked },
+    }));
+  };
+  const saveDashboardDisplay = () => {
+    saveDashboardDisplayMutation.mutate(dashboardDisplay);
+  };
+
   return (
     <div>
       <PageHeader
@@ -664,6 +708,7 @@ export default function ITMonitorConfig() {
           <TabsTrigger value="glpi" data-testid="tab-glpi">GLPI</TabsTrigger>
           <TabsTrigger value="nvr" data-testid="tab-nvr">NVR</TabsTrigger>
           <TabsTrigger value="fortigate" data-testid="tab-fortigate">FortiGate</TabsTrigger>
+           <TabsTrigger value="dashboard" data-testid="tab-dashboard-display">{it.dashboardDisplay || "Dashboard display"}</TabsTrigger>
         </TabsList>
 
         {/* ── Monitored Hosts tab ── */}
@@ -921,6 +966,173 @@ export default function ITMonitorConfig() {
             </div>
           )}
         </TabsContent>
+
+         {/* ── Dashboard display tab ── */}
+         <TabsContent value="dashboard" className="mt-4">
+           <div className="max-w-4xl space-y-6">
+             <Card>
+               <CardContent className="pt-6 space-y-6">
+                 <div className="flex items-center gap-3 pb-2 border-b">
+                   <Monitor className="w-5 h-5 text-primary" />
+                   <div>
+                     <p className="font-semibold">{it.dashboardDisplay || "Dashboard display"}</p>
+                     <p className="text-sm text-muted-foreground">{it.dashboardDisplayDescription || "Choose what the TV dashboard shows."}</p>
+                   </div>
+                 </div>
+
+                 <div className="space-y-3">
+                   <Label>{it.dashboardSections || "Dashboard sections"}</Label>
+                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                     {([
+                       ["summary", it.summary || "Network health summary"],
+                       ["internetLinks", it.sectionInternetLinks || "Internet Links"],
+                       ["fortigateLinks", it.fortigateLinks || "FortiGate WAN links"],
+                       ["bandwidth", it.sectionBandwidth || "FortiGate Bandwidth"],
+                       ["devices", it.sectionDevices || "Network Devices"],
+                       ["kpis", it.sectionKpis || "KPIs"],
+                     ] as [string, string][]).map(([key, label]) => (
+                       <label key={key} className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">
+                         <input
+                           type="checkbox"
+                           checked={!!dashboardDisplay.visibleSections[key as keyof typeof dashboardDisplay.visibleSections]}
+                           onChange={e => toggleDashboardOption("visibleSections", key, e.target.checked)}
+                           data-testid={`checkbox-dashboard-section-${key}`}
+                         />
+                         <span className="text-sm">{label}</span>
+                       </label>
+                     ))}
+                   </div>
+                 </div>
+
+                 <div className="space-y-3">
+                   <Label>{it.dashboardMetrics || "Displayed metrics"}</Label>
+                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                     {([
+                       ["onlineCounts", it.onlineCounts || "Current online counts"],
+                       ["historyAvailability", it.historyAvailability || "24-hour availability"],
+                       ["packetLoss", it.packetLoss || "24-hour packet loss"],
+                       ["hostLatency", it.hostLatency || "Host latency"],
+                       ["hostLastChecked", it.hostLastChecked || "Last host check"],
+                       ["fortigateRates", it.fortigateRates || "WAN TX/RX rates"],
+                       ["fortigateLastChecked", it.fortigateLastChecked || "WAN last checked"],
+                       ["fortigateUtilization", it.fortigateUtilization || "WAN utilization"],
+                       ["lowBandwidth", it.lowBandwidthMetric || "Low-bandwidth warnings"],
+                       ["deviceOfflineList", it.deviceOfflineList || "Offline device list"],
+                       ["kpiMonthly", it.kpiMonthly || "Monthly KPI comparison"],
+                     ] as [string, string][]).map(([key, label]) => (
+                       <label key={key} className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">
+                         <input
+                           type="checkbox"
+                           checked={!!dashboardDisplay.visibleMetrics[key as keyof typeof dashboardDisplay.visibleMetrics]}
+                           onChange={e => toggleDashboardOption("visibleMetrics", key, e.target.checked)}
+                           data-testid={`checkbox-dashboard-metric-${key}`}
+                         />
+                         <span className="text-sm">{label}</span>
+                       </label>
+                     ))}
+                   </div>
+                 </div>
+
+                 <div className="grid md:grid-cols-2 gap-6">
+                   <div className="space-y-3">
+                     <Label>{it.selectedHosts || "Devices shown"}</Label>
+                     <p className="text-xs text-muted-foreground">{it.allDevices || "All active devices"}: leave every device selected.</p>
+                     <div className="border rounded-lg divide-y max-h-52 overflow-y-auto">
+                       {activeDashboardHosts.length === 0 ? (
+                         <p className="p-3 text-sm text-muted-foreground">{it.noHosts || "No hosts configured"}</p>
+                       ) : activeDashboardHosts.map(host => {
+                         const selected = dashboardDisplay.selectedHostIds.length === 0 || dashboardDisplay.selectedHostIds.includes(host.id);
+                         return (
+                           <label key={host.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/30">
+                             <input
+                               type="checkbox"
+                               checked={selected}
+                               onChange={e => setDashboardDisplay(prev => ({
+                                 ...prev,
+                                 selectedHostIds: e.target.checked
+                                   ? Array.from(new Set([...prev.selectedHostIds, host.id]))
+                                   : (prev.selectedHostIds.length === 0 ? activeDashboardHosts.filter(h => h.id !== host.id).map(h => h.id) : prev.selectedHostIds.filter(id => id !== host.id)),
+                               }))}
+                               data-testid={`checkbox-dashboard-host-${host.id}`}
+                             />
+                             <span className="text-sm">{host.name}</span>
+                             <span className="ml-auto text-xs text-muted-foreground font-mono">{host.ipAddress}</span>
+                           </label>
+                         );
+                       })}
+                     </div>
+                   </div>
+
+                   <div className="space-y-3">
+                     <Label>{it.selectedWanLinks || "WAN links shown"}</Label>
+                     <p className="text-xs text-muted-foreground">{it.allWanLinks || "All configured WAN links"}: leave every link selected.</p>
+                     <div className="border rounded-lg divide-y max-h-52 overflow-y-auto">
+                       {dashboardInterfaces.length === 0 ? (
+                         <p className="p-3 text-sm text-muted-foreground">{it.unavailable || "Unavailable — not configured"}</p>
+                       ) : dashboardInterfaces.map(iface => {
+                         const selected = dashboardDisplay.selectedInterfaces.length === 0 || dashboardDisplay.selectedInterfaces.includes(iface);
+                         return (
+                           <div key={iface} className="px-3 py-2 space-y-2">
+                             <label className="flex items-center gap-3 cursor-pointer">
+                               <input
+                                 type="checkbox"
+                                 checked={selected}
+                                 onChange={e => setDashboardDisplay(prev => ({
+                                   ...prev,
+                                   selectedInterfaces: e.target.checked
+                                     ? Array.from(new Set([...prev.selectedInterfaces, iface]))
+                                     : (prev.selectedInterfaces.length === 0 ? dashboardInterfaces.filter(i => i !== iface) : prev.selectedInterfaces.filter(i => i !== iface)),
+                                 }))}
+                                 data-testid={`checkbox-dashboard-interface-${iface}`}
+                               />
+                               <span className="text-sm font-mono">{iface}</span>
+                             </label>
+                             {selected && (
+                               <div className="flex items-center gap-2 pl-7">
+                                 <Label className="text-xs text-muted-foreground">{it.capacity || "Capacity (Mbps)"}</Label>
+                                 <Input
+                                   type="number"
+                                   min="0"
+                                   step="0.1"
+                                   className="h-8 w-28"
+                                   value={dashboardDisplay.interfaceCapacities[iface] ?? ""}
+                                   onChange={e => setDashboardDisplay(prev => ({
+                                     ...prev,
+                                     interfaceCapacities: { ...prev.interfaceCapacities, [iface]: e.target.value === "" ? 0 : Number(e.target.value) },
+                                   }))}
+                                   placeholder="Optional"
+                                   data-testid={`input-dashboard-capacity-${iface}`}
+                                 />
+                               </div>
+                             )}
+                           </div>
+                         );
+                       })}
+                     </div>
+                     <p className="text-xs text-muted-foreground">{it.capacityHint || "Optional. Enables truthful utilization display for that link."}</p>
+                   </div>
+                 </div>
+
+                 <div className="flex items-end gap-4 pt-2">
+                   <div className="space-y-1">
+                     <Label>{it.chartStyle || "Bandwidth graph style"}</Label>
+                     <Select value={dashboardDisplay.chartStyle} onValueChange={value => setDashboardDisplay(prev => ({ ...prev, chartStyle: value as "line" | "area" | "bar" }))}>
+                       <SelectTrigger className="w-44" data-testid="select-dashboard-chart-style"><SelectValue /></SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="line">{it.lineChart || "Lines"}</SelectItem>
+                         <SelectItem value="area">{it.areaChart || "Areas"}</SelectItem>
+                         <SelectItem value="bar">{it.barChart || "Bars"}</SelectItem>
+                       </SelectContent>
+                     </Select>
+                   </div>
+                   <Button onClick={saveDashboardDisplay} disabled={saveDashboardDisplayMutation.isPending} data-testid="button-save-dashboard-display">
+                     {saveDashboardDisplayMutation.isPending ? (t.tvDashboard?.saving || "Saving...") : (it.saveDashboardDisplay || "Save dashboard display")}
+                   </Button>
+                 </div>
+               </CardContent>
+             </Card>
+           </div>
+         </TabsContent>
 
         {/* ── GLPI Integration tab ── */}
         <TabsContent value="glpi" className="mt-4">

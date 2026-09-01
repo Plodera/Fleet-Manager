@@ -150,6 +150,16 @@ export async function initDatabase() {
       report_recipients TEXT[] NOT NULL DEFAULT '{}', email_reports BOOLEAN NOT NULL DEFAULT FALSE,
       updated_at TIMESTAMP DEFAULT NOW()
     )`).catch(() => {});
+    await _pool.query(`CREATE TABLE IF NOT EXISTS it_dashboard_settings (
+      id SERIAL PRIMARY KEY,
+      visible_sections TEXT NOT NULL DEFAULT '{"summary":true,"internetLinks":true,"fortigateLinks":true,"bandwidth":true,"devices":true,"kpis":true}',
+      visible_metrics TEXT NOT NULL DEFAULT '{"onlineCounts":true,"historyAvailability":true,"packetLoss":true,"hostLatency":true,"hostLastChecked":true,"fortigateRates":true,"fortigateLastChecked":true,"fortigateUtilization":true,"lowBandwidth":true,"deviceOfflineList":true,"kpiMonthly":true}',
+      selected_host_ids TEXT NOT NULL DEFAULT '[]',
+      selected_interfaces TEXT NOT NULL DEFAULT '[]',
+      interface_capacities TEXT NOT NULL DEFAULT '{}',
+      chart_style TEXT NOT NULL DEFAULT 'line',
+      updated_at TIMESTAMP DEFAULT NOW()
+    )`).catch(() => {});
     await _pool.query(`CREATE TABLE IF NOT EXISTS it_monitoring_reports (
       id SERIAL PRIMARY KEY, week_start DATE NOT NULL UNIQUE, week_end DATE NOT NULL,
       report_json JSONB NOT NULL, generated_at TIMESTAMP NOT NULL DEFAULT NOW(), emailed_at TIMESTAMP

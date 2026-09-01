@@ -2294,6 +2294,108 @@ export async function registerRoutes(
   });
 
   // IT Operations Monitor
+  const defaultItDashboardSettings = {
+    visibleSections: {
+      summary: true,
+      internetLinks: true,
+      fortigateLinks: true,
+      bandwidth: true,
+      devices: true,
+      kpis: true,
+    },
+    visibleMetrics: {
+      onlineCounts: true,
+      historyAvailability: true,
+      packetLoss: true,
+      hostLatency: true,
+      hostLastChecked: true,
+      fortigateRates: true,
+      fortigateLastChecked: true,
+      fortigateUtilization: true,
+      lowBandwidth: true,
+      deviceOfflineList: true,
+      kpiMonthly: true,
+    },
+    selectedHostIds: [] as number[],
+    selectedInterfaces: [] as string[],
+    interfaceCapacities: {} as Record<string, number>,
+    chartStyle: "line" as "line" | "area" | "bar",
+  };
+
+  function parseJsonSetting(value: unknown, fallback: unknown): any {
+    if (typeof value !== "string") return value ?? fallback;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
+    }
+  }
+
+  function dashboardSettingsResponse(row: any) {
+    return {
+      id: row?.id ?? null,
+      visibleSections: { ...defaultItDashboardSettings.visibleSections, ...parseJsonSetting(row?.visibleSections, {}) },
+      visibleMetrics: { ...defaultItDashboardSettings.visibleMetrics, ...parseJsonSetting(row?.visibleMetrics, {}) },
+      selectedHostIds: Array.isArray(parseJsonSetting(row?.selectedHostIds, []))
+        ? parseJsonSetting(row?.selectedHostIds, []).map(Number).filter((id: number) => Number.isInteger(id) && id > 0)
+        : [],
+      selectedInterfaces: Array.isArray(parseJsonSetting(row?.selectedInterfaces, []))
+        ? parseJsonSetting(row?.selectedInterfaces, []).map(String).filter(Boolean)
+        : [],
+      interfaceCapacities: (() => {
+        const value = parseJsonSetting(row?.interfaceCapacities, {});
+        if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+        return Object.fromEntries(Object.entries(value).map(([name, capacity]) => [name, Math.max(0, Number(capacity) || 0)]));
+      })(),
+      chartStyle: ["line", "area", "bar"].includes(row?.chartStyle) ? row.chartStyle : "line",
+      updatedAt: row?.updatedAt ?? null,
+    };
+  }
+
+  // Public read-only settings used by the TV/dashboard display.
+  app.get('/api/it/dashboard-settings', async (_req, res) => {
+    try {
+      res.json(dashboardSettingsResponse(await storage.getItDashboardSettings()));
+    } catch {
+      res.json(defaultItDashboardSettings);
+    }
+  });
+
+  app.put('/api/it/dashboard-settings', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
+    try {
+      const sections = req.body.visibleSections && typeof req.body.visibleSections === "object"
+        ? Object.fromEntries(Object.entries(defaultItDashboardSettings.visibleSections).map(([key, fallback]) => [key, req.body.visibleSections[key] === undefined ? fallback : !!req.body.visibleSections[key]]))
+        : defaultItDashboardSettings.visibleSections;
+      const metrics = req.body.visibleMetrics && typeof req.body.visibleMetrics === "object"
+        ? Object.fromEntries(Object.entries(defaultItDashboardSettings.visibleMetrics).map(([key, fallback]) => [key, req.body.visibleMetrics[key] === undefined ? fallback : !!req.body.visibleMetrics[key]]))
+        : defaultItDashboardSettings.visibleMetrics;
+      const selectedHostIds = Array.isArray(req.body.selectedHostIds)
+        ? Array.from(new Set(req.body.selectedHostIds.map(Number).filter((id: number) => Number.isInteger(id) && id > 0)))
+        : [];
+      const selectedInterfaces = Array.isArray(req.body.selectedInterfaces)
+        ? Array.from(new Set(req.body.selectedInterfaces.map(String).map((name: string) => name.trim()).filter(Boolean)))
+        : [];
+      const interfaceCapacities = req.body.interfaceCapacities && typeof req.body.interfaceCapacities === "object"
+        ? Object.fromEntries(Object.entries(req.body.interfaceCapacities).map(([name, capacity]) => [name, Math.max(0, Number(capacity) || 0)]))
+        : {};
+      const chartStyle = ["line", "area", "bar"].includes(req.body.chartStyle) ? req.body.chartStyle : "line";
+      const saved = await storage.upsertItDashboardSettings({
+        visibleSections: JSON.stringify(sections),
+        visibleMetrics: JSON.stringify(metrics),
+        selectedHostIds: JSON.stringify(selectedHostIds),
+        selectedInterfaces: JSON.stringify(selectedInterfaces),
+        interfaceCapacities: JSON.stringify(interfaceCapacities),
+        chartStyle,
+      });
+      res.json(dashboardSettingsResponse(saved));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to save IT dashboard settings" });
+    }
+  });
+
   app.get('/api/it/hosts', async (req, res) => {
     try {
       const hosts = await storage.getItHostsWithStatus();
@@ -2448,6 +2550,18 @@ export async function registerRoutes(
       res.json(await storage.getItHostHistory(hostId, from, to, Number(req.query.limit) || 2000));
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to fetch monitoring history" });
+    }
+  });
+
+  // Public summary for the TV dashboard. It contains only aggregate health
+  // data already intended for the IT display, not issue ownership/details.
+  app.get('/api/it/dashboard/summary', async (_req, res) => {
+    try {
+      const to = new Date();
+      const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+      res.json(await storage.getItMonitoringSummary(from, to));
+    } catch {
+      res.json([]);
     }
   });
 

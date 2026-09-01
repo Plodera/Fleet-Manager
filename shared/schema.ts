@@ -999,6 +999,19 @@ export const itMonitoringSettings = pgTable("it_monitoring_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Dashboard presentation preferences are intentionally separate from monitor
+// settings: hiding a card must never stop collection or historical reporting.
+export const itDashboardSettings = pgTable("it_dashboard_settings", {
+  id: serial("id").primaryKey(),
+  visibleSections: text("visible_sections").notNull().default('{"summary":true,"internetLinks":true,"fortigateLinks":true,"bandwidth":true,"devices":true,"kpis":true}'),
+  visibleMetrics: text("visible_metrics").notNull().default('{"onlineCounts":true,"historyAvailability":true,"packetLoss":true,"hostLatency":true,"hostLastChecked":true,"fortigateRates":true,"fortigateLastChecked":true,"fortigateUtilization":true,"lowBandwidth":true,"deviceOfflineList":true,"kpiMonthly":true}'),
+  selectedHostIds: text("selected_host_ids").notNull().default("[]"),
+  selectedInterfaces: text("selected_interfaces").notNull().default("[]"),
+  interfaceCapacities: text("interface_capacities").notNull().default("{}"),
+  chartStyle: text("chart_style").notNull().default("line"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const itMonitoringReports = pgTable("it_monitoring_reports", {
   id: serial("id").primaryKey(),
   weekStart: date("week_start").notNull().unique(),
@@ -1058,6 +1071,8 @@ export type ItNetworkIssue = typeof itNetworkIssues.$inferSelect;
 export type ItNetworkIssueUpdate = typeof itNetworkIssueUpdates.$inferSelect;
 export type ItMonitoringSettings = typeof itMonitoringSettings.$inferSelect;
 export type InsertItMonitoringSettings = typeof itMonitoringSettings.$inferInsert;
+export type ItDashboardSettings = typeof itDashboardSettings.$inferSelect;
+export type InsertItDashboardSettings = typeof itDashboardSettings.$inferInsert;
 export type ItMonitoringReport = typeof itMonitoringReports.$inferSelect;
 export type ItMonthlyNetworkReport = typeof itMonthlyNetworkReports.$inferSelect;
 
