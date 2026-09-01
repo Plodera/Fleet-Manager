@@ -54,15 +54,15 @@ export default function ITNetworkOperations() {
   const [reportEmail, setReportEmail] = useState(false);
   const [settings, setSettings] = useState<any>({ reportsEnabled: true, reportDayOfWeek: 1, reportHour: 8, reportRecipients: [], emailReports: false });
 
-  const { data: hosts = [] } = useQuery<ItHostWithStatus[]>({ queryKey: ["/api/it/hosts"], queryFn: async () => (await fetch("/api/it/hosts")).json(), refetchInterval: 30000 });
+  const { data: hosts = [] } = useQuery<ItHostWithStatus[]>({ queryKey: ["/api/it/hosts"], queryFn: async () => { const res = await fetch("/api/it/hosts"); return res.ok ? res.json() : []; }, refetchInterval: 30000 });
   const { data: issueAssignees = [] } = useQuery<ItIssueAssignee[]>({ queryKey: ["/api/it/issue-assignees"], queryFn: async () => { const res = await fetch("/api/it/issue-assignees"); return res.ok ? res.json() : []; } });
-  const { data: summary = [], isFetching: summaryFetching } = useQuery<any[]>({ queryKey: ["/api/it/monitoring/summary", fromDay, toDay], queryFn: async () => (await fetch(`/api/it/monitoring/summary?${rangeQuery(fromDay, toDay)}`)).json(), refetchInterval: 60000 });
+  const { data: summary = [], isFetching: summaryFetching } = useQuery<any[]>({ queryKey: ["/api/it/monitoring/summary", fromDay, toDay], queryFn: async () => { const res = await fetch(`/api/it/monitoring/summary?${rangeQuery(fromDay, toDay)}`); return res.ok ? res.json() : []; }, refetchInterval: 60000 });
   const issueQuery = new URLSearchParams({ status: issueStatus, severity: issueSeverity, hostId: issueHostId });
   if (issueOwnerId) issueQuery.set("assignedToId", issueOwnerId);
-  const { data: issues = [], isFetching: issuesFetching } = useQuery<any[]>({ queryKey: ["/api/it/issues", issueStatus, issueSeverity, issueHostId, issueOwnerId], queryFn: async () => (await fetch(`/api/it/issues?${issueQuery.toString()}`)).json(), refetchInterval: 30000 });
-  const { data: issueUpdates = [] } = useQuery<any[]>({ queryKey: ["/api/it/issues", selectedIssue?.id, "updates"], enabled: !!selectedIssue, queryFn: async () => (await fetch(`/api/it/issues/${selectedIssue.id}/updates`)).json() });
-  const { data: reports = [] } = useQuery<any[]>({ queryKey: ["/api/it/reports"], queryFn: async () => (await fetch("/api/it/reports")).json() });
-  const { data: bandwidth = [] } = useQuery<any[]>({ queryKey: ["/api/it/fortigate/bandwidth/monthly", month, bandwidthInterface], queryFn: async () => (await fetch(`/api/it/fortigate/bandwidth/monthly?month=${month}&interface=${encodeURIComponent(bandwidthInterface)}`)).json() });
+  const { data: issues = [], isFetching: issuesFetching } = useQuery<any[]>({ queryKey: ["/api/it/issues", issueStatus, issueSeverity, issueHostId, issueOwnerId], queryFn: async () => { const res = await fetch(`/api/it/issues?${issueQuery.toString()}`); return res.ok ? res.json() : []; }, refetchInterval: 30000 });
+  const { data: issueUpdates = [] } = useQuery<any[]>({ queryKey: ["/api/it/issues", selectedIssue?.id, "updates"], enabled: !!selectedIssue, queryFn: async () => { const res = await fetch(`/api/it/issues/${selectedIssue.id}/updates`); return res.ok ? res.json() : []; } });
+  const { data: reports = [] } = useQuery<any[]>({ queryKey: ["/api/it/reports"], queryFn: async () => { const res = await fetch("/api/it/reports"); return res.ok ? res.json() : []; } });
+  const { data: bandwidth = [] } = useQuery<any[]>({ queryKey: ["/api/it/fortigate/bandwidth/monthly", month, bandwidthInterface], queryFn: async () => { const res = await fetch(`/api/it/fortigate/bandwidth/monthly?month=${month}&interface=${encodeURIComponent(bandwidthInterface)}`); return res.ok ? res.json() : []; } });
   const { data: history = [] } = useQuery<any[]>({
     queryKey: ["/api/it/monitoring/history", selectedHost],
     enabled: !!selectedHost,

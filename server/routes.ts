@@ -2409,6 +2409,11 @@ export async function registerRoutes(
     const parsed = new Date(String(value || ""));
     return Number.isNaN(parsed.getTime()) ? fallback : parsed;
   };
+  const parseOptionalPositiveInteger = (value: unknown): number | undefined => {
+    if (value === undefined || value === null || value === "" || value === "all") return undefined;
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+  };
 
   app.get('/api/it/issue-assignees', async (req, res) => {
     const user = requireItOperations(req, res);
@@ -2453,8 +2458,8 @@ export async function registerRoutes(
       res.json(await storage.getItNetworkIssues({
         status: String(req.query.status || ""),
         severity: String(req.query.severity || ""),
-        hostId: req.query.hostId ? Number(req.query.hostId) : undefined,
-        assignedToId: req.query.assignedToId ? Number(req.query.assignedToId) : undefined,
+        hostId: parseOptionalPositiveInteger(req.query.hostId),
+        assignedToId: parseOptionalPositiveInteger(req.query.assignedToId),
       }));
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to fetch network issues" });
