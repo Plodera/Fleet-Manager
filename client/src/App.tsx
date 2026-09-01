@@ -36,6 +36,7 @@ import TVDashboardIndex from "@/pages/TVDashboardIndex";
 import StatusTracker from "@/pages/StatusTracker";
 import ITMonitorConfig from "@/pages/ITMonitorConfig";
 import ITDashboard from "@/pages/ITDashboard";
+import ITNetworkOperations from "@/pages/ITNetworkOperations";
 import FactoryMachines from "@/pages/FactoryMachines";
 import FactoryMachineTypeConfig from "@/pages/FactoryMachineTypeConfig";
 import MachineStatus from "@/pages/MachineStatus";
@@ -189,6 +190,9 @@ function Router() {
       </Route>
       <Route path="/it-dashboard">
         <PrivateRoute component={ITDashboard} requiredPermission="view_it_dashboard" noShell />
+      </Route>
+      <Route path="/it-network-operations">
+        <PrivateRoute component={ITNetworkOperations} requiredPermission="view_it_monitor" />
       </Route>
       <Route path="/factory-machines">
         <PrivateRoute component={FactoryMachines} requiredPermission="view_factory_machines" />

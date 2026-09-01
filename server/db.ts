@@ -107,6 +107,43 @@ export async function initDatabase() {
     await _pool.query(`ALTER TABLE fortigate_bandwidth ADD COLUMN IF NOT EXISTS sampled_at TIMESTAMP NOT NULL DEFAULT NOW()`).catch(() => {});
     await _pool.query(`ALTER TABLE fortigate_bandwidth ADD COLUMN IF NOT EXISTS tx_kbps TEXT NOT NULL DEFAULT '0'`).catch(() => {});
     await _pool.query(`ALTER TABLE fortigate_bandwidth ADD COLUMN IF NOT EXISTS rx_kbps TEXT NOT NULL DEFAULT '0'`).catch(() => {});
+    // Historical network monitoring and report tables. The standalone SQL
+    // migration contains the same idempotent statements for on-prem installs.
+    await _pool.query(`CREATE TABLE IF NOT EXISTS it_host_checks (
+      id SERIAL PRIMARY KEY, host_id INTEGER NOT NULL REFERENCES it_monitored_hosts(id) ON DELETE CASCADE,
+      is_online BOOLEAN NOT NULL, response_time_ms INTEGER, failure_reason TEXT,
+      checked_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`).catch(() => {});
+    await _pool.query(`CREATE TABLE IF NOT EXISTS it_network_issues (
+      id SERIAL PRIMARY KEY, host_id INTEGER REFERENCES it_monitored_hosts(id) ON DELETE CASCADE,
+      issue_type TEXT NOT NULL, title TEXT NOT NULL, severity TEXT NOT NULL DEFAULT 'medium',
+      status TEXT NOT NULL DEFAULT 'open', started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      resolved_at TIMESTAMP, assigned_to_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      target_date DATE, investigation_notes TEXT, corrective_action TEXT,
+      resolution_details TEXT, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
+    )`).catch(() => {});
+    await _pool.query(`CREATE TABLE IF NOT EXISTS it_network_issue_updates (
+      id SERIAL PRIMARY KEY, issue_id INTEGER NOT NULL REFERENCES it_network_issues(id) ON DELETE CASCADE,
+      status TEXT, note TEXT, corrective_action TEXT, resolution_details TEXT,
+      created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL, created_at TIMESTAMP DEFAULT NOW()
+    )`).catch(() => {});
+    await _pool.query(`CREATE TABLE IF NOT EXISTS it_monitoring_settings (
+      id SERIAL PRIMARY KEY, reports_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      report_day_of_week INTEGER NOT NULL DEFAULT 1, report_hour INTEGER NOT NULL DEFAULT 8,
+      report_recipients TEXT[] NOT NULL DEFAULT '{}', email_reports BOOLEAN NOT NULL DEFAULT FALSE,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )`).catch(() => {});
+    await _pool.query(`CREATE TABLE IF NOT EXISTS it_monitoring_reports (
+      id SERIAL PRIMARY KEY, week_start DATE NOT NULL UNIQUE, week_end DATE NOT NULL,
+      report_json JSONB NOT NULL, generated_at TIMESTAMP NOT NULL DEFAULT NOW(), emailed_at TIMESTAMP
+    )`).catch(() => {});
+    await _pool.query(`CREATE INDEX IF NOT EXISTS it_host_checks_host_checked_idx ON it_host_checks(host_id, checked_at DESC)`).catch(() => {});
+    await _pool.query(`CREATE INDEX IF NOT EXISTS it_host_checks_checked_idx ON it_host_checks(checked_at DESC)`).catch(() => {});
+    await _pool.query(`CREATE INDEX IF NOT EXISTS it_network_issues_status_idx ON it_network_issues(status, started_at DESC)`).catch(() => {});
+    await _pool.query(`CREATE INDEX IF NOT EXISTS it_network_issues_host_type_idx ON it_network_issues(host_id, issue_type, status)`).catch(() => {});
+    await _pool.query(`CREATE INDEX IF NOT EXISTS it_network_issue_updates_issue_idx ON it_network_issue_updates(issue_id, created_at DESC)`).catch(() => {});
+    await _pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS it_network_issues_open_dedupe_idx
+      ON it_network_issues(host_id, issue_type) WHERE status <> 'resolved' AND host_id IS NOT NULL`).catch(() => {});
 
     // Add breakdown alert recipients to factory_machines if not present
     await _pool.query(`ALTER TABLE factory_machines ADD COLUMN IF NOT EXISTS breakdown_alert_recipients TEXT[] NOT NULL DEFAULT '{}'`).catch(() => {});

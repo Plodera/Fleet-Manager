@@ -8,6 +8,7 @@ import {
   companyDocuments, companyDocumentAccess, expiryNotificationRules, expiryNotificationRecipients,
   expiryNotifications, expiryNotificationDeliveries,
   itHostTypes, itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
+  itHostChecks, itNetworkIssues, itNetworkIssueUpdates, itMonitoringSettings, itMonitoringReports,
   glpiSettings,
   hikvisionNvrs, hikvisionGlobalSettings,
   fortigateSettings, fortigateBandwidth,
@@ -21,6 +22,7 @@ import {
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
   type ItHostType, type InsertItHostType, type ItMonitoredHost, type InsertItMonitoredHost, type ItHostStatus, type ItKpi, type InsertItKpi, type ItKpiValue, type InsertItKpiValue, type ItHostWithStatus,
+  type ItHostCheck, type ItNetworkIssue, type ItNetworkIssueUpdate, type ItMonitoringSettings, type ItMonitoringReport,
   type VehicleInspection, type InsertVehicleInspection,
   type EquipmentType, type InsertEquipmentType,
   type EquipmentChecklistItem, type InsertEquipmentChecklistItem,
@@ -281,6 +283,22 @@ export interface IStorage {
   deleteItKpi(id: number): Promise<void>;
   getItKpiValues(periodType: string, periodDate: string): Promise<any[]>;
   upsertItKpiValues(values: any[]): Promise<void>;
+  recordItHostCheck(data: { hostId: number; isOnline: boolean; responseTimeMs: number | null; failureReason?: string | null; checkedAt?: Date }): Promise<ItHostCheck>;
+  getItHostStatus(hostId: number): Promise<ItHostStatus | undefined>;
+  getItHostHistory(hostId: number, from: Date, to: Date, limit?: number): Promise<any[]>;
+  getItMonitoringSummary(from: Date, to: Date): Promise<any[]>;
+  getItOpenIssue(hostId: number, issueType: string): Promise<ItNetworkIssue | undefined>;
+  createItNetworkIssue(data: Partial<ItNetworkIssue> & { hostId: number; issueType: string; title: string }): Promise<ItNetworkIssue>;
+  updateItNetworkIssue(id: number, updates: Partial<ItNetworkIssue>): Promise<ItNetworkIssue>;
+  addItNetworkIssueUpdate(data: { issueId: number; status?: string | null; note?: string | null; correctiveAction?: string | null; resolutionDetails?: string | null; createdById?: number | null }): Promise<ItNetworkIssueUpdate>;
+  getItNetworkIssues(filters?: { status?: string; severity?: string; hostId?: number; assignedToId?: number }): Promise<any[]>;
+  getItNetworkIssueUpdates(issueId: number): Promise<ItNetworkIssueUpdate[]>;
+  getItMonthlyBandwidth(from: Date, to: Date, interfaceName?: string): Promise<any[]>;
+  getItMonitoringSettings(): Promise<ItMonitoringSettings | undefined>;
+  upsertItMonitoringSettings(data: Partial<ItMonitoringSettings>): Promise<ItMonitoringSettings>;
+  createItMonitoringReport(data: { weekStart: string; weekEnd: string; reportJson: Record<string, unknown> }): Promise<ItMonitoringReport>;
+  getItMonitoringReports(limit?: number): Promise<ItMonitoringReport[]>;
+  markItMonitoringReportEmailed(id: number): Promise<void>;
 
 
   // Factory Machine Maintenance
@@ -923,7 +941,7 @@ export class DatabaseStorage implements IStorage {
 
   async getMyIndentApproverDepartments(userId: number): Promise<number[]> {
     const rows = await getDb().select().from(indentApproverDepartments).where(eq(indentApproverDepartments.userId, userId));
-    return rows.map(r => r.departmentId);
+    return rows.map((r: any) => r.departmentId);
   }
 
   async setIndentApproverDepartments(userId: number, departmentIds: number[]): Promise<void> {
@@ -1134,9 +1152,9 @@ export class DatabaseStorage implements IStorage {
   async getTrackers(): Promise<(Tracker & { department?: Department })[]> {
     const rows = await getDb().select().from(trackers).orderBy(trackers.name);
     const depts = await getDb().select().from(departments);
-    return rows.map(t => ({
+    return rows.map((t: any) => ({
       ...t,
-      department: t.departmentId ? depts.find(d => d.id === t.departmentId) : undefined,
+      department: t.departmentId ? depts.find((d: any) => d.id === t.departmentId) : undefined,
     }));
   }
 
@@ -1499,7 +1517,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(itHostStatus, eq(itHostStatus.hostId, itMonitoredHosts.id))
       .orderBy(itMonitoredHosts.sortOrder, itMonitoredHosts.name);
 
-    return rows.map(r => ({
+    return rows.map((r: any) => ({
       id: r.id,
       name: r.name,
       ipAddress: r.ipAddress,
@@ -1557,6 +1575,224 @@ export class DatabaseStorage implements IStorage {
         await getDb().insert(itKpiValues).values(v);
       }
     }
+  }
+
+  async recordItHostCheck(data: { hostId: number; isOnline: boolean; responseTimeMs: number | null; failureReason?: string | null; checkedAt?: Date }): Promise<ItHostCheck> {
+    const [row] = await getDb().insert(itHostChecks).values({
+      hostId: data.hostId,
+      isOnline: data.isOnline,
+      responseTimeMs: data.responseTimeMs,
+      failureReason: data.failureReason ?? null,
+      checkedAt: data.checkedAt ?? new Date(),
+    }).returning();
+    return row;
+  }
+
+  async getItHostStatus(hostId: number): Promise<ItHostStatus | undefined> {
+    const [row] = await getDb().select().from(itHostStatus).where(eq(itHostStatus.hostId, hostId)).limit(1);
+    return row;
+  }
+
+  async getItHostHistory(hostId: number, from: Date, to: Date, limit = 2000): Promise<any[]> {
+    const result = await getPool().query({
+      text: `SELECT id, host_id AS "hostId", is_online AS "isOnline",
+        response_time_ms AS "responseTimeMs", failure_reason AS "failureReason",
+        checked_at AS "checkedAt"
+        FROM it_host_checks
+        WHERE host_id = $1 AND checked_at >= $2 AND checked_at < $3
+        ORDER BY checked_at DESC LIMIT $4`,
+      values: [hostId, from, to, Math.min(Math.max(limit, 1), 10000)],
+    });
+    return result.rows;
+  }
+
+  async getItMonitoringSummary(from: Date, to: Date): Promise<any[]> {
+    const result = await getPool().query({
+      text: `SELECT h.id, h.name, h.ip_address AS "ipAddress", h.host_type AS "hostType",
+        COUNT(c.id)::int AS "checks", COUNT(c.id) FILTER (WHERE c.is_online)::int AS "onlineChecks",
+        COALESCE(ROUND(100.0 * COUNT(c.id) FILTER (WHERE c.is_online) / NULLIF(COUNT(c.id), 0), 2), 0)::float AS "availability",
+        ROUND(AVG(c.response_time_ms) FILTER (WHERE c.is_online), 2)::float AS "averageLatencyMs",
+        MAX(c.response_time_ms) FILTER (WHERE c.is_online)::int AS "maxLatencyMs",
+        COUNT(c.id) FILTER (WHERE NOT c.is_online)::int AS "failedChecks",
+        MAX(c.checked_at) AS "lastCheckedAt"
+        FROM it_monitored_hosts h
+        LEFT JOIN it_host_checks c ON c.host_id = h.id AND c.checked_at >= $1 AND c.checked_at < $2
+        WHERE h.is_active = TRUE
+        GROUP BY h.id ORDER BY h.sort_order, h.name`,
+      values: [from, to],
+    });
+    return result.rows;
+  }
+
+  async getItOpenIssue(hostId: number, issueType: string): Promise<ItNetworkIssue | undefined> {
+    const result = await getPool().query({
+      text: `SELECT * FROM it_network_issues
+        WHERE host_id = $1 AND issue_type = $2 AND status <> 'resolved'
+        ORDER BY started_at DESC LIMIT 1`,
+      values: [hostId, issueType],
+    });
+    return result.rows[0] ? this.mapItIssue(result.rows[0]) : undefined;
+  }
+
+  private mapItIssue(row: any): ItNetworkIssue {
+    return {
+      id: row.id, hostId: row.host_id, issueType: row.issue_type, title: row.title,
+      severity: row.severity, status: row.status, startedAt: row.started_at,
+      resolvedAt: row.resolved_at, assignedToId: row.assigned_to_id, targetDate: row.target_date,
+      investigationNotes: row.investigation_notes, correctiveAction: row.corrective_action,
+      resolutionDetails: row.resolution_details, createdAt: row.created_at, updatedAt: row.updated_at,
+    };
+  }
+
+  async createItNetworkIssue(data: Partial<ItNetworkIssue> & { hostId: number; issueType: string; title: string }): Promise<ItNetworkIssue> {
+    const result = await getPool().query({
+      text: `INSERT INTO it_network_issues
+        (host_id, issue_type, title, severity, status, started_at, assigned_to_id, target_date,
+         investigation_notes, corrective_action, resolution_details, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+        ON CONFLICT (host_id, issue_type) WHERE status <> 'resolved' AND host_id IS NOT NULL
+        DO UPDATE SET title = EXCLUDED.title, updated_at = NOW()
+        RETURNING *`,
+      values: [
+        data.hostId, data.issueType, data.title, data.severity ?? "medium", data.status ?? "open",
+        data.startedAt ?? new Date(), data.assignedToId ?? null, data.targetDate ?? null,
+        data.investigationNotes ?? null, data.correctiveAction ?? null, data.resolutionDetails ?? null,
+      ],
+    });
+    return this.mapItIssue(result.rows[0]);
+  }
+
+  async updateItNetworkIssue(id: number, updates: Partial<ItNetworkIssue>): Promise<ItNetworkIssue> {
+    const allowed: Record<string, string> = {
+      title: "title", severity: "severity", status: "status", resolvedAt: "resolved_at",
+      assignedToId: "assigned_to_id", targetDate: "target_date", investigationNotes: "investigation_notes",
+      correctiveAction: "corrective_action", resolutionDetails: "resolution_details",
+    };
+    const entries = Object.entries(updates).filter(([key]) => allowed[key]);
+    if (entries.length === 0) {
+      const result = await getPool().query({ text: "SELECT * FROM it_network_issues WHERE id = $1", values: [id] });
+      return this.mapItIssue(result.rows[0]);
+    }
+    const values: unknown[] = [id];
+    const sets = entries.map(([key, value], index) => {
+      values.push(value ?? null);
+      return `${allowed[key]} = $${index + 2}`;
+    });
+    values.push(new Date());
+    sets.push(`updated_at = $${values.length}`);
+    const result = await getPool().query({
+      text: `UPDATE it_network_issues SET ${sets.join(", ")} WHERE id = $1 RETURNING *`,
+      values,
+    });
+    return this.mapItIssue(result.rows[0]);
+  }
+
+  async addItNetworkIssueUpdate(data: { issueId: number; status?: string | null; note?: string | null; correctiveAction?: string | null; resolutionDetails?: string | null; createdById?: number | null }): Promise<ItNetworkIssueUpdate> {
+    const result = await getPool().query({
+      text: `INSERT INTO it_network_issue_updates
+        (issue_id, status, note, corrective_action, resolution_details, created_by_id)
+        VALUES ($1,$2,$3,$4,$5,$6) RETURNING
+        id, issue_id AS "issueId", status, note, corrective_action AS "correctiveAction",
+        resolution_details AS "resolutionDetails", created_by_id AS "createdById", created_at AS "createdAt"`,
+      values: [data.issueId, data.status ?? null, data.note ?? null, data.correctiveAction ?? null, data.resolutionDetails ?? null, data.createdById ?? null],
+    });
+    return result.rows[0];
+  }
+
+  async getItNetworkIssues(filters: { status?: string; severity?: string; hostId?: number; assignedToId?: number } = {}): Promise<any[]> {
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    for (const [key, column] of [["status", "i.status"], ["severity", "i.severity"], ["hostId", "i.host_id"], ["assignedToId", "i.assigned_to_id"]] as const) {
+      const value = filters[key];
+      if (value !== undefined && value !== "" && value !== "all") {
+        values.push(key.endsWith("Id") ? Number(value) : value);
+        conditions.push(`${column} = $${values.length}`);
+      }
+    }
+    const result = await getPool().query({
+      text: `SELECT i.*, h.name AS host_name, h.ip_address AS host_ip,
+        u.full_name AS assignee_name
+        FROM it_network_issues i
+        LEFT JOIN it_monitored_hosts h ON h.id = i.host_id
+        LEFT JOIN users u ON u.id = i.assigned_to_id
+        ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+        ORDER BY CASE WHEN i.status = 'resolved' THEN 1 ELSE 0 END, i.started_at DESC`,
+      values,
+    });
+    return result.rows.map((row: any) => ({ ...this.mapItIssue(row), hostName: row.host_name, hostIp: row.host_ip, assigneeName: row.assignee_name }));
+  }
+
+  async getItNetworkIssueUpdates(issueId: number): Promise<ItNetworkIssueUpdate[]> {
+    const result = await getPool().query({
+      text: `SELECT id, issue_id AS "issueId", status, note,
+        corrective_action AS "correctiveAction", resolution_details AS "resolutionDetails",
+        created_by_id AS "createdById", created_at AS "createdAt"
+        FROM it_network_issue_updates WHERE issue_id = $1 ORDER BY created_at DESC`,
+      values: [issueId],
+    });
+    return result.rows;
+  }
+
+  async getItMonthlyBandwidth(from: Date, to: Date, interfaceName?: string): Promise<any[]> {
+    const values: unknown[] = [from, to];
+    const ifaceClause = interfaceName && interfaceName !== "all" ? `AND interface_name = $3` : "";
+    if (ifaceClause) values.push(interfaceName);
+    const result = await getPool().query({
+      text: `SELECT TO_CHAR(DATE_TRUNC('day', sampled_at), 'YYYY-MM-DD') AS day,
+        interface_name AS "interfaceName",
+        ROUND(SUM(tx_kbps::numeric) / 1000, 2)::float AS "txMbpsTotal",
+        ROUND(SUM(rx_kbps::numeric) / 1000, 2)::float AS "rxMbpsTotal",
+        ROUND(AVG(tx_kbps::numeric) / 1000, 2)::float AS "txMbpsAverage",
+        ROUND(AVG(rx_kbps::numeric) / 1000, 2)::float AS "rxMbpsAverage",
+        ROUND(MAX(tx_kbps::numeric) / 1000, 2)::float AS "txMbpsPeak",
+        ROUND(MAX(rx_kbps::numeric) / 1000, 2)::float AS "rxMbpsPeak",
+        COUNT(*)::int AS samples
+        FROM fortigate_bandwidth
+        WHERE sampled_at >= $1 AND sampled_at < $2 ${ifaceClause}
+        GROUP BY DATE_TRUNC('day', sampled_at), interface_name
+        ORDER BY day, interface_name`,
+      values,
+    });
+    return result.rows;
+  }
+
+  async getItMonitoringSettings(): Promise<ItMonitoringSettings | undefined> {
+    const [row] = await getDb().select().from(itMonitoringSettings).limit(1);
+    return row;
+  }
+
+  async upsertItMonitoringSettings(data: Partial<ItMonitoringSettings>): Promise<ItMonitoringSettings> {
+    const existing = await this.getItMonitoringSettings();
+    if (existing) {
+      const [row] = await getDb().update(itMonitoringSettings).set({ ...data, updatedAt: new Date() }).where(eq(itMonitoringSettings.id, existing.id)).returning();
+      return row;
+    }
+    const [row] = await getDb().insert(itMonitoringSettings).values({
+      reportsEnabled: data.reportsEnabled ?? true,
+      reportDayOfWeek: data.reportDayOfWeek ?? 1,
+      reportHour: data.reportHour ?? 8,
+      reportRecipients: data.reportRecipients ?? [],
+      emailReports: data.emailReports ?? false,
+    }).returning();
+    return row;
+  }
+
+  async createItMonitoringReport(data: { weekStart: string; weekEnd: string; reportJson: Record<string, unknown> }): Promise<ItMonitoringReport> {
+    const [row] = await getDb().insert(itMonitoringReports).values({
+      weekStart: data.weekStart, weekEnd: data.weekEnd, reportJson: data.reportJson,
+    }).onConflictDoUpdate({
+      target: itMonitoringReports.weekStart,
+      set: { weekEnd: data.weekEnd, reportJson: data.reportJson, generatedAt: new Date() },
+    }).returning();
+    return row;
+  }
+
+  async getItMonitoringReports(limit = 20): Promise<ItMonitoringReport[]> {
+    return getDb().select().from(itMonitoringReports).orderBy(desc(itMonitoringReports.weekStart)).limit(Math.min(Math.max(limit, 1), 100));
+  }
+
+  async markItMonitoringReportEmailed(id: number): Promise<void> {
+    await getDb().update(itMonitoringReports).set({ emailedAt: new Date() }).where(eq(itMonitoringReports.id, id));
   }
 
   async getGlpiSettings(): Promise<GlpiSettings | undefined> {
@@ -1719,7 +1955,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async pruneFortigateBandwidth(): Promise<void> {
-    const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    // Keep six weeks so the UI can render a full calendar month plus context.
+    const cutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
     await getDb().delete(fortigateBandwidth)
       .where(lt(fortigateBandwidth.sampledAt, cutoff));
   }
@@ -1750,7 +1987,7 @@ export class DatabaseStorage implements IStorage {
       .from(factoryMachines)
       .leftJoin(factoryMachineTypes, eq(factoryMachines.machineTypeId, factoryMachineTypes.id))
       .orderBy(factoryMachines.name);
-    return rows.map(r => ({ ...r.factory_machines, machineType: r.factory_machine_types ?? undefined }));
+    return rows.map((r: any) => ({ ...r.factory_machines, machineType: r.factory_machine_types ?? undefined }));
   }
 
   async getFactoryMachine(id: number): Promise<(FactoryMachine & { machineType?: FactoryMachineType }) | undefined> {
@@ -1831,7 +2068,7 @@ export class DatabaseStorage implements IStorage {
     const rows = machineTypeId
       ? await base.where(eq(machineTypeRecordTypeConfigs.machineTypeId, machineTypeId))
       : await base;
-    return rows.map(r => ({ ...r.machine_type_record_type_configs, maintenanceTypeConfig: r.maintenance_type_config }));
+    return rows.map((r: any) => ({ ...r.machine_type_record_type_configs, maintenanceTypeConfig: r.maintenance_type_config }));
   }
 
   async createMachineTypeRecordTypeConfig(data: any): Promise<any> {
@@ -1858,14 +2095,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(machineRecords.machineId, machine.id))
       .orderBy(machineRecords.date);
 
-    const allRecords = records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const lastMaintenance = allRecords.find(r => r.recordType === 'maintenance') ?? null;
-    const lastBreakdown = allRecords.find(r => r.recordType === 'breakdown') ?? null;
-    const nextScheduled = allRecords.find(r => r.recordType === 'scheduled' && r.nextMaintenanceDate) ?? null;
+    const allRecords = records.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const lastMaintenance = allRecords.find((r: any) => r.recordType === 'maintenance') ?? null;
+    const lastBreakdown = allRecords.find((r: any) => r.recordType === 'breakdown') ?? null;
+    const nextScheduled = allRecords.find((r: any) => r.recordType === 'scheduled' && r.nextMaintenanceDate) ?? null;
 
     // Status: breakdown if the last breakdown record is newer than the last maintenance record
-    const lastMaintenanceRecord = allRecords.find(r => r.recordType === 'maintenance');
-    const lastBreakdownRecord = allRecords.find(r => r.recordType === 'breakdown');
+    const lastMaintenanceRecord = allRecords.find((r: any) => r.recordType === 'maintenance');
+    const lastBreakdownRecord = allRecords.find((r: any) => r.recordType === 'breakdown');
     let status: 'operational' | 'breakdown' = 'operational';
     if (lastBreakdownRecord) {
       if (!lastMaintenanceRecord) {
@@ -1878,7 +2115,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-    const recentBreakdown = allRecords.find(r =>
+    const recentBreakdown = allRecords.find((r: any) =>
       r.recordType === 'breakdown' && new Date(r.date) >= ninetyDaysAgo
     ) ?? null;
 
@@ -2069,6 +2306,22 @@ export const storage = {
   deleteItKpi: (...args: Parameters<DatabaseStorage['deleteItKpi']>) => getStorage().deleteItKpi(...args),
   getItKpiValues: (...args: Parameters<DatabaseStorage['getItKpiValues']>) => getStorage().getItKpiValues(...args),
   upsertItKpiValues: (...args: Parameters<DatabaseStorage['upsertItKpiValues']>) => getStorage().upsertItKpiValues(...args),
+  recordItHostCheck: (...args: Parameters<DatabaseStorage['recordItHostCheck']>) => getStorage().recordItHostCheck(...args),
+  getItHostStatus: (...args: Parameters<DatabaseStorage['getItHostStatus']>) => getStorage().getItHostStatus(...args),
+  getItHostHistory: (...args: Parameters<DatabaseStorage['getItHostHistory']>) => getStorage().getItHostHistory(...args),
+  getItMonitoringSummary: (...args: Parameters<DatabaseStorage['getItMonitoringSummary']>) => getStorage().getItMonitoringSummary(...args),
+  getItOpenIssue: (...args: Parameters<DatabaseStorage['getItOpenIssue']>) => getStorage().getItOpenIssue(...args),
+  createItNetworkIssue: (...args: Parameters<DatabaseStorage['createItNetworkIssue']>) => getStorage().createItNetworkIssue(...args),
+  updateItNetworkIssue: (...args: Parameters<DatabaseStorage['updateItNetworkIssue']>) => getStorage().updateItNetworkIssue(...args),
+  addItNetworkIssueUpdate: (...args: Parameters<DatabaseStorage['addItNetworkIssueUpdate']>) => getStorage().addItNetworkIssueUpdate(...args),
+  getItNetworkIssues: (...args: Parameters<DatabaseStorage['getItNetworkIssues']>) => getStorage().getItNetworkIssues(...args),
+  getItNetworkIssueUpdates: (...args: Parameters<DatabaseStorage['getItNetworkIssueUpdates']>) => getStorage().getItNetworkIssueUpdates(...args),
+  getItMonthlyBandwidth: (...args: Parameters<DatabaseStorage['getItMonthlyBandwidth']>) => getStorage().getItMonthlyBandwidth(...args),
+  getItMonitoringSettings: () => getStorage().getItMonitoringSettings(),
+  upsertItMonitoringSettings: (...args: Parameters<DatabaseStorage['upsertItMonitoringSettings']>) => getStorage().upsertItMonitoringSettings(...args),
+  createItMonitoringReport: (...args: Parameters<DatabaseStorage['createItMonitoringReport']>) => getStorage().createItMonitoringReport(...args),
+  getItMonitoringReports: (...args: Parameters<DatabaseStorage['getItMonitoringReports']>) => getStorage().getItMonitoringReports(...args),
+  markItMonitoringReportEmailed: (...args: Parameters<DatabaseStorage['markItMonitoringReportEmailed']>) => getStorage().markItMonitoringReportEmailed(...args),
   getGlpiSettings: () => getStorage().getGlpiSettings(),
   upsertGlpiSettings: (...args: Parameters<DatabaseStorage['upsertGlpiSettings']>) => getStorage().upsertGlpiSettings(...args),
   updateGlpiSyncStatus: (...args: Parameters<DatabaseStorage['updateGlpiSyncStatus']>) => getStorage().updateGlpiSyncStatus(...args),

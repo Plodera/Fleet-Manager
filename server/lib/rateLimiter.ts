@@ -66,11 +66,11 @@ export class RateLimiter {
 
   private sweep(): void {
     const now = Date.now();
-    for (const [key, entry] of this.map) {
+    this.map.forEach((entry, key) => {
       if (now >= entry.resetAt) {
         this.map.delete(key);
       }
-    }
+    });
   }
 
   destroy(): void {

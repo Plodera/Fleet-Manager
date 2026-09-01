@@ -124,6 +124,10 @@ import { initDatabase } from "./db";
   const { startFortigateSync } = await import("./fortigateSync");
   startFortigateSync();
 
+  // Generate and retain the previous week's IT monitoring report on schedule.
+  const { startITMonitoringReports } = await import("./itMonitoringReports");
+  startITMonitoringReports();
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

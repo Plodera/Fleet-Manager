@@ -15,6 +15,10 @@ const prevCounters: Record<string, { tx: number; rx: number; ts: number }> = {};
 // This agent is scoped exclusively to fortigateFetch(); NODE_TLS_REJECT_UNAUTHORIZED is NOT modified.
 const tlsAgent = new https.Agent({ rejectUnauthorized: false });
 
+export function getSafePollIntervalMinutes(configuredMinutes: number | null | undefined): number {
+  return Math.min(8 * 60, Math.max(1, configuredMinutes ?? 1));
+}
+
 /** Thin fetch wrapper using Node https/http modules (bypasses self-signed cert rejection). */
 function fortigateFetch(url: string, headers: Record<string, string>, timeoutMs = 10000): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
@@ -176,7 +180,12 @@ async function pollFortigate(): Promise<void> {
 async function reschedule(): Promise<void> {
   try {
     const settings = await storage.getFortigateSettings();
-    const intervalMs = Math.max(1, settings?.pollIntervalMinutes ?? 1) * 60 * 1000;
+    // A configured interval may be slower than the reporting requirement.
+    // Clamp enabled polling to 8 hours so a healthy FortiGate can produce at
+    // least three observations per day; shorter configured intervals remain
+    // unchanged.
+    const intervalMinutes = getSafePollIntervalMinutes(settings?.pollIntervalMinutes);
+    const intervalMs = intervalMinutes * 60 * 1000;
     if (syncTimer) clearInterval(syncTimer);
     syncTimer = setInterval(() => {
       pollFortigate().catch(err => console.error("[fortigateSync] Error:", err));

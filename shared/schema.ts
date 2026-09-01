@@ -930,9 +930,70 @@ export const itKpiValues = pgTable("it_kpi_values", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Append-only connectivity checks retained for availability and latency reporting.
+export const itHostChecks = pgTable("it_host_checks", {
+  id: serial("id").primaryKey(),
+  hostId: integer("host_id").references(() => itMonitoredHosts.id, { onDelete: "cascade" }).notNull(),
+  isOnline: boolean("is_online").notNull(),
+  responseTimeMs: integer("response_time_ms"),
+  failureReason: text("failure_reason"),
+  checkedAt: timestamp("checked_at").defaultNow().notNull(),
+});
+
+// Operational issues are deduplicated by host/type while unresolved.
+export const itNetworkIssues = pgTable("it_network_issues", {
+  id: serial("id").primaryKey(),
+  hostId: integer("host_id").references(() => itMonitoredHosts.id, { onDelete: "cascade" }),
+  issueType: text("issue_type").notNull(), // outage | performance
+  title: text("title").notNull(),
+  severity: text("severity").notNull().default("medium"), // low | medium | high | critical
+  status: text("status").notNull().default("open"), // open | investigating | resolved
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+  assignedToId: integer("assigned_to_id").references(() => users.id, { onDelete: "set null" }),
+  targetDate: date("target_date"),
+  investigationNotes: text("investigation_notes"),
+  correctiveAction: text("corrective_action"),
+  resolutionDetails: text("resolution_details"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const itNetworkIssueUpdates = pgTable("it_network_issue_updates", {
+  id: serial("id").primaryKey(),
+  issueId: integer("issue_id").references(() => itNetworkIssues.id, { onDelete: "cascade" }).notNull(),
+  status: text("status"),
+  note: text("note"),
+  correctiveAction: text("corrective_action"),
+  resolutionDetails: text("resolution_details"),
+  createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const itMonitoringSettings = pgTable("it_monitoring_settings", {
+  id: serial("id").primaryKey(),
+  reportsEnabled: boolean("reports_enabled").notNull().default(true),
+  reportDayOfWeek: integer("report_day_of_week").notNull().default(1), // Monday = 1
+  reportHour: integer("report_hour").notNull().default(8),
+  reportRecipients: text("report_recipients").array().notNull().default([]),
+  emailReports: boolean("email_reports").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const itMonitoringReports = pgTable("it_monitoring_reports", {
+  id: serial("id").primaryKey(),
+  weekStart: date("week_start").notNull().unique(),
+  weekEnd: date("week_end").notNull(),
+  reportJson: jsonb("report_json").notNull(),
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+  emailedAt: timestamp("emailed_at"),
+});
+
 export const itMonitoredHostsRelations = relations(itMonitoredHosts, ({ one, many }) => ({
   department: one(departments, { fields: [itMonitoredHosts.departmentId], references: [departments.id] }),
   statusHistory: many(itHostStatus),
+  checks: many(itHostChecks),
+  issues: many(itNetworkIssues),
 }));
 
 export const itHostStatusRelations = relations(itHostStatus, ({ one }) => ({
@@ -965,6 +1026,12 @@ export type ItKpi = typeof itKpis.$inferSelect;
 export type InsertItKpi = z.infer<typeof insertItKpiSchema>;
 export type ItKpiValue = typeof itKpiValues.$inferSelect;
 export type InsertItKpiValue = z.infer<typeof insertItKpiValueSchema>;
+export type ItHostCheck = typeof itHostChecks.$inferSelect;
+export type ItNetworkIssue = typeof itNetworkIssues.$inferSelect;
+export type ItNetworkIssueUpdate = typeof itNetworkIssueUpdates.$inferSelect;
+export type ItMonitoringSettings = typeof itMonitoringSettings.$inferSelect;
+export type InsertItMonitoringSettings = typeof itMonitoringSettings.$inferInsert;
+export type ItMonitoringReport = typeof itMonitoringReports.$inferSelect;
 
 // Composite: host with latest status (from LEFT JOIN)
 export type ItHostWithStatus = ItMonitoredHost & {

@@ -619,12 +619,20 @@ export default function ITMonitorConfig() {
         title={it.configTitle || "IT Monitor Configuration"}
         description={it.configSubtitle || "Manage monitored hosts, cameras, and IT dashboard KPIs"}
         actions={
-          <a href="/it-dashboard" target="_blank" rel="noopener noreferrer" data-testid="button-view-it-dashboard">
-            <Button variant="outline">
-              <ExternalLink className="w-4 h-4 mr-2" />
-              {it.viewDashboard || "View IT Dashboard"}
-            </Button>
-          </a>
+          <div className="flex gap-2">
+            <a href="/it-network-operations" data-testid="button-view-it-operations">
+              <Button variant="outline">
+                <Activity className="w-4 h-4 mr-2" />
+                {it.operations || "Network Operations"}
+              </Button>
+            </a>
+            <a href="/it-dashboard" target="_blank" rel="noopener noreferrer" data-testid="button-view-it-dashboard">
+              <Button variant="outline">
+                <ExternalLink className="w-4 h-4 mr-2" />
+                {it.viewDashboard || "View IT Dashboard"}
+              </Button>
+            </a>
+          </div>
         }
       />
 

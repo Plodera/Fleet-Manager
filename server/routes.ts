@@ -2351,6 +2351,192 @@ export async function registerRoutes(
     }
   });
 
+  // Historical monitoring and issue follow-up
+  const canViewItOperations = (user: User) => user.role === 'admin' || hasPermission(user, 'view_it_monitor');
+  const requireItOperations = (req: any, res: any): User | null => {
+    if (!req.isAuthenticated()) {
+      res.status(401).send("Unauthorized");
+      return null;
+    }
+    const user = req.user as User;
+    if (!canViewItOperations(user)) {
+      res.status(403).json({ message: "Access denied" });
+      return null;
+    }
+    return user;
+  };
+  const parseMonitoringDate = (value: unknown, fallback: Date): Date => {
+    const parsed = new Date(String(value || ""));
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+  };
+
+  app.get('/api/it/monitoring/summary', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      const to = parseMonitoringDate(req.query.to, new Date());
+      const from = parseMonitoringDate(req.query.from, new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000));
+      res.json(await storage.getItMonitoringSummary(from, to));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch monitoring summary" });
+    }
+  });
+
+  app.get('/api/it/monitoring/history', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    const hostId = Number(req.query.hostId);
+    if (!Number.isInteger(hostId) || hostId <= 0) return res.status(400).json({ message: "A valid hostId is required" });
+    try {
+      const to = parseMonitoringDate(req.query.to, new Date());
+      const from = parseMonitoringDate(req.query.from, new Date(to.getTime() - 24 * 60 * 60 * 1000));
+      res.json(await storage.getItHostHistory(hostId, from, to, Number(req.query.limit) || 2000));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch monitoring history" });
+    }
+  });
+
+  app.get('/api/it/issues', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      res.json(await storage.getItNetworkIssues({
+        status: String(req.query.status || ""),
+        severity: String(req.query.severity || ""),
+        hostId: req.query.hostId ? Number(req.query.hostId) : undefined,
+        assignedToId: req.query.assignedToId ? Number(req.query.assignedToId) : undefined,
+      }));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch network issues" });
+    }
+  });
+
+  app.get('/api/it/issues/:id/updates', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      res.json(await storage.getItNetworkIssueUpdates(Number(req.params.id)));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch issue updates" });
+    }
+  });
+
+  app.patch('/api/it/issues/:id', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      const allowed = ["title", "severity", "status", "resolvedAt", "assignedToId", "targetDate", "investigationNotes", "correctiveAction", "resolutionDetails"];
+      const updates: Record<string, unknown> = {};
+      for (const key of allowed) if (req.body[key] !== undefined) updates[key] = req.body[key];
+      if (updates.status === "resolved" && updates.resolvedAt === undefined) updates.resolvedAt = new Date();
+      const issue = await storage.updateItNetworkIssue(Number(req.params.id), updates);
+      await storage.addItNetworkIssueUpdate({
+        issueId: issue.id,
+        status: issue.status,
+        note: req.body.updateNote || "Issue details updated.",
+        correctiveAction: issue.correctiveAction,
+        resolutionDetails: issue.resolutionDetails,
+        createdById: user.id,
+      });
+      res.json(issue);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to update network issue" });
+    }
+  });
+
+  app.post('/api/it/issues/:id/updates', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      const update = await storage.addItNetworkIssueUpdate({
+        issueId: Number(req.params.id),
+        status: req.body.status || null,
+        note: req.body.note || null,
+        correctiveAction: req.body.correctiveAction || null,
+        resolutionDetails: req.body.resolutionDetails || null,
+        createdById: user.id,
+      });
+      if (req.body.status || req.body.resolutionDetails) {
+        await storage.updateItNetworkIssue(Number(req.params.id), {
+          ...(req.body.status ? { status: req.body.status } : {}),
+          ...(req.body.resolutionDetails ? { resolutionDetails: req.body.resolutionDetails } : {}),
+          ...(req.body.status === "resolved" ? { resolvedAt: new Date() } : {}),
+        });
+      }
+      res.json(update);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to add issue update" });
+    }
+  });
+
+  app.get('/api/it/fortigate/bandwidth/monthly', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      const month = /^\d{4}-\d{2}$/.test(String(req.query.month || "")) ? String(req.query.month) : new Date().toISOString().slice(0, 7);
+      const from = new Date(`${month}-01T00:00:00.000Z`);
+      const to = new Date(from);
+      to.setUTCMonth(to.getUTCMonth() + 1);
+      res.json(await storage.getItMonthlyBandwidth(from, to, String(req.query.interface || "all")));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch monthly bandwidth" });
+    }
+  });
+
+  app.get('/api/it/report-settings', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      res.json(await storage.getItMonitoringSettings() || {
+        reportsEnabled: true, reportDayOfWeek: 1, reportHour: 8,
+        reportRecipients: [], emailReports: false,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch report settings" });
+    }
+  });
+
+  app.put('/api/it/report-settings', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user || user.role !== "admin") return;
+    try {
+      const recipients = Array.isArray(req.body.reportRecipients)
+        ? req.body.reportRecipients.map((value: unknown) => String(value).trim()).filter(Boolean)
+        : [];
+      res.json(await storage.upsertItMonitoringSettings({
+        reportsEnabled: req.body.reportsEnabled !== false,
+        reportDayOfWeek: Math.min(7, Math.max(0, Number(req.body.reportDayOfWeek) || 1)),
+        reportHour: Math.min(23, Math.max(0, Number(req.body.reportHour) || 8)),
+        reportRecipients: recipients,
+        emailReports: !!req.body.emailReports,
+      }));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to save report settings" });
+    }
+  });
+
+  app.get('/api/it/reports', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      res.json(await storage.getItMonitoringReports(Number(req.query.limit) || 20));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch IT reports" });
+    }
+  });
+
+  app.post('/api/it/reports/generate', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      const { generateWeeklyItReport } = await import("./itMonitoringReports");
+      const report = await generateWeeklyItReport({ email: !!req.body.email });
+      res.json(report);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to generate IT report" });
+    }
+  });
+
   app.get('/api/it/kpis', async (req, res) => {
     try {
       const kpis = await storage.getItKpis();
@@ -3096,11 +3282,11 @@ export async function registerRoutes(
 
   const _statusReadSweepInterval = setInterval(() => {
     const now = Date.now();
-    for (const [ip, entry] of _statusReadRateLimitMap) {
+    _statusReadRateLimitMap.forEach((entry, ip) => {
       if (now >= entry.resetAt) {
         _statusReadRateLimitMap.delete(ip);
       }
-    }
+    });
   }, 5 * 60_000);
   if (_statusReadSweepInterval.unref) _statusReadSweepInterval.unref();
 

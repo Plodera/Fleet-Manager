@@ -67,7 +67,7 @@ export function Sidebar() {
   const { language, setLanguage, t } = useLanguage();
   const { toast } = useToast();
 
-  const usersT = t?.users || {} as any;
+  const usersT = (t as any)?.users || {};
 
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
@@ -166,6 +166,7 @@ export function Sidebar() {
         { href: "/tv-dashboard-config", label: t.nav.tvDashboardsConfig, icon: Monitor, permission: "manage_tv_dashboards", anyPermissions: ["manage_tv_dashboards","manage_tv_kpis","tv_data_entry","manage_tv_videos"], hideFromDriver: true },
         { href: "/tv-dashboard", label: t.nav.tvDashboards, icon: Monitor, permission: "view_tv_dashboard", hideFromDriver: true },
         { href: "/it-monitor-config", label: t.nav.itMonitorConfig, icon: Network, permission: "view_it_monitor", hideFromDriver: true },
+        { href: "/it-network-operations", label: t.itMonitor.operations, icon: Activity, permission: "view_it_monitor", hideFromDriver: true },
         { href: "/it-dashboard", label: t.nav.itDashboard, icon: Activity, permission: "view_it_dashboard", hideFromDriver: true },
       ],
     },
