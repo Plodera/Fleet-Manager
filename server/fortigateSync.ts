@@ -84,6 +84,35 @@ function parseInterfaceNames(data: any): string[] {
   return [];
 }
 
+export function parseInterfaceIsUp(iface: any): boolean | null {
+  const candidates = [iface?.link, iface?.link_status, iface?.linkStatus, iface?.status, iface?.state, iface?.is_up, iface?.isUp, iface?.up];
+  for (const value of candidates) {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+      if (["up", "up/up", "online", "connected", "running", "link_up", "true", "1"].includes(normalized)) return true;
+      if (["down", "offline", "disconnected", "stopped", "link_down", "false", "0"].includes(normalized)) return false;
+    }
+  }
+  return null;
+}
+
+function parseInterfaceLabels(value: string | null | undefined): Record<string, string> {
+  try {
+    const parsed = JSON.parse(value || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getDefaultInterfaceLabel(name: string): string {
+  if (name.toLowerCase() === "wan1") return "MS Telcom";
+  if (name.toLowerCase() === "wan2") return "Saas";
+  return name;
+}
+
 function buildBase(host: string, port: number): string {
   const trimmed = host.replace(/\/+$/, "").trim();
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
@@ -103,6 +132,9 @@ async function pollFortigate(): Promise<void> {
   const ifaces: string[] = (() => {
     try { return JSON.parse(settings.interfaces || "[]"); } catch { return []; }
   })();
+  const interfaceLabels = parseInterfaceLabels(settings.interfaceLabels);
+  const lowThresholdMbps = Math.max(0, Number(settings.lowBandwidthThresholdMbps || 0));
+  const lowDurationMinutes = Math.max(1, Number(settings.lowBandwidthDurationMinutes || 10));
 
   const base = buildBase(settings.host, settings.port);
 
@@ -133,29 +165,53 @@ async function pollFortigate(): Promise<void> {
 
     const now = Date.now();
     const rows: { interfaceName: string; txKbps: string; rxKbps: string }[] = [];
+    const statusRows = await storage.getFortigateInterfaceStatuses();
+    const statusByName = new Map(statusRows.map(row => [row.interfaceName, row]));
 
     for (const { name, obj: iface } of ifaceEntries) {
       if (ifaces.length > 0 && !ifaces.includes(name)) continue;
 
       const txBytes: number = Number(iface.tx_bytes ?? iface.statistics?.tx_bytes ?? 0);
       const rxBytes: number = Number(iface.rx_bytes ?? iface.statistics?.rx_bytes ?? 0);
+      const isUp = parseInterfaceIsUp(iface) ?? true;
 
       const prev = prevCounters[name];
       prevCounters[name] = { tx: txBytes, rx: rxBytes, ts: now };
 
-      if (!prev) continue;
+      let txKbps = "0";
+      let rxKbps = "0";
+      if (prev) {
+        const elapsed = (now - prev.ts) / 1000;
+        if (elapsed > 0) {
+          const txDelta = txBytes >= prev.tx ? txBytes - prev.tx : txBytes;
+          const rxDelta = rxBytes >= prev.rx ? rxBytes - prev.rx : rxBytes;
+          // Store as Kbps; chart converts to Mbps for display
+          txKbps = ((txDelta * 8) / elapsed / 1000).toFixed(2);
+          rxKbps = ((rxDelta * 8) / elapsed / 1000).toFixed(2);
+          rows.push({ interfaceName: name, txKbps, rxKbps });
+        }
+      }
 
-      const elapsed = (now - prev.ts) / 1000;
-      if (elapsed <= 0) continue;
-
-      const txDelta = txBytes >= prev.tx ? txBytes - prev.tx : txBytes;
-      const rxDelta = rxBytes >= prev.rx ? rxBytes - prev.rx : rxBytes;
-
-      // Store as Kbps; chart converts to Mbps for display
-      const txKbps = ((txDelta * 8) / elapsed / 1000).toFixed(2);
-      const rxKbps = ((rxDelta * 8) / elapsed / 1000).toFixed(2);
-
-      rows.push({ interfaceName: name, txKbps, rxKbps });
+      const previousStatus = statusByName.get(name);
+      const totalMbps = (Number(txKbps) + Number(rxKbps)) / 1000;
+      const hasMeasuredRate = !!prev;
+      const isLow = hasMeasuredRate && lowThresholdMbps > 0 && totalMbps < lowThresholdMbps;
+      let lowBandwidthSince = previousStatus?.lowBandwidthSince ?? null;
+      if (isLow) {
+        lowBandwidthSince ||= new Date();
+      } else if (hasMeasuredRate) {
+        lowBandwidthSince = null;
+      }
+      await storage.upsertFortigateInterfaceStatus({
+        interfaceName: name,
+        displayName: interfaceLabels[name] || getDefaultInterfaceLabel(name),
+        isUp,
+        txKbps,
+        rxKbps,
+        lowBandwidthSince,
+        lastCheckedAt: new Date(),
+        lastError: null,
+      });
     }
 
     if (rows.length > 0) {
@@ -174,6 +230,19 @@ async function pollFortigate(): Promise<void> {
     const msg = err.message || String(err);
     console.error("[fortigateSync] Poll failed:", msg);
     await storage.updateFortigateSyncStatus(null, msg);
+    const statuses = await storage.getFortigateInterfaceStatuses().catch(() => []);
+    for (const status of statuses) {
+      await storage.upsertFortigateInterfaceStatus({
+        interfaceName: status.interfaceName,
+        displayName: status.displayName,
+        isUp: false,
+        txKbps: status.txKbps,
+        rxKbps: status.rxKbps,
+        lowBandwidthSince: status.lowBandwidthSince,
+        lastCheckedAt: new Date(),
+        lastError: msg,
+      }).catch(() => {});
+    }
   }
 }
 

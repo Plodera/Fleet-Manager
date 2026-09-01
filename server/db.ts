@@ -84,6 +84,9 @@ export async function initDatabase() {
         poll_interval_minutes  INTEGER NOT NULL DEFAULT 1,
         enabled                BOOLEAN NOT NULL DEFAULT FALSE,
         interfaces             TEXT NOT NULL DEFAULT '[]',
+        interface_labels       TEXT NOT NULL DEFAULT '{}',
+        low_bandwidth_threshold_mbps NUMERIC NOT NULL DEFAULT 0,
+        low_bandwidth_duration_minutes INTEGER NOT NULL DEFAULT 10,
         last_sync_at           TIMESTAMP,
         last_error             TEXT,
         updated_at             TIMESTAMP DEFAULT NOW()
@@ -92,6 +95,9 @@ export async function initDatabase() {
     // Migrate old column names if they exist
     await _pool.query(`ALTER TABLE fortigate_settings ADD COLUMN IF NOT EXISTS port INTEGER NOT NULL DEFAULT 443`).catch(() => {});
     await _pool.query(`ALTER TABLE fortigate_settings ADD COLUMN IF NOT EXISTS poll_interval_minutes INTEGER NOT NULL DEFAULT 1`).catch(() => {});
+    await _pool.query(`ALTER TABLE fortigate_settings ADD COLUMN IF NOT EXISTS interface_labels TEXT NOT NULL DEFAULT '{}'`).catch(() => {});
+    await _pool.query(`ALTER TABLE fortigate_settings ADD COLUMN IF NOT EXISTS low_bandwidth_threshold_mbps NUMERIC NOT NULL DEFAULT 0`).catch(() => {});
+    await _pool.query(`ALTER TABLE fortigate_settings ADD COLUMN IF NOT EXISTS low_bandwidth_duration_minutes INTEGER NOT NULL DEFAULT 10`).catch(() => {});
     // rename old columns to new names only if old columns still exist
     await _pool.query(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fortigate_settings' AND column_name='poll_interval_seconds') THEN ALTER TABLE fortigate_settings RENAME COLUMN poll_interval_seconds TO poll_interval_minutes_old; END IF; END $$`).catch(() => {});
     await _pool.query(`
@@ -107,6 +113,17 @@ export async function initDatabase() {
     await _pool.query(`ALTER TABLE fortigate_bandwidth ADD COLUMN IF NOT EXISTS sampled_at TIMESTAMP NOT NULL DEFAULT NOW()`).catch(() => {});
     await _pool.query(`ALTER TABLE fortigate_bandwidth ADD COLUMN IF NOT EXISTS tx_kbps TEXT NOT NULL DEFAULT '0'`).catch(() => {});
     await _pool.query(`ALTER TABLE fortigate_bandwidth ADD COLUMN IF NOT EXISTS rx_kbps TEXT NOT NULL DEFAULT '0'`).catch(() => {});
+    await _pool.query(`CREATE TABLE IF NOT EXISTS fortigate_interface_status (
+      id SERIAL PRIMARY KEY,
+      interface_name TEXT NOT NULL UNIQUE,
+      display_name TEXT NOT NULL,
+      is_up BOOLEAN NOT NULL DEFAULT FALSE,
+      tx_kbps TEXT NOT NULL DEFAULT '0',
+      rx_kbps TEXT NOT NULL DEFAULT '0',
+      low_bandwidth_since TIMESTAMP,
+      last_checked_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      last_error TEXT
+    )`).catch(() => {});
     // Historical network monitoring and report tables. The standalone SQL
     // migration contains the same idempotent statements for on-prem installs.
     await _pool.query(`CREATE TABLE IF NOT EXISTS it_host_checks (

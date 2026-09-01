@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n";
 import { Link } from "wouter";
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { Area, AreaChart, Bar, BarChart, LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import type { ItHostWithStatus, ItKpi, ItKpiValue, ItHostType, FortigateBandwidth } from "@shared/schema";
 import {
   Wifi, WifiOff, Camera, Globe, Monitor, Network, ArrowLeft,
@@ -319,6 +319,37 @@ function HostStatusCard({ host, idx }: { host: ItHostWithStatus; idx: number }) 
   );
 }
 
+function FortigateLinkCard({ link, idx, thresholdMbps }: { link: any; idx: number; thresholdMbps: number }) {
+  const isLow = !!link.isLowBandwidth;
+  const isUp = !!link.isUp;
+  const cardGlow = !isUp ? "it-pill-down bg-red-900/20 border-red-700/40" : isLow ? "bg-amber-900/20 border-amber-700/40" : "it-pill-up bg-green-900/20 border-green-700/40";
+  const totalMbps = (Number(link.txKbps || 0) + Number(link.rxKbps || 0)) / 1000;
+  const durationMinutes = Math.floor(Number(link.lowBandwidthDurationSeconds || 0) / 60);
+  return (
+    <div className={`flex flex-col gap-2 px-5 py-4 rounded-xl border it-card-enter ${cardGlow}`} style={{ animationDelay: `${idx * 60}ms` }} data-testid={`fortigate-link-${link.interfaceName}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {isUp ? <Wifi className={`w-5 h-5 ${isLow ? "text-amber-400" : "text-green-400"} shrink-0`} /> : <WifiOff className="w-5 h-5 text-red-400 it-offline-pulse shrink-0" />}
+          <div className="min-w-0">
+            <span className="block text-base font-bold text-gray-100 truncate">{link.displayName || link.interfaceName}</span>
+            <span className="text-[11px] font-mono text-gray-500">{link.interfaceName}</span>
+          </div>
+        </div>
+        <span className={`text-xl font-black tracking-widest shrink-0 ${isUp ? isLow ? "text-amber-400" : "text-green-400" : "text-red-400"}`} data-testid={`fortigate-status-${link.interfaceName}`}>
+          {isUp ? "UP" : "DOWN"}
+        </span>
+      </div>
+      <div className="flex items-center justify-between text-xs">
+        <span className={isLow ? "text-amber-400 font-semibold" : "text-gray-500"}>
+          {isLow ? `LOW BANDWIDTH · ${durationMinutes} min` : `${totalMbps.toFixed(2)} Mbps`}
+        </span>
+        <span className="text-gray-500">{Number(link.rxKbps || 0) / 1000 >= 0 ? `RX ${(Number(link.rxKbps || 0) / 1000).toFixed(2)}` : ""} · TX {(Number(link.txKbps || 0) / 1000).toFixed(2)}</span>
+      </div>
+      {isLow && <div className="text-[11px] text-amber-300">Below {thresholdMbps} Mbps sustained</div>}
+    </div>
+  );
+}
+
 /* ─── Device type summary card ─── */
 function DeviceTypeSummaryCard({
   hosts, hostType, lang, idx,
@@ -485,6 +516,7 @@ function buildChartData(rows: FortigateBandwidth[]): { time: string; [key: strin
 
 const BandwidthChart = memo(function BandwidthChart({ rows, label }: { rows: FortigateBandwidth[]; label: string }) {
   const isEmpty = rows.length === 0;
+  const [chartStyle, setChartStyle] = useState<"line" | "area" | "bar">("line");
 
   const interfaces = Array.from(new Set(rows.map(r => r.interfaceName)));
   const chartData = buildChartData(rows);
@@ -495,12 +527,23 @@ const BandwidthChart = memo(function BandwidthChart({ rows, label }: { rows: For
         <span className="it-dot it-dot-blink bg-cyan-400" />
         <Activity className="w-3.5 h-3.5 text-gray-500" />
         <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</span>
+        <select
+          value={chartStyle}
+          onChange={e => setChartStyle(e.target.value as "line" | "area" | "bar")}
+          className="ml-auto bg-gray-900 border border-gray-700 rounded px-2 py-1 text-[10px] text-gray-300"
+          aria-label="Bandwidth graph type"
+          data-testid="select-bandwidth-graph-type"
+        >
+          <option value="line">Lines</option>
+          <option value="area">Areas</option>
+          <option value="bar">Bars</option>
+        </select>
       </div>
       {isEmpty ? (
         <div className="flex items-center justify-center h-[120px] text-gray-600 text-xs">Awaiting first poll…</div>
       ) : (
-        <ResponsiveContainer width="100%" height={120}>
-          <LineChart data={chartData} margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={120}>
+           {chartStyle === "line" ? <LineChart data={chartData} margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
             <XAxis
               dataKey="time"
               tick={{ fill: "#6b7280", fontSize: 9 }}
@@ -546,7 +589,25 @@ const BandwidthChart = memo(function BandwidthChart({ rows, label }: { rows: For
                 activeDot={{ r: 3 }}
               />,
             ])}
-          </LineChart>
+           </LineChart> : chartStyle === "area" ? <AreaChart data={chartData} margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
+             <XAxis dataKey="time" tick={{ fill: "#6b7280", fontSize: 9 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+             <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} tickLine={false} axisLine={false} width={32} />
+             <Tooltip contentStyle={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, fontSize: 11 }} />
+             <Legend wrapperStyle={{ fontSize: 10, color: "#9ca3af", paddingTop: 4 }} iconSize={8} />
+             {interfaces.flatMap((iface, i) => [
+               <Area key={`${iface}_tx`} type="monotone" dataKey={`${iface}_tx`} name={`${iface} TX`} stroke={CHART_COLORS[i % CHART_COLORS.length]} fill={CHART_COLORS[i % CHART_COLORS.length]} fillOpacity={0.12} strokeWidth={1.5} dot={false} />,
+               <Area key={`${iface}_rx`} type="monotone" dataKey={`${iface}_rx`} name={`${iface} RX`} stroke={CHART_COLORS[i % CHART_COLORS.length]} fill={CHART_COLORS[i % CHART_COLORS.length]} fillOpacity={0.04} strokeDasharray="4 2" strokeWidth={1.5} dot={false} />,
+             ])}
+           </AreaChart> : <BarChart data={chartData} margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
+             <XAxis dataKey="time" tick={{ fill: "#6b7280", fontSize: 9 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+             <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} tickLine={false} axisLine={false} width={32} />
+             <Tooltip contentStyle={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, fontSize: 11 }} />
+             <Legend wrapperStyle={{ fontSize: 10, color: "#9ca3af", paddingTop: 4 }} iconSize={8} />
+             {interfaces.flatMap((iface, i) => [
+               <Bar key={`${iface}_tx`} dataKey={`${iface}_tx`} name={`${iface} TX`} fill={CHART_COLORS[i % CHART_COLORS.length]} />,
+               <Bar key={`${iface}_rx`} dataKey={`${iface}_rx`} name={`${iface} RX`} fill={CHART_COLORS[i % CHART_COLORS.length]} fillOpacity={0.45} />,
+             ])}
+           </BarChart>}
         </ResponsiveContainer>
       )}
     </div>
@@ -667,6 +728,23 @@ export default function ITDashboard() {
     staleTime: 0,
   });
 
+  const { data: fortigateStatus } = useQuery<{
+    enabled: boolean;
+    thresholdMbps: number;
+    durationMinutes: number;
+    lastSyncAt: string | null;
+    lastError: string | null;
+    interfaces: any[];
+  }>({
+    queryKey: ["/api/it/fortigate/status"],
+    queryFn: async () => {
+      const res = await fetch("/api/it/fortigate/status");
+      if (!res.ok) return { enabled: false, thresholdMbps: 0, durationMinutes: 10, lastSyncAt: null, lastError: null, interfaces: [] };
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
   const activeHosts = hosts.filter(h => h.isActive);
   const activeKpis = kpis.filter(k => k.isActive);
 
@@ -785,6 +863,21 @@ export default function ITDashboard() {
             >
               {internetLinks.map((host, i) => (
                 <HostStatusCard key={`${host.id}-v${hostsVersion}`} host={host} idx={i} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {fortigateStatus?.enabled && fortigateStatus.interfaces.length > 0 && (
+          <div data-testid="section-fortigate-links">
+            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-2">
+              <LiveDot allGood={fortigateStatus.interfaces.every(link => link.isUp && !link.isLowBandwidth)} anyBad={fortigateStatus.interfaces.some(link => !link.isUp || link.isLowBandwidth)} />
+              <Router className="w-3.5 h-3.5" />
+              FortiGate WAN links
+            </div>
+            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(fortigateStatus.interfaces.length, 4)}, minmax(0, 1fr))` }}>
+              {fortigateStatus.interfaces.map((link, i) => (
+                <FortigateLinkCard key={`${link.interfaceName}-${link.lastCheckedAt}`} link={link} idx={i} thresholdMbps={fortigateStatus.thresholdMbps} />
               ))}
             </div>
           </div>

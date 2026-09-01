@@ -1165,6 +1165,9 @@ export const fortigateSettings = pgTable("fortigate_settings", {
   pollIntervalMinutes: integer("poll_interval_minutes").notNull().default(1),
   enabled: boolean("enabled").notNull().default(false),
   interfaces: text("interfaces").notNull().default("[]"),  // JSON array of interface names
+  interfaceLabels: text("interface_labels").notNull().default("{}"), // JSON map of interface name -> display name
+  lowBandwidthThresholdMbps: numeric("low_bandwidth_threshold_mbps").notNull().default("0"),
+  lowBandwidthDurationMinutes: integer("low_bandwidth_duration_minutes").notNull().default(10),
   lastSyncAt: timestamp("last_sync_at"),
   lastError: text("last_error"),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1183,6 +1186,20 @@ export const fortigateBandwidth = pgTable("fortigate_bandwidth", {
 });
 
 export type FortigateBandwidth = typeof fortigateBandwidth.$inferSelect;
+
+export const fortigateInterfaceStatus = pgTable("fortigate_interface_status", {
+  id: serial("id").primaryKey(),
+  interfaceName: text("interface_name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  isUp: boolean("is_up").notNull().default(false),
+  txKbps: text("tx_kbps").notNull().default("0"),
+  rxKbps: text("rx_kbps").notNull().default("0"),
+  lowBandwidthSince: timestamp("low_bandwidth_since"),
+  lastCheckedAt: timestamp("last_checked_at").notNull().defaultNow(),
+  lastError: text("last_error"),
+});
+
+export type FortigateInterfaceStatus = typeof fortigateInterfaceStatus.$inferSelect;
 
 // ─── Factory Machine Maintenance ───────────────────────────────────────────
 

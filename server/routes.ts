@@ -2910,7 +2910,7 @@ export async function registerRoutes(
       const settings = await storage.getFortigateSettings();
       const safe = settings
         ? { ...settings, apiToken: "" }
-        : { host: "", port: 443, apiToken: "", pollIntervalMinutes: 1, enabled: false, interfaces: "[]", lastSyncAt: null, lastError: null };
+        : { host: "", port: 443, apiToken: "", pollIntervalMinutes: 1, enabled: false, interfaces: "[]", interfaceLabels: "{}", lowBandwidthThresholdMbps: "0", lowBandwidthDurationMinutes: 10, lastSyncAt: null, lastError: null };
       res.json(safe);
     } catch (err: any) {
       res.status(500).json({ message: "Failed to fetch FortiGate settings" });
@@ -2922,12 +2922,15 @@ export async function registerRoutes(
     const user = req.user as User;
     if (user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
     try {
-      const { host, port, apiToken, pollIntervalMinutes, enabled, interfaces } = req.body;
+      const { host, port, apiToken, pollIntervalMinutes, enabled, interfaces, interfaceLabels, lowBandwidthThresholdMbps, lowBandwidthDurationMinutes } = req.body;
       const existing = await storage.getFortigateSettings();
       const savedToken = apiToken && String(apiToken).trim() !== "" ? apiToken : (existing?.apiToken ?? "");
       const interfacesJson = Array.isArray(interfaces)
         ? JSON.stringify(interfaces)
         : (typeof interfaces === "string" ? interfaces : "[]");
+      const labelsJson = interfaceLabels && typeof interfaceLabels === "object"
+        ? JSON.stringify(interfaceLabels)
+        : (typeof interfaceLabels === "string" ? interfaceLabels : "{}");
       const settings = await storage.upsertFortigateSettings({
         host: host || "",
         port: parseInt(port) || 443,
@@ -2935,6 +2938,9 @@ export async function registerRoutes(
         pollIntervalMinutes: parseInt(pollIntervalMinutes) || 1,
         enabled: !!enabled,
         interfaces: interfacesJson,
+        interfaceLabels: labelsJson,
+        lowBandwidthThresholdMbps: String(Math.max(0, Number(lowBandwidthThresholdMbps) || 0)),
+        lowBandwidthDurationMinutes: Math.max(1, parseInt(lowBandwidthDurationMinutes) || 10),
       });
       const { rescheduleFortigateSync } = await import("./fortigateSync");
       rescheduleFortigateSync();
@@ -3007,6 +3013,39 @@ export async function registerRoutes(
       res.json({ enabled: configured });
     } catch {
       res.json({ enabled: false });
+    }
+  });
+
+  // Public read-only link health for the live IT dashboard.
+  app.get('/api/it/fortigate/status', async (_req, res) => {
+    try {
+      const [settings, statuses] = await Promise.all([
+        storage.getFortigateSettings(),
+        storage.getFortigateInterfaceStatuses(),
+      ]);
+      const selected = (() => {
+        try { return JSON.parse(settings?.interfaces || "[]"); } catch { return []; }
+      })();
+      const threshold = Math.max(0, Number(settings?.lowBandwidthThresholdMbps || 0));
+      const durationMinutes = Math.max(1, Number(settings?.lowBandwidthDurationMinutes || 10));
+      const now = Date.now();
+      const visibleStatuses = selected.length > 0
+        ? statuses.filter(status => selected.includes(status.interfaceName))
+        : statuses.filter(status => /^wan\d*$/i.test(status.interfaceName));
+      res.json({
+        enabled: !!(settings?.enabled && settings?.host && settings?.apiToken),
+        thresholdMbps: threshold,
+        durationMinutes,
+        lastSyncAt: settings?.lastSyncAt ?? null,
+        lastError: settings?.lastError ?? null,
+        interfaces: visibleStatuses.map(status => ({
+          ...status,
+          isLowBandwidth: threshold > 0 && !!status.lowBandwidthSince && now - new Date(status.lowBandwidthSince).getTime() >= durationMinutes * 60 * 1000,
+          lowBandwidthDurationSeconds: status.lowBandwidthSince ? Math.max(0, Math.floor((now - new Date(status.lowBandwidthSince).getTime()) / 1000)) : 0,
+        })),
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch FortiGate link status" });
     }
   });
 

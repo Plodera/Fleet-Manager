@@ -11,7 +11,7 @@ import {
   itHostChecks, itNetworkIssues, itNetworkIssueUpdates, itMonitoringSettings, itMonitoringReports, itMonthlyNetworkReports,
   glpiSettings,
   hikvisionNvrs, hikvisionGlobalSettings,
-  fortigateSettings, fortigateBandwidth,
+  fortigateSettings, fortigateBandwidth, fortigateInterfaceStatus,
   teamsSettings, teamsKpiMappings,
   factoryMachineTypes, factoryMachines, machineRecords, factoryMachineMachineTypes,
   type FactoryMachineType, type InsertFactoryMachineType,
@@ -22,7 +22,7 @@ import {
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
   type ItHostType, type InsertItHostType, type ItMonitoredHost, type InsertItMonitoredHost, type ItHostStatus, type ItKpi, type InsertItKpi, type ItKpiValue, type InsertItKpiValue, type ItHostWithStatus,
-  type ItHostCheck, type ItNetworkIssue, type ItNetworkIssueUpdate, type ItMonitoringSettings, type ItMonitoringReport, type ItMonthlyNetworkReport,
+  type ItHostCheck, type ItNetworkIssue, type ItNetworkIssueUpdate, type ItMonitoringSettings, type ItMonitoringReport, type ItMonthlyNetworkReport, type FortigateInterfaceStatus,
   type VehicleInspection, type InsertVehicleInspection,
   type EquipmentType, type InsertEquipmentType,
   type EquipmentChecklistItem, type InsertEquipmentChecklistItem,
@@ -306,6 +306,8 @@ export interface IStorage {
   createItMonthlyNetworkReport(data: { monthKey: string; reportJson: Record<string, unknown> }): Promise<ItMonthlyNetworkReport>;
   getItMonthlyNetworkReports(limit?: number): Promise<ItMonthlyNetworkReport[]>;
   markItMonthlyNetworkReportEmailed(id: number): Promise<void>;
+  getFortigateInterfaceStatuses(): Promise<FortigateInterfaceStatus[]>;
+  upsertFortigateInterfaceStatus(data: Partial<FortigateInterfaceStatus> & { interfaceName: string; displayName: string; isUp: boolean; lastCheckedAt: Date }): Promise<FortigateInterfaceStatus>;
 
 
   // Factory Machine Maintenance
@@ -2020,6 +2022,35 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getFortigateInterfaceStatuses(): Promise<FortigateInterfaceStatus[]> {
+    return getDb().select().from(fortigateInterfaceStatus).orderBy(fortigateInterfaceStatus.interfaceName);
+  }
+
+  async upsertFortigateInterfaceStatus(data: Partial<FortigateInterfaceStatus> & { interfaceName: string; displayName: string; isUp: boolean; lastCheckedAt: Date }): Promise<FortigateInterfaceStatus> {
+    const [row] = await getDb().insert(fortigateInterfaceStatus).values({
+      interfaceName: data.interfaceName,
+      displayName: data.displayName,
+      isUp: data.isUp,
+      txKbps: data.txKbps ?? "0",
+      rxKbps: data.rxKbps ?? "0",
+      lowBandwidthSince: data.lowBandwidthSince ?? null,
+      lastCheckedAt: data.lastCheckedAt,
+      lastError: data.lastError ?? null,
+    }).onConflictDoUpdate({
+      target: fortigateInterfaceStatus.interfaceName,
+      set: {
+        displayName: data.displayName,
+        isUp: data.isUp,
+        txKbps: data.txKbps ?? "0",
+        rxKbps: data.rxKbps ?? "0",
+        lowBandwidthSince: data.lowBandwidthSince ?? null,
+        lastCheckedAt: data.lastCheckedAt,
+        lastError: data.lastError ?? null,
+      },
+    }).returning();
+    return row;
+  }
+
   async insertFortigateBandwidth(rows: { interfaceName: string; txKbps: string; rxKbps: string }[]): Promise<void> {
     if (rows.length === 0) return;
     await getDb().insert(fortigateBandwidth).values(rows.map(r => ({
@@ -2412,6 +2443,8 @@ export const storage = {
   createItMonthlyNetworkReport: (...args: Parameters<DatabaseStorage['createItMonthlyNetworkReport']>) => getStorage().createItMonthlyNetworkReport(...args),
   getItMonthlyNetworkReports: (...args: Parameters<DatabaseStorage['getItMonthlyNetworkReports']>) => getStorage().getItMonthlyNetworkReports(...args),
   markItMonthlyNetworkReportEmailed: (...args: Parameters<DatabaseStorage['markItMonthlyNetworkReportEmailed']>) => getStorage().markItMonthlyNetworkReportEmailed(...args),
+  getFortigateInterfaceStatuses: () => getStorage().getFortigateInterfaceStatuses(),
+  upsertFortigateInterfaceStatus: (...args: Parameters<DatabaseStorage['upsertFortigateInterfaceStatus']>) => getStorage().upsertFortigateInterfaceStatus(...args),
   getGlpiSettings: () => getStorage().getGlpiSettings(),
   upsertGlpiSettings: (...args: Parameters<DatabaseStorage['upsertGlpiSettings']>) => getStorage().upsertGlpiSettings(...args),
   updateGlpiSyncStatus: (...args: Parameters<DatabaseStorage['updateGlpiSyncStatus']>) => getStorage().updateGlpiSyncStatus(...args),

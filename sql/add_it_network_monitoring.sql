@@ -67,6 +67,44 @@ CREATE TABLE IF NOT EXISTS it_monthly_network_reports (
   emailed_at TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS fortigate_settings (
+  id SERIAL PRIMARY KEY,
+  host TEXT NOT NULL DEFAULT '',
+  port INTEGER NOT NULL DEFAULT 443,
+  api_token TEXT NOT NULL DEFAULT '',
+  poll_interval_minutes INTEGER NOT NULL DEFAULT 1,
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  interfaces TEXT NOT NULL DEFAULT '[]',
+  last_sync_at TIMESTAMP,
+  last_error TEXT,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS fortigate_bandwidth (
+  id SERIAL PRIMARY KEY,
+  sampled_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  interface_name TEXT NOT NULL,
+  tx_kbps TEXT NOT NULL DEFAULT '0',
+  rx_kbps TEXT NOT NULL DEFAULT '0'
+);
+
+ALTER TABLE fortigate_settings
+  ADD COLUMN IF NOT EXISTS interface_labels TEXT NOT NULL DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS low_bandwidth_threshold_mbps NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS low_bandwidth_duration_minutes INTEGER NOT NULL DEFAULT 10;
+
+CREATE TABLE IF NOT EXISTS fortigate_interface_status (
+  id SERIAL PRIMARY KEY,
+  interface_name TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
+  is_up BOOLEAN NOT NULL DEFAULT FALSE,
+  tx_kbps TEXT NOT NULL DEFAULT '0',
+  rx_kbps TEXT NOT NULL DEFAULT '0',
+  low_bandwidth_since TIMESTAMP,
+  last_checked_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  last_error TEXT
+);
+
 CREATE INDEX IF NOT EXISTS it_host_checks_host_checked_idx
   ON it_host_checks(host_id, checked_at DESC);
 CREATE INDEX IF NOT EXISTS it_host_checks_checked_idx

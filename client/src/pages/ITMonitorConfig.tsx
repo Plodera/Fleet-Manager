@@ -101,6 +101,12 @@ function slugify(str: string) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 }
 
+function defaultFortigateLabel(interfaceName: string) {
+  if (interfaceName.toLowerCase() === "wan1") return "MS Telcom";
+  if (interfaceName.toLowerCase() === "wan2") return "Saas";
+  return interfaceName;
+}
+
 const BLANK_HOST = {
   name: "", ipAddress: "", hostType: "camera", isActive: true,
   sortOrder: "0", notes: "", departmentId: "",
@@ -185,8 +191,12 @@ export default function ITMonitorConfig() {
   const [testingNvrId, setTestingNvrId] = useState<number | null>(null);
 
   // FortiGate state
-  const [fortigateForm, setFortigateForm] = useState({ host: "", port: "443", apiToken: "", pollIntervalMinutes: "1", enabled: false });
+  const [fortigateForm, setFortigateForm] = useState({
+    host: "", port: "443", apiToken: "", pollIntervalMinutes: "1", enabled: false,
+    lowBandwidthThresholdMbps: "0", lowBandwidthDurationMinutes: "10",
+  });
   const [fortigateInterfaces, setFortigateInterfaces] = useState<string[]>([]); // selected interfaces
+  const [fortigateInterfaceLabels, setFortigateInterfaceLabels] = useState<Record<string, string>>({});
   const [availableInterfaces, setAvailableInterfaces] = useState<string[]>([]); // from test connection
   const [testingFortigate, setTestingFortigate] = useState(false);
 
@@ -452,11 +462,17 @@ export default function ITMonitorConfig() {
         apiToken: "",
         pollIntervalMinutes: String(fortigateSettings.pollIntervalMinutes ?? 1),
         enabled: !!fortigateSettings.enabled,
+        lowBandwidthThresholdMbps: String(fortigateSettings.lowBandwidthThresholdMbps ?? "0"),
+        lowBandwidthDurationMinutes: String(fortigateSettings.lowBandwidthDurationMinutes ?? 10),
       });
       try {
         const parsed = JSON.parse(fortigateSettings.interfaces || "[]");
         setFortigateInterfaces(Array.isArray(parsed) ? parsed : []);
       } catch { setFortigateInterfaces([]); }
+      try {
+        const parsed = JSON.parse(fortigateSettings.interfaceLabels || "{}");
+        setFortigateInterfaceLabels(parsed && typeof parsed === "object" ? parsed : {});
+      } catch { setFortigateInterfaceLabels({}); }
     }
   }, [fortigateSettings]);
 
@@ -483,6 +499,9 @@ export default function ITMonitorConfig() {
       const data = await res.json();
       if (data.ok) {
         setAvailableInterfaces(data.interfaces || []);
+        setFortigateInterfaceLabels(prev => Object.fromEntries(
+          (data.interfaces || []).map((iface: string) => [iface, prev[iface] || defaultFortigateLabel(iface)])
+        ));
         toast({ title: `Connected — ${data.interfaces?.length ?? 0} interface(s) found` });
       } else {
         toast({ title: `Connection failed: ${data.error}`, variant: "destructive" });
@@ -1310,6 +1329,60 @@ export default function ITMonitorConfig() {
                   )}
                 </div>
 
+                 {(availableInterfaces.length > 0 || fortigateInterfaces.length > 0) && (
+                   <div className="space-y-2">
+                     <Label>Link names / Nomes das ligações</Label>
+                     <p className="text-xs text-muted-foreground">
+                       Use friendly names such as “MS Telcom” for wan1 and “Saas” for wan2. These names appear on the dashboard and charts.
+                     </p>
+                     <div className="space-y-2">
+                       {(availableInterfaces.length > 0 ? availableInterfaces : fortigateInterfaces).map(iface => (
+                         <div key={iface} className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2 items-center">
+                           <span className="font-mono text-sm">{iface}</span>
+                           <Input
+                             value={fortigateInterfaceLabels[iface] || ""}
+                             onChange={e => setFortigateInterfaceLabels(prev => ({ ...prev, [iface]: e.target.value }))}
+                             placeholder={iface}
+                             data-testid={`input-fortigate-label-${iface}`}
+                           />
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+
+                 <div className="space-y-2 rounded-lg border p-3">
+                   <div>
+                     <Label>Low bandwidth warning / Aviso de baixa largura de banda</Label>
+                     <p className="text-xs text-muted-foreground mt-1">
+                       The warning appears only when combined TX + RX stays below the threshold for the full duration. Set threshold to 0 to disable.
+                     </p>
+                   </div>
+                   <div className="grid grid-cols-2 gap-3">
+                     <div className="space-y-1">
+                       <Label>Threshold (Mbps)</Label>
+                       <Input
+                         type="number"
+                         min="0"
+                         step="0.1"
+                         value={fortigateForm.lowBandwidthThresholdMbps}
+                         onChange={e => setFortigateForm(p => ({ ...p, lowBandwidthThresholdMbps: e.target.value }))}
+                         data-testid="input-fortigate-low-bandwidth-threshold"
+                       />
+                     </div>
+                     <div className="space-y-1">
+                       <Label>Sustained for (minutes)</Label>
+                       <Input
+                         type="number"
+                         min="1"
+                         value={fortigateForm.lowBandwidthDurationMinutes}
+                         onChange={e => setFortigateForm(p => ({ ...p, lowBandwidthDurationMinutes: e.target.value }))}
+                         data-testid="input-fortigate-low-bandwidth-duration"
+                       />
+                     </div>
+                   </div>
+                 </div>
+
                 <div className="space-y-1">
                   <Label>Poll Interval / Intervalo de Sondagem (minutes / minutos)</Label>
                   <Input
@@ -1341,6 +1414,9 @@ export default function ITMonitorConfig() {
                       pollIntervalMinutes: parseInt(fortigateForm.pollIntervalMinutes) || 1,
                       enabled: fortigateForm.enabled,
                       interfaces: JSON.stringify(fortigateInterfaces),
+                       interfaceLabels: fortigateInterfaceLabels,
+                       lowBandwidthThresholdMbps: Math.max(0, Number(fortigateForm.lowBandwidthThresholdMbps) || 0),
+                       lowBandwidthDurationMinutes: Math.max(1, parseInt(fortigateForm.lowBandwidthDurationMinutes) || 10),
                     })}
                     disabled={saveFortigateMutation.isPending}
                     data-testid="button-save-fortigate"
