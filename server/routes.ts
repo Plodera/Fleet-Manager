@@ -742,7 +742,7 @@ export async function registerRoutes(
       if (userId === user.id && !input.isActive) {
         return res.status(400).json({ message: "Cannot deactivate your own account" });
       }
-      const updatedUser = await storage.updateUserActive(userId, input.isActive);
+      const updatedUser = await storage.updateUserActive(userId, input.isActive, user.id, user.fullName);
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -753,6 +753,20 @@ export async function registerRoutes(
       }
       res.status(500).json({ message: "Failed to update user status" });
     }
+  });
+
+  app.get(api.users.statusHistory.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin access required" });
+    const userId = Number(req.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+    const targetUser = await storage.getUser(userId);
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+    const history = await storage.getUserStatusHistory(userId);
+    res.json(history);
   });
 
   // Update user password (admin only)

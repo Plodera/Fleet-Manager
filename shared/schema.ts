@@ -80,6 +80,15 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const userStatusHistory = pgTable("user_status_history", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  changedById: integer("changed_by_id").references(() => users.id, { onDelete: "set null" }),
+  changedByName: text("changed_by_name").notNull(),
+  isActive: boolean("is_active").notNull(),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+});
+
 export const vehicleCategoryEnum = pgEnum("vehicle_category", ["car", "van", "bus", "truck"]);
 
 export const vehicles = pgTable("vehicles", {
@@ -376,6 +385,13 @@ export const equipmentChecklistItemsRelations = relations(equipmentChecklistItem
 }));
 export const usersRelations = relations(users, ({ many }) => ({
   bookings: many(bookings),
+  statusChanges: many(userStatusHistory, { relationName: "statusTarget" }),
+  changedStatuses: many(userStatusHistory, { relationName: "statusActor" }),
+}));
+
+export const userStatusHistoryRelations = relations(userStatusHistory, ({ one }) => ({
+  user: one(users, { relationName: "statusTarget", fields: [userStatusHistory.userId], references: [users.id] }),
+  changedBy: one(users, { relationName: "statusActor", fields: [userStatusHistory.changedById], references: [users.id] }),
 }));
 
 export const vehiclesRelations = relations(vehicles, ({ many }) => ({
@@ -483,6 +499,7 @@ export const insertWorkOrderItemSchema = createInsertSchema(workOrderItems)
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UserStatusHistory = typeof userStatusHistory.$inferSelect;
 export type ItIssueAssignee = Pick<User, "id" | "fullName">;
 export type UserPermissions = typeof PERMISSIONS[keyof typeof PERMISSIONS];
 export type Vehicle = typeof vehicles.$inferSelect;

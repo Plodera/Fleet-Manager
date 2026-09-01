@@ -152,6 +152,16 @@ export async function initDatabase() {
     // User assignment lists need an explicit active flag. Existing installations
     // receive the same default as newly-created users.
     await _pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`).catch(() => {});
+    await _pool.query(`CREATE TABLE IF NOT EXISTS user_status_history (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      changed_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      changed_by_name TEXT NOT NULL,
+      is_active BOOLEAN NOT NULL,
+      changed_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`).catch(() => {});
+    await _pool.query(`CREATE INDEX IF NOT EXISTS user_status_history_user_changed_at_idx
+      ON user_status_history(user_id, changed_at DESC)`).catch(() => {});
     // License expiry monitoring columns and tables are created here as well as in the
     // on-prem migration so existing installations can start safely after an upgrade.
     await _pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS license_expiry_date DATE`).catch(() => {});

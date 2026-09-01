@@ -463,6 +463,11 @@ const translations = {
       deactivate: "Deactivate",
       activate: "Activate",
       cannotDeactivateSelf: "You cannot deactivate your own account.",
+      statusHistory: "Status History",
+      statusHistoryDescription: "Review activation and deactivation changes for this user.",
+      noStatusHistory: "No status changes recorded.",
+      changedBy: "Changed by",
+      changedAt: "Date",
     },
     // Driver Dashboard
     driverDashboard: {
@@ -1386,6 +1391,11 @@ const translations = {
       deactivate: "Desativar",
       activate: "Ativar",
       cannotDeactivateSelf: "Não pode desativar a sua própria conta.",
+      statusHistory: "Histórico de Estado",
+      statusHistoryDescription: "Reveja as alterações de ativação e desativação deste utilizador.",
+      noStatusHistory: "Nenhuma alteração de estado registada.",
+      changedBy: "Alterado por",
+      changedAt: "Data",
     },
     // Driver Dashboard
     driverDashboard: {

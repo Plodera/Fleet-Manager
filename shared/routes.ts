@@ -19,6 +19,7 @@ import {
   insertWorkOrderItemSchema,
   insertIndentSchema,
   users,
+  userStatusHistory,
   vehicles,
   bookings,
   maintenanceRecords,
@@ -303,6 +304,14 @@ export const api = {
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
         400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    statusHistory: {
+      method: 'GET' as const,
+      path: '/api/users/:id/status-history',
+      responses: {
+        200: z.array(z.custom<typeof userStatusHistory.$inferSelect>()),
         404: errorSchemas.notFound,
       },
     },

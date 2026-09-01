@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/lib/i18n";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { api } from "@shared/routes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -15,8 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertUserSchema, AVAILABLE_PERMISSIONS, type Department } from "@shared/schema";
-import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, XCircle, Key, Mail, Building2, Trash2, Plus, User, Info, Car, FileCheck, Eye, PackageSearch } from "lucide-react";
+import { insertUserSchema, AVAILABLE_PERMISSIONS, type Department, type UserStatusHistory } from "@shared/schema";
+import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, XCircle, Key, Mail, Building2, Trash2, Plus, User, Info, Car, FileCheck, Eye, PackageSearch, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
 import { Label } from "@/components/ui/label";
@@ -56,6 +57,7 @@ export default function Users() {
   const [editFullName, setEditFullName] = useState("");
   const [indentApproverUserId, setIndentApproverUserId] = useState<number | null>(null);
   const [pendingApproverDepts, setPendingApproverDepts] = useState<number[]>([]);
+  const [statusHistoryUserId, setStatusHistoryUserId] = useState<number | null>(null);
 
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["/api/departments"],
@@ -64,6 +66,16 @@ export default function Users() {
   const { data: approverAssignments = [] } = useQuery<any[]>({
     queryKey: ["/api/indent-approvers"],
     enabled: currentUser?.role === "admin",
+  });
+
+  const { data: statusHistory = [], isLoading: isStatusHistoryLoading } = useQuery<UserStatusHistory[]>({
+    queryKey: [api.users.statusHistory.path, statusHistoryUserId],
+    queryFn: async () => {
+      const res = await fetch(api.users.statusHistory.path.replace(":id", String(statusHistoryUserId)));
+      if (!res.ok) throw new Error("Failed to fetch user status history");
+      return api.users.statusHistory.responses[200].parse(await res.json());
+    },
+    enabled: statusHistoryUserId !== null,
   });
 
   const saveApproverDeptsMutation = useMutation({
@@ -651,6 +663,17 @@ export default function Users() {
                             <Button
                               size="sm"
                               variant="ghost"
+                              className="text-muted-foreground"
+                              onClick={() => setStatusHistoryUserId(user.id)}
+                              title={um.statusHistory}
+                              aria-label={`${um.statusHistory} ${user.fullName}`}
+                              data-testid={`button-status-history-${user.id}`}
+                            >
+                              <History className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
                               onClick={() => setEditingUserId(user.id)}
                               disabled={isUpdatingRole}
                               data-testid={`button-edit-role-${user.id}`}
@@ -834,6 +857,57 @@ export default function Users() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={statusHistoryUserId !== null}
+        onOpenChange={(open) => {
+          if (!open) setStatusHistoryUserId(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {um.statusHistory}
+              {statusHistoryUserId !== null && users && (
+                <span className="ml-2 text-muted-foreground font-normal">
+                  · {users.find((user) => user.id === statusHistoryUserId)?.fullName}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{um.statusHistoryDescription}</p>
+          {isStatusHistoryLoading ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">{t.labels.loading}</p>
+          ) : statusHistory.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">{um.noStatusHistory}</p>
+          ) : (
+            <div className="max-h-[360px] overflow-y-auto space-y-3 pr-1">
+              {statusHistory.map((entry) => (
+                <div key={entry.id} className="rounded-md border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <Badge
+                      variant={entry.isActive ? "default" : "outline"}
+                      className={entry.isActive
+                        ? "bg-green-100 text-green-700 hover:bg-green-100 border-green-200"
+                        : "text-muted-foreground border-muted-foreground/40"}
+                    >
+                      {entry.isActive ? um.active : um.inactive}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {entry.changedAt
+                        ? new Date(entry.changedAt).toLocaleString(language === "pt" ? "pt-PT" : "en-US")
+                        : "-"}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm">
+                    {um.changedBy}: <span className="font-medium">{entry.changedByName}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {currentUser?.role === 'admin' && (
         <Card className="border-none shadow-md">

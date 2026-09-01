@@ -1,5 +1,5 @@
 import { 
-  users, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
+  users, userStatusHistory, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
   machineTypeRecordTypeConfigs,
   indents, indentItems, indentApproverDepartments,
@@ -17,7 +17,7 @@ import {
   type FactoryMachineType, type InsertFactoryMachineType,
   type FactoryMachine, type InsertFactoryMachine,
   type MachineRecord, type InsertMachineRecord,
-  type User, type InsertUser, type ItIssueAssignee, type Vehicle, type InsertVehicle,
+  type User, type InsertUser, type UserStatusHistory, type ItIssueAssignee, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
@@ -105,7 +105,8 @@ export interface IStorage {
   updateUserPermissions(id: number, permissions: string[]): Promise<User>;
   updateUserApprover(id: number, isApprover: boolean): Promise<User>;
   updateUserDriver(id: number, isDriver: boolean): Promise<User>;
-  updateUserActive(id: number, isActive: boolean): Promise<User | undefined>;
+  updateUserActive(id: number, isActive: boolean, changedById: number, changedByName: string): Promise<User | undefined>;
+  getUserStatusHistory(userId: number): Promise<UserStatusHistory[]>;
   updateUserPassword(id: number, password: string): Promise<void>;
   updateUserSession(id: number, sessionId: string | null): Promise<void>;
   updateUserEmail(id: number, email: string): Promise<User | undefined>;
@@ -486,9 +487,31 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserActive(id: number, isActive: boolean): Promise<User | undefined> {
-    const [user] = await getDb().update(users).set({ isActive }).where(eq(users.id, id)).returning();
-    return user;
+  async updateUserActive(id: number, isActive: boolean, changedById: number, changedByName: string): Promise<User | undefined> {
+    return await getDb().transaction(async (tx: any) => {
+      const [currentUser] = await tx.select().from(users).where(eq(users.id, id));
+      if (!currentUser) return undefined;
+      if (currentUser.isActive === isActive) return currentUser;
+
+      const [updatedUser] = await tx.update(users).set({ isActive }).where(eq(users.id, id)).returning();
+      if (updatedUser) {
+        await tx.insert(userStatusHistory).values({
+          userId: id,
+          changedById,
+          changedByName,
+          isActive,
+        });
+      }
+      return updatedUser;
+    });
+  }
+
+  async getUserStatusHistory(userId: number): Promise<UserStatusHistory[]> {
+    return await getDb()
+      .select()
+      .from(userStatusHistory)
+      .where(eq(userStatusHistory.userId, userId))
+      .orderBy(desc(userStatusHistory.changedAt), desc(userStatusHistory.id));
   }
 
   async updateUserPassword(id: number, password: string): Promise<void> {
@@ -2187,6 +2210,7 @@ export const storage = {
   updateUserApprover: (...args: Parameters<DatabaseStorage['updateUserApprover']>) => getStorage().updateUserApprover(...args),
   updateUserDriver: (...args: Parameters<DatabaseStorage['updateUserDriver']>) => getStorage().updateUserDriver(...args),
   updateUserActive: (...args: Parameters<DatabaseStorage['updateUserActive']>) => getStorage().updateUserActive(...args),
+  getUserStatusHistory: (...args: Parameters<DatabaseStorage['getUserStatusHistory']>) => getStorage().getUserStatusHistory(...args),
   updateUserPassword: (...args: Parameters<DatabaseStorage['updateUserPassword']>) => getStorage().updateUserPassword(...args),
   updateUserSession: (...args: Parameters<DatabaseStorage['updateUserSession']>) => getStorage().updateUserSession(...args),
   updateUserEmail: (...args: Parameters<DatabaseStorage['updateUserEmail']>) => getStorage().updateUserEmail(...args),
