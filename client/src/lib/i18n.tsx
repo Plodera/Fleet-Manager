@@ -457,6 +457,12 @@ const translations = {
       accessRights: "Access Rights",
       licenseNumber: "License Number",
       none: "None",
+      status: "Status",
+      active: "Active",
+      inactive: "Inactive",
+      deactivate: "Deactivate",
+      activate: "Activate",
+      cannotDeactivateSelf: "You cannot deactivate your own account.",
     },
     // Driver Dashboard
     driverDashboard: {
@@ -1374,6 +1380,12 @@ const translations = {
       accessRights: "Direitos de Acesso",
       licenseNumber: "Número de Carta",
       none: "Nenhum",
+      status: "Estado",
+      active: "Ativo",
+      inactive: "Inativo",
+      deactivate: "Desativar",
+      activate: "Ativar",
+      cannotDeactivateSelf: "Não pode desativar a sua própria conta.",
     },
     // Driver Dashboard
     driverDashboard: {

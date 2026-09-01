@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, AVAILABLE_PERMISSIONS, type Department } from "@shared/schema";
-import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, Key, Mail, Building2, Trash2, Plus, User, Info, Car, FileCheck, Eye, PackageSearch } from "lucide-react";
+import { Users as UsersIcon, Shield, UserPlus, Edit2, Lock, CheckCircle, XCircle, Key, Mail, Building2, Trash2, Plus, User, Info, Car, FileCheck, Eye, PackageSearch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
 import { Label } from "@/components/ui/label";
@@ -32,7 +32,7 @@ function DriverExpiryBadge({ date, labels }: { date: string | null | undefined; 
 }
 
 export default function Users() {
-  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updateDriver, isUpdatingDriver, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser, updateProfile, isUpdatingProfile, updateLicenseExpiry, isUpdatingLicenseExpiry } = useUsers();
+  const { users, isLoading, createUser, isCreatingUser, updateRole, isUpdatingRole, updatePermissions, isUpdatingPermissions, updateApprover, isUpdatingApprover, updateDriver, isUpdatingDriver, updateActive, isUpdatingActive, updatePassword, isUpdatingPassword, updateEmail, isUpdatingEmail, deleteUser, isDeletingUser, updateProfile, isUpdatingProfile, updateLicenseExpiry, isUpdatingLicenseExpiry } = useUsers();
   const { user: currentUser } = useAuth();
   const { language } = useLanguage();
   const { toast } = useToast();
@@ -358,6 +358,7 @@ export default function Users() {
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>{um.fullName}</TableHead>
+                <TableHead>{um.status}</TableHead>
                 <TableHead>{um.role}</TableHead>
                 <TableHead>{um.department}</TableHead>
                 <TableHead>
@@ -388,7 +389,7 @@ export default function Users() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={currentUser?.role === 'admin' ? 8 : 7} className="h-24 text-center">{t.labels.loading}</TableCell>
+                  <TableCell colSpan={currentUser?.role === 'admin' ? 9 : 8} className="h-24 text-center">{t.labels.loading}</TableCell>
                 </TableRow>
               ) : users?.map((user) => {
                 const userPermissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions || [];
@@ -396,9 +397,20 @@ export default function Users() {
                 <TableRow key={user.id} className="hover:bg-muted/20">
                   <TableCell>
                     <div>
-                      <div className="font-medium">{user.fullName}</div>
+                      <div className={`font-medium ${!user.isActive ? "text-muted-foreground" : ""}`}>{user.fullName}</div>
                       <div className="text-xs text-muted-foreground">{user.username}{user.email ? ` · ${user.email}` : ''}</div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={user.isActive ? "default" : "outline"}
+                      className={user.isActive
+                        ? "bg-green-100 text-green-700 hover:bg-green-100 border-green-200"
+                        : "text-muted-foreground border-muted-foreground/40"}
+                    >
+                      {user.isActive ? <CheckCircle className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
+                      {user.isActive ? um.active : um.inactive}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     {(user as any).isDriver ? (
@@ -777,6 +789,23 @@ export default function Users() {
                                 </div>
                               </DialogContent>
                             </Dialog>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className={user.isActive
+                                ? "text-destructive hover:text-destructive"
+                                : "text-green-700 hover:text-green-700"}
+                              onClick={() => {
+                                if (user.isActive && !confirm(`${um.deactivate} ${user.fullName}?`)) return;
+                                updateActive({ userId: user.id, isActive: !user.isActive });
+                              }}
+                              disabled={isUpdatingActive || (user.isActive && user.id === currentUser?.id)}
+                              title={user.isActive ? um.deactivate : um.activate}
+                              aria-label={`${user.isActive ? um.deactivate : um.activate} ${user.fullName}`}
+                              data-testid={`button-toggle-active-${user.id}`}
+                            >
+                              {user.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                            </Button>
                             {user.id !== currentUser?.id && (
                               <Button
                                 size="sm"

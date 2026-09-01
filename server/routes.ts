@@ -729,6 +729,32 @@ export async function registerRoutes(
     }
   });
 
+  app.put(api.users.updateActive.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admin access required" });
+    try {
+      const input = api.users.updateActive.input.parse(req.body);
+      const userId = Number(req.params.id);
+      if (!Number.isInteger(userId) || userId <= 0) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+      if (userId === user.id && !input.isActive) {
+        return res.status(400).json({ message: "Cannot deactivate your own account" });
+      }
+      const updatedUser = await storage.updateUserActive(userId, input.isActive);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(updatedUser);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Failed to update user status" });
+    }
+  });
+
   // Update user password (admin only)
   app.put(api.users.updatePassword.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

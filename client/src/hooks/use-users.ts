@@ -115,6 +115,33 @@ export function useUsers() {
     },
   });
 
+  const updateActiveMutation = useMutation({
+    mutationFn: async ({ userId, isActive }: { userId: number; isActive: boolean }) => {
+      const res = await fetch(api.users.updateActive.path.replace(":id", String(userId)), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update user status");
+      }
+      return api.users.updateActive.responses[200].parse(await res.json());
+    },
+    onSuccess: (_user, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      toast({
+        title: variables.isActive ? "User activated" : "User deactivated",
+        description: variables.isActive
+          ? "The user can be assigned to network issues again"
+          : "The user can no longer be assigned to new network issues",
+      });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to update user status", description: error.message, variant: "destructive" });
+    },
+  });
+
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ userId, password }: { userId: number; password: string }) => {
       const res = await fetch(api.users.updatePassword.path.replace(":id", String(userId)), {
@@ -234,6 +261,8 @@ export function useUsers() {
     isUpdatingApprover: updateApproverMutation.isPending,
     updateDriver: updateDriverMutation.mutate,
     isUpdatingDriver: updateDriverMutation.isPending,
+    updateActive: updateActiveMutation.mutate,
+    isUpdatingActive: updateActiveMutation.isPending,
     updatePassword: updatePasswordMutation.mutate,
     isUpdatingPassword: updatePasswordMutation.isPending,
     updateEmail: updateEmailMutation.mutate,

@@ -296,6 +296,16 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    updateActive: {
+      method: 'PUT' as const,
+      path: '/api/users/:id/active',
+      input: z.object({ isActive: z.boolean() }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
     updatePassword: {
       method: 'PUT' as const,
       path: '/api/users/:id/password',
