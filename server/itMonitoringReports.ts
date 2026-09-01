@@ -2,6 +2,7 @@ import { sendEmail } from "./email";
 import { storage } from "./storage";
 
 export type ItWeekRange = { weekStart: string; weekEnd: string; from: Date; to: Date };
+export type ItMonthRange = { monthKey: string; from: Date; to: Date; comparisonFrom: Date };
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -16,6 +17,23 @@ export function getPreviousWeekRange(reference = new Date()): ItWeekRange {
   start.setUTCDate(start.getUTCDate() - 7);
   const end = new Date(thisMonday);
   return { weekStart: isoDate(start), weekEnd: isoDate(end), from: start, to: end };
+}
+
+export function getMonthlyReportRange(monthKey?: string, reference = new Date()): ItMonthRange {
+  let year: number;
+  let month: number;
+  if (monthKey && /^\d{4}-\d{2}$/.test(monthKey)) {
+    [year, month] = monthKey.split("-").map(Number);
+    month -= 1;
+  } else {
+    const previous = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() - 1, 1));
+    year = previous.getUTCFullYear();
+    month = previous.getUTCMonth();
+  }
+  const from = new Date(Date.UTC(year, month, 1));
+  const to = new Date(Date.UTC(year, month + 1, 1));
+  const comparisonFrom = new Date(Date.UTC(year, month - 4, 1));
+  return { monthKey: isoDate(from).slice(0, 7), from, to, comparisonFrom };
 }
 
 export function buildFollowUpSummary(issues: Array<{ status: string; targetDate?: string | null }>, today = new Date()): Record<string, number> {
@@ -93,8 +111,67 @@ export async function generateWeeklyItReport(options: { reference?: Date; email?
   return report;
 }
 
+export async function generateMonthlyItReport(options: { month?: string; email?: boolean } = {}) {
+  const range = getMonthlyReportRange(options.month);
+  const [bandwidth, uptimeComparison, issues] = await Promise.all([
+    storage.getItMonthlyBandwidth(range.from, range.to),
+    storage.getItMonthlyUptimeComparison(range.comparisonFrom, range.to),
+    storage.getItNetworkIssues(),
+  ]);
+  const periodIssues = issues.filter((issue: any) => {
+    const started = new Date(issue.startedAt).getTime();
+    const resolved = issue.resolvedAt ? new Date(issue.resolvedAt).getTime() : 0;
+    return started < range.to.getTime() && (!resolved || resolved >= range.from.getTime());
+  });
+  const dailyAverages = bandwidth.map((row: any) => ({
+    ...row,
+    averageMbps: Math.round(((Number(row.txMbpsAverage || 0) + Number(row.rxMbpsAverage || 0)) / 2) * 100) / 100,
+  }));
+  const reportJson = {
+    reportType: "monthly_network",
+    generatedAt: new Date().toISOString(),
+    period: { month: range.monthKey, from: isoDate(range.comparisonFrom), to: isoDate(range.to) },
+    bandwidth: {
+      dailyAverages,
+      interfaces: Array.from(new Set(dailyAverages.map((row: any) => row.interfaceName))),
+    },
+    uptimeComparison,
+    issues: {
+      outages: periodIssues.filter((issue: any) => issue.issueType === "outage"),
+      performance: periodIssues.filter((issue: any) => issue.issueType === "performance"),
+      followUp: buildFollowUpSummary(issues),
+    },
+  };
+  const report = await storage.createItMonthlyNetworkReport({
+    monthKey: range.monthKey,
+    reportJson,
+  });
+
+  const settings = await storage.getItMonitoringSettings();
+  const recipients = settings?.reportRecipients ?? [];
+  if ((options.email || settings?.emailReports) && recipients.length > 0) {
+    const body = [
+      `Monthly IT network report: ${range.monthKey}`,
+      "",
+      `Bandwidth observations: ${dailyAverages.reduce((total: number, row: any) => total + Number(row.samples || 0), 0)}`,
+      `Internet links compared: ${new Set(uptimeComparison.map((row: any) => row.hostId)).size}`,
+      `Outages in period: ${reportJson.issues.outages.length}`,
+      `Performance issues in period: ${reportJson.issues.performance.length}`,
+      "",
+      "Please log in to review the daily bandwidth and uptime comparison charts.",
+    ].join("\n");
+    let sent = false;
+    for (const recipient of recipients) {
+      if (await sendEmail({ to: recipient, subject: `Monthly IT network report — ${range.monthKey}`, body })) sent = true;
+    }
+    if (sent) await storage.markItMonthlyNetworkReportEmailed(report.id);
+  }
+  return report;
+}
+
 let reportTimer: ReturnType<typeof setInterval> | null = null;
 let lastScheduleKey = "";
+let lastMonthlyScheduleKey = "";
 
 async function runScheduledReport() {
   const settings = (await storage.getItMonitoringSettings()) ?? {
@@ -107,11 +184,23 @@ async function runScheduledReport() {
   if (!settings.reportsEnabled) return;
   const now = new Date();
   const scheduleKey = `${isoDate(now)}-${settings.reportDayOfWeek}-${settings.reportHour}`;
-  if (now.getUTCDay() !== settings.reportDayOfWeek % 7 || now.getUTCHours() < settings.reportHour || now.getUTCHours() > settings.reportHour + 1 || lastScheduleKey === scheduleKey) return;
-  lastScheduleKey = scheduleKey;
-  const range = getPreviousWeekRange(now);
-  const existing = (await storage.getItMonitoringReports(100)).some(report => report.weekStart === range.weekStart);
-  if (!existing) await generateWeeklyItReport();
+  const withinReportHour = now.getUTCHours() >= settings.reportHour && now.getUTCHours() <= settings.reportHour + 1;
+  const weeklyDue = now.getUTCDay() === settings.reportDayOfWeek % 7 && withinReportHour && lastScheduleKey !== scheduleKey;
+  if (weeklyDue) {
+    lastScheduleKey = scheduleKey;
+    const range = getPreviousWeekRange(now);
+    const existing = (await storage.getItMonitoringReports(100)).some(report => report.weekStart === range.weekStart);
+    if (!existing) await generateWeeklyItReport();
+  }
+
+  const monthlyScheduleKey = `${isoDate(now)}-${settings.reportHour}`;
+  if (now.getUTCDate() === 1 && withinReportHour && lastMonthlyScheduleKey !== monthlyScheduleKey) {
+    lastMonthlyScheduleKey = monthlyScheduleKey;
+    const monthlyRange = getMonthlyReportRange(undefined, now);
+    const monthlyReports = await storage.getItMonthlyNetworkReports(100);
+    const exists = monthlyReports.some(report => report.monthKey === monthlyRange.monthKey);
+    if (!exists) await generateMonthlyItReport();
+  }
 }
 
 export function startITMonitoringReports() {

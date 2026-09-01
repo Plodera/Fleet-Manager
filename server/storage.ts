@@ -8,7 +8,7 @@ import {
   companyDocuments, companyDocumentAccess, expiryNotificationRules, expiryNotificationRecipients,
   expiryNotifications, expiryNotificationDeliveries,
   itHostTypes, itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
-  itHostChecks, itNetworkIssues, itNetworkIssueUpdates, itMonitoringSettings, itMonitoringReports,
+  itHostChecks, itNetworkIssues, itNetworkIssueUpdates, itMonitoringSettings, itMonitoringReports, itMonthlyNetworkReports,
   glpiSettings,
   hikvisionNvrs, hikvisionGlobalSettings,
   fortigateSettings, fortigateBandwidth,
@@ -22,7 +22,7 @@ import {
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
   type ItHostType, type InsertItHostType, type ItMonitoredHost, type InsertItMonitoredHost, type ItHostStatus, type ItKpi, type InsertItKpi, type ItKpiValue, type InsertItKpiValue, type ItHostWithStatus,
-  type ItHostCheck, type ItNetworkIssue, type ItNetworkIssueUpdate, type ItMonitoringSettings, type ItMonitoringReport,
+  type ItHostCheck, type ItNetworkIssue, type ItNetworkIssueUpdate, type ItMonitoringSettings, type ItMonitoringReport, type ItMonthlyNetworkReport,
   type VehicleInspection, type InsertVehicleInspection,
   type EquipmentType, type InsertEquipmentType,
   type EquipmentChecklistItem, type InsertEquipmentChecklistItem,
@@ -302,6 +302,10 @@ export interface IStorage {
   createItMonitoringReport(data: { weekStart: string; weekEnd: string; reportJson: Record<string, unknown> }): Promise<ItMonitoringReport>;
   getItMonitoringReports(limit?: number): Promise<ItMonitoringReport[]>;
   markItMonitoringReportEmailed(id: number): Promise<void>;
+  getItMonthlyUptimeComparison(from: Date, to: Date): Promise<any[]>;
+  createItMonthlyNetworkReport(data: { monthKey: string; reportJson: Record<string, unknown> }): Promise<ItMonthlyNetworkReport>;
+  getItMonthlyNetworkReports(limit?: number): Promise<ItMonthlyNetworkReport[]>;
+  markItMonthlyNetworkReportEmailed(id: number): Promise<void>;
 
 
   // Factory Machine Maintenance
@@ -1797,6 +1801,25 @@ export class DatabaseStorage implements IStorage {
     return result.rows;
   }
 
+  async getItMonthlyUptimeComparison(from: Date, to: Date): Promise<any[]> {
+    const result = await getPool().query({
+      text: `SELECT TO_CHAR(DATE_TRUNC('month', c.checked_at), 'YYYY-MM') AS month,
+        h.id AS "hostId", h.name AS "hostName",
+        COUNT(c.id)::int AS checks,
+        COUNT(c.id) FILTER (WHERE c.is_online)::int AS "onlineChecks",
+        COALESCE(ROUND(100.0 * COUNT(c.id) FILTER (WHERE c.is_online) / NULLIF(COUNT(c.id), 0), 2), 0)::float AS "uptimePercent",
+        ROUND(AVG(c.response_time_ms) FILTER (WHERE c.is_online), 2)::float AS "averageLatencyMs"
+        FROM it_host_checks c
+        INNER JOIN it_monitored_hosts h ON h.id = c.host_id
+        WHERE h.host_type = 'internet_link' AND h.is_active = TRUE
+          AND c.checked_at >= $1 AND c.checked_at < $2
+        GROUP BY DATE_TRUNC('month', c.checked_at), h.id, h.name
+        ORDER BY month, h.name`,
+      values: [from, to],
+    });
+    return result.rows;
+  }
+
   async getItMonitoringSettings(): Promise<ItMonitoringSettings | undefined> {
     const [row] = await getDb().select().from(itMonitoringSettings).limit(1);
     return row;
@@ -1834,6 +1857,25 @@ export class DatabaseStorage implements IStorage {
 
   async markItMonitoringReportEmailed(id: number): Promise<void> {
     await getDb().update(itMonitoringReports).set({ emailedAt: new Date() }).where(eq(itMonitoringReports.id, id));
+  }
+
+  async createItMonthlyNetworkReport(data: { monthKey: string; reportJson: Record<string, unknown> }): Promise<ItMonthlyNetworkReport> {
+    const [row] = await getDb().insert(itMonthlyNetworkReports).values({
+      monthKey: data.monthKey,
+      reportJson: data.reportJson,
+    }).onConflictDoUpdate({
+      target: itMonthlyNetworkReports.monthKey,
+      set: { reportJson: data.reportJson, generatedAt: new Date() },
+    }).returning();
+    return row;
+  }
+
+  async getItMonthlyNetworkReports(limit = 20): Promise<ItMonthlyNetworkReport[]> {
+    return getDb().select().from(itMonthlyNetworkReports).orderBy(desc(itMonthlyNetworkReports.monthKey)).limit(Math.min(Math.max(limit, 1), 100));
+  }
+
+  async markItMonthlyNetworkReportEmailed(id: number): Promise<void> {
+    await getDb().update(itMonthlyNetworkReports).set({ emailedAt: new Date() }).where(eq(itMonthlyNetworkReports.id, id));
   }
 
   async getGlpiSettings(): Promise<GlpiSettings | undefined> {
@@ -2366,6 +2408,10 @@ export const storage = {
   createItMonitoringReport: (...args: Parameters<DatabaseStorage['createItMonitoringReport']>) => getStorage().createItMonitoringReport(...args),
   getItMonitoringReports: (...args: Parameters<DatabaseStorage['getItMonitoringReports']>) => getStorage().getItMonitoringReports(...args),
   markItMonitoringReportEmailed: (...args: Parameters<DatabaseStorage['markItMonitoringReportEmailed']>) => getStorage().markItMonitoringReportEmailed(...args),
+  getItMonthlyUptimeComparison: (...args: Parameters<DatabaseStorage['getItMonthlyUptimeComparison']>) => getStorage().getItMonthlyUptimeComparison(...args),
+  createItMonthlyNetworkReport: (...args: Parameters<DatabaseStorage['createItMonthlyNetworkReport']>) => getStorage().createItMonthlyNetworkReport(...args),
+  getItMonthlyNetworkReports: (...args: Parameters<DatabaseStorage['getItMonthlyNetworkReports']>) => getStorage().getItMonthlyNetworkReports(...args),
+  markItMonthlyNetworkReportEmailed: (...args: Parameters<DatabaseStorage['markItMonthlyNetworkReportEmailed']>) => getStorage().markItMonthlyNetworkReportEmailed(...args),
   getGlpiSettings: () => getStorage().getGlpiSettings(),
   upsertGlpiSettings: (...args: Parameters<DatabaseStorage['upsertGlpiSettings']>) => getStorage().upsertGlpiSettings(...args),
   updateGlpiSyncStatus: (...args: Parameters<DatabaseStorage['updateGlpiSyncStatus']>) => getStorage().updateGlpiSyncStatus(...args),

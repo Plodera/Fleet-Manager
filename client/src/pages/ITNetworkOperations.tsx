@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Activity, AlertTriangle, ArrowLeft, CheckCircle2, Clock3, FileText, Gauge, RefreshCw, Save, WifiOff } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,12 @@ import type { ItHostWithStatus, ItIssueAssignee } from "@shared/schema";
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 const rangeQuery = (fromDay: string, toDay: string) => {
   return `from=${encodeURIComponent(`${fromDay}T00:00:00.000Z`)}&to=${encodeURIComponent(`${toDay}T23:59:59.999Z`)}`;
+};
+const previousMonth = () => {
+  const date = new Date();
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() - 1);
+  return date.toISOString().slice(0, 7);
 };
 
 function StatCard({ icon: Icon, label, value, detail }: { icon: React.ElementType; label: string; value: string; detail?: string }) {
@@ -41,7 +47,9 @@ export default function ITNetworkOperations() {
   const { toast } = useToast();
   const [selectedHost, setSelectedHost] = useState<number | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<any | null>(null);
+  const [selectedMonthlyReport, setSelectedMonthlyReport] = useState<any | null>(null);
   const [month, setMonth] = useState(isoDay(new Date()).slice(0, 7));
+  const [reportMonth, setReportMonth] = useState(previousMonth);
   const [bandwidthInterface, setBandwidthInterface] = useState("all");
   const defaultTo = isoDay(new Date());
   const defaultFrom = isoDay(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
@@ -62,6 +70,7 @@ export default function ITNetworkOperations() {
   const { data: issues = [], isFetching: issuesFetching } = useQuery<any[]>({ queryKey: ["/api/it/issues", issueStatus, issueSeverity, issueHostId, issueOwnerId], queryFn: async () => { const res = await fetch(`/api/it/issues?${issueQuery.toString()}`); return res.ok ? res.json() : []; }, refetchInterval: 30000 });
   const { data: issueUpdates = [] } = useQuery<any[]>({ queryKey: ["/api/it/issues", selectedIssue?.id, "updates"], enabled: !!selectedIssue, queryFn: async () => { const res = await fetch(`/api/it/issues/${selectedIssue.id}/updates`); return res.ok ? res.json() : []; } });
   const { data: reports = [] } = useQuery<any[]>({ queryKey: ["/api/it/reports"], queryFn: async () => { const res = await fetch("/api/it/reports"); return res.ok ? res.json() : []; } });
+  const { data: monthlyReports = [] } = useQuery<any[]>({ queryKey: ["/api/it/monthly-reports"], queryFn: async () => { const res = await fetch("/api/it/monthly-reports"); return res.ok ? res.json() : []; } });
   const { data: bandwidth = [] } = useQuery<any[]>({ queryKey: ["/api/it/fortigate/bandwidth/monthly", month, bandwidthInterface], queryFn: async () => { const res = await fetch(`/api/it/fortigate/bandwidth/monthly?month=${month}&interface=${encodeURIComponent(bandwidthInterface)}`); return res.ok ? res.json() : []; } });
   const { data: history = [] } = useQuery<any[]>({
     queryKey: ["/api/it/monitoring/history", selectedHost],
@@ -99,6 +108,14 @@ export default function ITNetworkOperations() {
       toast({ title: it.reportGenerated });
     },
   });
+  const generateMonthlyReport = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/it/monthly-reports/generate", { month: reportMonth, email: reportEmail }),
+    onSuccess: (report: any) => {
+      setSelectedMonthlyReport(report);
+      queryClient.invalidateQueries({ queryKey: ["/api/it/monthly-reports"] });
+      toast({ title: it.monthlyReportGenerated });
+    },
+  });
   const saveSettings = useMutation({
     mutationFn: () => apiRequest("PUT", "/api/it/report-settings", settings),
     onSuccess: () => toast({ title: it.reportSettings }),
@@ -117,6 +134,19 @@ export default function ITNetworkOperations() {
     return acc;
   }, {}));
   const historyChart = [...history].reverse().map(row => ({ time: new Date(row.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), latency: row.responseTimeMs || 0, online: row.isOnline ? 1 : 0 }));
+  const activeMonthlyReport = selectedMonthlyReport || monthlyReports[0];
+  const monthlyReportJson = activeMonthlyReport?.reportJson || {};
+  const reportInterfaces: string[] = monthlyReportJson.bandwidth?.interfaces || [];
+  const dailyBandwidthChart = Object.values((monthlyReportJson.bandwidth?.dailyAverages || []).reduce((days: Record<string, any>, row: any) => {
+    days[row.day] ||= { day: row.day };
+    days[row.day][row.interfaceName] = row.averageMbps;
+    return days;
+  }, {}));
+  const uptimeComparisonChart = Object.values((monthlyReportJson.uptimeComparison || []).reduce((months: Record<string, any>, row: any) => {
+    months[row.month] ||= { month: row.month };
+    months[row.month][row.hostName] = row.uptimePercent;
+    return months;
+  }, {}));
 
   return (
     <div className="space-y-6">
@@ -200,6 +230,49 @@ export default function ITNetworkOperations() {
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="w-5 h-5" />{it.monthlyReports}</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Input type="month" value={reportMonth} onChange={event => setReportMonth(event.target.value)} className="w-40" />
+                <Button onClick={() => generateMonthlyReport.mutate()} disabled={generateMonthlyReport.isPending || !/^\d{4}-(0[1-9]|1[0-2])$/.test(reportMonth)}>
+                  <FileText className="w-4 h-4 mr-2" />{it.generateMonthlyReport}
+                </Button>
+                <Button variant="outline" onClick={() => window.print()} disabled={!activeMonthlyReport}>{it.printReport}</Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {monthlyReports.map(report => <Button key={report.id} size="sm" variant={activeMonthlyReport?.id === report.id ? "default" : "outline"} onClick={() => setSelectedMonthlyReport(report)}>
+                  {report.monthKey}
+                </Button>)}
+              </div>
+              {activeMonthlyReport ? <div className="space-y-6 rounded-lg border p-4" id="monthly-network-report">
+                <div>
+                  <h3 className="text-lg font-semibold">{it.monthlyReports} · {activeMonthlyReport.monthKey}</h3>
+                  <p className="text-xs text-muted-foreground">{it.reportPeriod}: {monthlyReportJson.period?.from} → {monthlyReportJson.period?.to}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">{it.dailyAverageBandwidth}</h4>
+                  <div className="h-72">
+                    {dailyBandwidthChart.length > 0 ? <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={dailyBandwidthChart}><XAxis dataKey="day" tick={{ fontSize: 10 }} /><YAxis /><Tooltip />
+                        {reportInterfaces.map((name, index) => <Bar key={name} dataKey={name} name={name} fill={["#2563eb", "#f97316", "#16a34a", "#7c3aed"][index % 4]} />)}
+                      </BarChart>
+                    </ResponsiveContainer> : <p className="py-20 text-center text-muted-foreground">{it.noDataMessage}</p>}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">{it.uptimeComparison}</h4>
+                  <div className="h-72">
+                    {uptimeComparisonChart.length > 0 ? <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={uptimeComparisonChart}><XAxis dataKey="month" /><YAxis domain={[0, 100]} /><Tooltip />
+                        {Array.from(new Set((monthlyReportJson.uptimeComparison || []).map((row: any) => row.hostName))).map((name: any, index) => <Bar key={name} dataKey={name} name={name} fill={["#2563eb", "#f97316", "#16a34a", "#7c3aed"][index % 4]} />)}
+                      </BarChart>
+                    </ResponsiveContainer> : <p className="py-20 text-center text-muted-foreground">{it.noDataMessage}</p>}
+                  </div>
+                </div>
+              </div> : <p className="text-muted-foreground">{it.noMonthlyReports}</p>}
+            </CardContent>
+          </Card>
           <Card><CardHeader><CardTitle className="flex items-center gap-2"><FileText className="w-5 h-5" />{it.reports}</CardTitle></CardHeader><CardContent className="space-y-4">
             <div className="flex flex-wrap items-center gap-3"><Button onClick={() => generateReport.mutate()} disabled={generateReport.isPending}><FileText className="w-4 h-4 mr-2" />{it.generateReport}</Button><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={reportEmail} onChange={event => setReportEmail(event.target.checked)} />{it.reportEmail}</label></div>
             <div className="space-y-2">{reports.map(report => <div key={report.id} className="border rounded-lg p-3 flex items-center justify-between"><div><p className="font-medium">{report.weekStart} → {report.weekEnd}</p><p className="text-xs text-muted-foreground">{new Date(report.generatedAt).toLocaleString(language === "pt" ? "pt-PT" : "en-US")} · {report.emailedAt ? "Emailed" : "Stored"}</p></div><Badge variant="outline">{Object.keys(report.reportJson || {}).length} sections</Badge></div>)}</div>

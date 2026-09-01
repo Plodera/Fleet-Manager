@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculateAvailability } from "./itMonitor";
 import { getSafePollIntervalMinutes } from "./fortigateSync";
-import { aggregateBandwidthRows, buildFollowUpSummary, getPreviousWeekRange } from "./itMonitoringReports";
+import { aggregateBandwidthRows, buildFollowUpSummary, getMonthlyReportRange, getPreviousWeekRange } from "./itMonitoringReports";
 
 describe("internet and network monitoring calculations", () => {
   it("calculates availability from retained checks", () => {
@@ -26,6 +26,14 @@ describe("internet and network monitoring calculations", () => {
     const range = getPreviousWeekRange(new Date("2026-09-01T12:00:00Z"));
     expect(range.weekStart).toBe("2026-08-24");
     expect(range.weekEnd).toBe("2026-08-31");
+  });
+
+  it("builds a monthly report range with a five-month uptime comparison window", () => {
+    const range = getMonthlyReportRange("2026-05");
+    expect(range.monthKey).toBe("2026-05");
+    expect(range.from.toISOString()).toBe("2026-05-01T00:00:00.000Z");
+    expect(range.to.toISOString()).toBe("2026-06-01T00:00:00.000Z");
+    expect(range.comparisonFrom.toISOString()).toBe("2026-01-01T00:00:00.000Z");
   });
 
   it("tracks open, resolved, and overdue follow-up counts", () => {

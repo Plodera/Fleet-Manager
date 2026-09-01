@@ -137,6 +137,10 @@ export async function initDatabase() {
       id SERIAL PRIMARY KEY, week_start DATE NOT NULL UNIQUE, week_end DATE NOT NULL,
       report_json JSONB NOT NULL, generated_at TIMESTAMP NOT NULL DEFAULT NOW(), emailed_at TIMESTAMP
     )`).catch(() => {});
+    await _pool.query(`CREATE TABLE IF NOT EXISTS it_monthly_network_reports (
+      id SERIAL PRIMARY KEY, month_key DATE NOT NULL UNIQUE,
+      report_json JSONB NOT NULL, generated_at TIMESTAMP NOT NULL DEFAULT NOW(), emailed_at TIMESTAMP
+    )`).catch(() => {});
     await _pool.query(`CREATE INDEX IF NOT EXISTS it_host_checks_host_checked_idx ON it_host_checks(host_id, checked_at DESC)`).catch(() => {});
     await _pool.query(`CREATE INDEX IF NOT EXISTS it_host_checks_checked_idx ON it_host_checks(checked_at DESC)`).catch(() => {});
     await _pool.query(`CREATE INDEX IF NOT EXISTS it_network_issues_status_idx ON it_network_issues(status, started_at DESC)`).catch(() => {});

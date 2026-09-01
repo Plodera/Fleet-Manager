@@ -2603,6 +2603,32 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/it/monthly-reports', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    try {
+      res.json(await storage.getItMonthlyNetworkReports(Number(req.query.limit) || 20));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch monthly IT reports" });
+    }
+  });
+
+  app.post('/api/it/monthly-reports/generate', async (req, res) => {
+    const user = requireItOperations(req, res);
+    if (!user) return;
+    const month = String(req.body.month || "");
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+      return res.status(400).json({ message: "A valid report month is required" });
+    }
+    try {
+      const { generateMonthlyItReport } = await import("./itMonitoringReports");
+      const report = await generateMonthlyItReport({ month, email: !!req.body.email });
+      res.json(report);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to generate monthly IT report" });
+    }
+  });
+
   app.get('/api/it/kpis', async (req, res) => {
     try {
       const kpis = await storage.getItKpis();

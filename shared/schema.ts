@@ -1008,6 +1008,14 @@ export const itMonitoringReports = pgTable("it_monitoring_reports", {
   emailedAt: timestamp("emailed_at"),
 });
 
+export const itMonthlyNetworkReports = pgTable("it_monthly_network_reports", {
+  id: serial("id").primaryKey(),
+  monthKey: date("month_key").notNull().unique(),
+  reportJson: jsonb("report_json").notNull(),
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+  emailedAt: timestamp("emailed_at"),
+});
+
 export const itMonitoredHostsRelations = relations(itMonitoredHosts, ({ one, many }) => ({
   department: one(departments, { fields: [itMonitoredHosts.departmentId], references: [departments.id] }),
   statusHistory: many(itHostStatus),
@@ -1051,6 +1059,7 @@ export type ItNetworkIssueUpdate = typeof itNetworkIssueUpdates.$inferSelect;
 export type ItMonitoringSettings = typeof itMonitoringSettings.$inferSelect;
 export type InsertItMonitoringSettings = typeof itMonitoringSettings.$inferInsert;
 export type ItMonitoringReport = typeof itMonitoringReports.$inferSelect;
+export type ItMonthlyNetworkReport = typeof itMonthlyNetworkReports.$inferSelect;
 
 // Composite: host with latest status (from LEFT JOIN)
 export type ItHostWithStatus = ItMonitoredHost & {
