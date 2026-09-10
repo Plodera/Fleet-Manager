@@ -9,34 +9,54 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Mail, Send, Settings as SettingsIcon } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { useState } from "react";
 
 const emailSettingsSchema = z.object({
-  smtpHost: z.string().min(1, "SMTP host is required"),
+  provider: z.enum(["smtp", "microsoft_graph"]),
+  smtpHost: z.string(),
   smtpPort: z.coerce.number().min(1).max(65535),
-  smtpUser: z.string().min(1, "SMTP username is required"),
-  smtpPass: z.string().min(1, "SMTP password is required"),
+  smtpUser: z.string(),
+  smtpPass: z.string(),
   smtpSecure: z.boolean(),
   fromName: z.string().min(1, "From name is required"),
   fromEmail: z.string().email("Valid email required"),
   enabled: z.boolean(),
+}).superRefine((data, ctx) => {
+  if (data.provider !== "smtp") return;
+  for (const [path, value, message] of [
+    ["smtpHost", data.smtpHost, "SMTP host is required"],
+    ["smtpUser", data.smtpUser, "SMTP username is required"],
+    ["smtpPass", data.smtpPass, "SMTP password is required"],
+  ] as const) {
+    if (!value.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+  }
 });
 
 type EmailSettingsForm = z.infer<typeof emailSettingsSchema>;
+type EmailSettingsResponse = EmailSettingsForm & {
+  graphStatus?: {
+    configured: boolean;
+    tenantIdConfigured: boolean;
+    clientIdConfigured: boolean;
+    clientSecretConfigured: boolean;
+  };
+};
 
 export default function Settings() {
   const { toast } = useToast();
   const [testEmail, setTestEmail] = useState("");
 
-  const { data: settings, isLoading } = useQuery<EmailSettingsForm | null>({
+  const { data: settings, isLoading } = useQuery<EmailSettingsResponse | null>({
     queryKey: ["/api/settings/email"],
   });
 
   const form = useForm<EmailSettingsForm>({
     resolver: zodResolver(emailSettingsSchema),
     defaultValues: {
+      provider: "smtp",
       smtpHost: "",
       smtpPort: 465,
       smtpUser: "",
@@ -48,6 +68,7 @@ export default function Settings() {
     },
     values: settings ?? undefined,
   });
+  const provider = form.watch("provider");
 
   const saveMutation = useMutation({
     mutationFn: async (data: EmailSettingsForm) => {
@@ -115,7 +136,7 @@ export default function Settings() {
             <CardTitle>Email Configuration</CardTitle>
           </div>
           <CardDescription>
-            Configure SMTP settings to enable email notifications for booking approvals and status updates.
+            Configure SMTP or Microsoft Graph to enable email notifications and monitoring reports.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -143,7 +164,50 @@ export default function Settings() {
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="provider"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Provider</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-email-provider">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="smtp">SMTP</SelectItem>
+                        <SelectItem value="microsoft_graph">Microsoft 365 (Graph OAuth 2.0)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>Microsoft Graph is recommended when SMTP AUTH is disabled.</FormDescription>
+                  </FormItem>
+                )}
+              />
+
+              {provider === "microsoft_graph" && (
+                <div className={`rounded-lg border p-4 ${settings?.graphStatus?.configured ? "border-green-500/40 bg-green-500/5" : "border-amber-500/40 bg-amber-500/5"}`}>
+                  <p className="font-medium">
+                    Graph credentials: {settings?.graphStatus?.configured ? "Configured" : "Configuration required"}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Configure MICROSOFT_GRAPH_TENANT_ID, MICROSOFT_GRAPH_CLIENT_ID, and the secret
+                    MICROSOFT_GRAPH_CLIENT_SECRET. The Azure app requires Microsoft Graph application
+                    permission Mail.Send with administrator consent.
+                  </p>
+                  {!settings?.graphStatus?.configured && (
+                    <ul className="mt-2 text-sm text-muted-foreground list-disc pl-5">
+                      {!settings?.graphStatus?.tenantIdConfigured && <li>Tenant ID is missing</li>}
+                      {!settings?.graphStatus?.clientIdConfigured && <li>Client ID is missing</li>}
+                      {!settings?.graphStatus?.clientSecretConfigured && <li>Client secret is missing</li>}
+                    </ul>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {provider === "smtp" && (<>
                 <FormField
                   control={form.control}
                   name="smtpHost"
@@ -157,6 +221,7 @@ export default function Settings() {
                     </FormItem>
                   )}
                 />
+                </>)}
 
                 <FormField
                   control={form.control}
@@ -230,7 +295,7 @@ export default function Settings() {
                 />
               </div>
 
-              <FormField
+              {provider === "smtp" && <FormField
                 control={form.control}
                 name="smtpSecure"
                 render={({ field }) => (
@@ -250,7 +315,7 @@ export default function Settings() {
                     </FormControl>
                   </FormItem>
                 )}
-              />
+              />}
 
               <Button type="submit" disabled={saveMutation.isPending} data-testid="button-save-settings">
                 {saveMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

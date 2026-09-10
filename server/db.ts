@@ -175,6 +175,7 @@ export async function initDatabase() {
     await _pool.query(`CREATE INDEX IF NOT EXISTS it_network_issue_updates_issue_idx ON it_network_issue_updates(issue_id, created_at DESC)`).catch(() => {});
     await _pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS it_network_issues_open_dedupe_idx
       ON it_network_issues(host_id, issue_type) WHERE status <> 'resolved' AND host_id IS NOT NULL`).catch(() => {});
+    await _pool.query(`ALTER TABLE email_settings ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'smtp'`).catch(() => {});
 
     // Add breakdown alert recipients to factory_machines if not present
     await _pool.query(`ALTER TABLE factory_machines ADD COLUMN IF NOT EXISTS breakdown_alert_recipients TEXT[] NOT NULL DEFAULT '{}'`).catch(() => {});

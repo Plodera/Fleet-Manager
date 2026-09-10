@@ -939,7 +939,8 @@ export async function registerRoutes(
     const settings = await storage.getEmailSettings();
     if (settings) {
       // Mask password for security
-      res.json({ ...settings, smtpPass: settings.smtpPass ? "********" : "" });
+      const { getMicrosoftGraphStatus } = await import("./email");
+      res.json({ ...settings, smtpPass: settings.smtpPass ? "********" : "", graphStatus: getMicrosoftGraphStatus() });
     } else {
       res.json(null);
     }
@@ -951,10 +952,25 @@ export async function registerRoutes(
     if (user.role !== 'admin') return res.status(401).send("Unauthorized");
     try {
       const existing = await storage.getEmailSettings();
+      const provider = req.body.provider === "microsoft_graph" ? "microsoft_graph" : "smtp";
+      if (!req.body.fromName?.trim() || !req.body.fromEmail?.trim()) {
+        return res.status(400).json({ message: "From name and from email are required" });
+      }
+      if (provider === "smtp" && (!req.body.smtpHost?.trim() || !req.body.smtpUser?.trim() || !req.body.smtpPass)) {
+        return res.status(400).json({ message: "SMTP host, username, and password are required" });
+      }
       // If password is masked, keep the existing password
       const smtpPass = req.body.smtpPass === "********" && existing ? existing.smtpPass : req.body.smtpPass;
-      const settings = await storage.upsertEmailSettings({ ...req.body, smtpPass });
-      res.json({ ...settings, smtpPass: "********" });
+      const settings = await storage.upsertEmailSettings({
+        ...req.body,
+        provider,
+        smtpHost: req.body.smtpHost || "",
+        smtpPort: Number(req.body.smtpPort) || 465,
+        smtpUser: req.body.smtpUser || "",
+        smtpPass: smtpPass || "",
+      });
+      const { getMicrosoftGraphStatus } = await import("./email");
+      res.json({ ...settings, smtpPass: settings.smtpPass ? "********" : "", graphStatus: getMicrosoftGraphStatus() });
     } catch (err) {
       console.error("Email settings error:", err);
       res.status(400).json({ message: "Failed to save email settings" });

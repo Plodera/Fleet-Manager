@@ -2,6 +2,9 @@
 -- long-retention FortiGate bandwidth support.
 -- Safe to run repeatedly on an on-prem PostgreSQL installation.
 
+ALTER TABLE email_settings
+  ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'smtp';
+
 CREATE TABLE IF NOT EXISTS it_host_checks (
   id SERIAL PRIMARY KEY,
   host_id INTEGER NOT NULL REFERENCES it_monitored_hosts(id) ON DELETE CASCADE,

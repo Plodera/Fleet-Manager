@@ -8,6 +8,104 @@ interface EmailContent {
   body: string;
 }
 
+type EmailSettings = NonNullable<Awaited<ReturnType<typeof storage.getEmailSettings>>>;
+
+function getGraphConfiguration() {
+  return {
+    tenantId: process.env.MICROSOFT_GRAPH_TENANT_ID?.trim(),
+    clientId: process.env.MICROSOFT_GRAPH_CLIENT_ID?.trim(),
+    clientSecret: process.env.MICROSOFT_GRAPH_CLIENT_SECRET?.trim(),
+  };
+}
+
+export function getMicrosoftGraphStatus() {
+  const config = getGraphConfiguration();
+  return {
+    configured: Boolean(config.tenantId && config.clientId && config.clientSecret),
+    tenantIdConfigured: Boolean(config.tenantId),
+    clientIdConfigured: Boolean(config.clientId),
+    clientSecretConfigured: Boolean(config.clientSecret),
+  };
+}
+
+async function sendWithMicrosoftGraph(settings: EmailSettings, emailContent: EmailContent): Promise<void> {
+  const config = getGraphConfiguration();
+  if (!config.tenantId || !config.clientId || !config.clientSecret) {
+    throw new Error("Microsoft Graph is not fully configured. Set the tenant ID, client ID, and client secret.");
+  }
+
+  const tokenResponse = await fetch(
+    `https://login.microsoftonline.com/${encodeURIComponent(config.tenantId)}/oauth2/v2.0/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        scope: "https://graph.microsoft.com/.default",
+        grant_type: "client_credentials",
+      }),
+    },
+  );
+
+  const tokenPayload = await tokenResponse.json() as { access_token?: string; error_description?: string };
+  if (!tokenResponse.ok || !tokenPayload.access_token) {
+    throw new Error(tokenPayload.error_description || `Microsoft Graph authentication failed (${tokenResponse.status})`);
+  }
+
+  const sendResponse = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(settings.fromEmail)}/sendMail`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${tokenPayload.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          subject: emailContent.subject,
+          body: { contentType: "Text", content: emailContent.body },
+          toRecipients: [{ emailAddress: { address: emailContent.to } }],
+          from: { emailAddress: { name: settings.fromName, address: settings.fromEmail } },
+        },
+        saveToSentItems: true,
+      }),
+    },
+  );
+
+  if (!sendResponse.ok) {
+    const graphError = await sendResponse.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new Error(graphError?.error?.message || `Microsoft Graph sendMail failed (${sendResponse.status})`);
+  }
+}
+
+async function sendWithSmtp(settings: EmailSettings, emailContent: EmailContent): Promise<void> {
+  const transporter = nodemailer.createTransport({
+    host: settings.smtpHost,
+    port: settings.smtpPort,
+    secure: settings.smtpSecure,
+    auth: {
+      user: settings.smtpUser,
+      pass: settings.smtpPass,
+    },
+  });
+
+  await transporter.sendMail({
+    from: `"${settings.fromName}" <${settings.fromEmail}>`,
+    to: emailContent.to,
+    subject: emailContent.subject,
+    text: emailContent.body,
+  });
+}
+
+async function deliverEmail(settings: EmailSettings, emailContent: EmailContent): Promise<void> {
+  if (settings.provider === "microsoft_graph") {
+    await sendWithMicrosoftGraph(settings, emailContent);
+    return;
+  }
+  await sendWithSmtp(settings, emailContent);
+}
+
 export async function sendEmail(emailContent: EmailContent): Promise<boolean> {
   let settings;
   try {
@@ -27,24 +125,9 @@ export async function sendEmail(emailContent: EmailContent): Promise<boolean> {
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host: settings.smtpHost,
-      port: settings.smtpPort,
-      secure: settings.smtpSecure,
-      auth: {
-        user: settings.smtpUser,
-        pass: settings.smtpPass,
-      },
-    });
+    await deliverEmail(settings, emailContent);
 
-    await transporter.sendMail({
-      from: `"${settings.fromName}" <${settings.fromEmail}>`,
-      to: emailContent.to,
-      subject: emailContent.subject,
-      text: emailContent.body,
-    });
-
-    console.log(`Email sent successfully to ${emailContent.to}`);
+    console.log(`Email sent successfully to ${emailContent.to} using ${settings.provider}`);
     return true;
   } catch (error) {
     console.error("Failed to send email:", error);
@@ -207,21 +290,10 @@ export async function sendTestEmail(to: string): Promise<{ success: boolean; err
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host: settings.smtpHost,
-      port: settings.smtpPort,
-      secure: settings.smtpSecure,
-      auth: {
-        user: settings.smtpUser,
-        pass: settings.smtpPass,
-      },
-    });
-
-    await transporter.sendMail({
-      from: `"${settings.fromName}" <${settings.fromEmail}>`,
-      to: to,
+    await deliverEmail(settings, {
+      to,
       subject: "Test Email - FleetCmd Transport Management",
-      text: "This is a test email from the FleetCmd Transport Management System. If you received this email, your SMTP settings are configured correctly.",
+      body: `This is a test email from the FleetCmd Transport Management System. If you received this email, your ${settings.provider === "microsoft_graph" ? "Microsoft Graph" : "SMTP"} settings are configured correctly.`,
     });
 
     return { success: true };
