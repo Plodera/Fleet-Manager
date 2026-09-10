@@ -60,3 +60,9 @@ args = "npx vitest run --config vitest.config.ts"
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+MICROSOFT_GRAPH_TENANT_ID = "alerts@aisco.com.co"
+MICROSOFT_GRAPH_CLIENT_ID = "alerts@aisco.com.co"
