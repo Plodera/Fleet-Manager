@@ -1,0 +1,185 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { createTransportMock, getEmailSettingsMock, sendMailMock } = vi.hoisted(() => {
+  const sendMailMock = vi.fn();
+  return {
+    createTransportMock: vi.fn(() => ({ sendMail: sendMailMock })),
+    getEmailSettingsMock: vi.fn(),
+    sendMailMock,
+  };
+});
+
+vi.mock("nodemailer", () => ({
+  default: {
+    createTransport: createTransportMock,
+  },
+}));
+
+vi.mock("./storage", () => ({
+  storage: {
+    getEmailSettings: getEmailSettingsMock,
+  },
+}));
+
+import { sendTestEmail } from "./email";
+
+const graphSettings = {
+  id: 1,
+  provider: "microsoft_graph",
+  smtpHost: "",
+  smtpPort: 465,
+  smtpUser: "",
+  smtpPass: "",
+  smtpSecure: true,
+  fromName: "FleetCmd",
+  fromEmail: "fleet@example.com",
+  enabled: true,
+  updatedAt: new Date(),
+};
+
+const smtpSettings = {
+  ...graphSettings,
+  provider: "smtp",
+  smtpHost: "smtp.example.com",
+  smtpPort: 587,
+  smtpUser: "fleet@example.com",
+  smtpPass: "smtp-password",
+  smtpSecure: false,
+};
+
+function mockJsonResponse(status: number, payload: unknown) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: vi.fn().mockResolvedValue(payload),
+  };
+}
+
+describe("email delivery providers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubEnv("MICROSOFT_GRAPH_TENANT_ID", "tenant-id");
+    vi.stubEnv("MICROSOFT_GRAPH_CLIENT_ID", "client-id");
+    vi.stubEnv("MICROSOFT_GRAPH_CLIENT_SECRET", "client-secret");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("acquires a token and sends mail through Microsoft Graph", async () => {
+    getEmailSettingsMock.mockResolvedValue(graphSettings);
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(mockJsonResponse(200, { access_token: "access-token" }) as Response)
+      .mockResolvedValueOnce(mockJsonResponse(202, {}) as Response);
+
+    await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({ success: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://login.microsoftonline.com/tenant-id/oauth2/v2.0/token",
+    );
+    const tokenRequest = fetchMock.mock.calls[0][1];
+    expect(tokenRequest).toMatchObject({
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    expect(tokenRequest?.body?.toString()).toContain("grant_type=client_credentials");
+    expect(tokenRequest?.body?.toString()).toContain(
+      "scope=https%3A%2F%2Fgraph.microsoft.com%2F.default",
+    );
+
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "https://graph.microsoft.com/v1.0/users/fleet%40example.com/sendMail",
+    );
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({
+      method: "POST",
+      headers: {
+        Authorization: "Bearer access-token",
+        "Content-Type": "application/json",
+      },
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toMatchObject({
+      message: {
+        toRecipients: [{ emailAddress: { address: "recipient@example.com" } }],
+        from: { emailAddress: { name: "FleetCmd", address: "fleet@example.com" } },
+      },
+      saveToSentItems: true,
+    });
+  });
+
+  it("reports missing Microsoft Graph configuration before making a request", async () => {
+    getEmailSettingsMock.mockResolvedValue(graphSettings);
+    vi.stubEnv("MICROSOFT_GRAPH_CLIENT_SECRET", "");
+
+    await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({
+      success: false,
+      error: "Microsoft Graph is not fully configured. Set the tenant ID, client ID, and client secret.",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("reports invalid Microsoft Graph client credentials", async () => {
+    getEmailSettingsMock.mockResolvedValue(graphSettings);
+    vi.mocked(fetch).mockResolvedValueOnce(
+      mockJsonResponse(401, {
+        error: "invalid_client",
+        error_description: "Invalid client secret provided.",
+      }) as Response,
+    );
+
+    await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({
+      success: false,
+      error: "Invalid client secret provided.",
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a missing Mail.Send application permission", async () => {
+    getEmailSettingsMock.mockResolvedValue(graphSettings);
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(mockJsonResponse(200, { access_token: "access-token" }) as Response)
+      .mockResolvedValueOnce(
+        mockJsonResponse(403, {
+          error: {
+            code: "Authorization_RequestDenied",
+            message: "Insufficient privileges to complete the operation.",
+          },
+        }) as Response,
+      );
+
+    await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({
+      success: false,
+      error: "Insufficient privileges to complete the operation.",
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("continues to deliver through SMTP when SMTP is selected", async () => {
+    getEmailSettingsMock.mockResolvedValue(smtpSettings);
+    sendMailMock.mockResolvedValue({ messageId: "message-id" });
+
+    await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({ success: true });
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(createTransportMock).toHaveBeenCalledWith({
+      host: "smtp.example.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: "fleet@example.com",
+        pass: "smtp-password",
+      },
+    });
+    expect(sendMailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: '"FleetCmd" <fleet@example.com>',
+        to: "recipient@example.com",
+        subject: "Test Email - FleetCmd Transport Management",
+      }),
+    );
+  });
+});
