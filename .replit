@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "postgresql-16", "python-3.11"]
+modules = ["nodejs-20", "web", "python-3.11", "postgresql-16"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
@@ -64,5 +64,5 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.shared]
-MICROSOFT_GRAPH_TENANT_ID = "alerts@aisco.com.co"
-MICROSOFT_GRAPH_CLIENT_ID = "alerts@aisco.com.co"
+MICROSOFT_GRAPH_TENANT_ID = "ea9bc542-8b40-4eac-a81a-38f7fce4efd8"
+MICROSOFT_GRAPH_CLIENT_ID = "93eab273-60b4-4015-82a9-7cc0e217e48d"
