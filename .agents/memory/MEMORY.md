@@ -1,1 +1,2 @@
 - [On-prem DB schema sync](onprem-db-sync.md) — on-prem PostgreSQL missing enum values (booking_status); fix with ALTER TYPE ADD VALUE IF NOT EXISTS.
+- [Microsoft 365 email provider](microsoft-365-email.md) — prefer app-only Microsoft Graph for M365; retain SMTP as a selectable fallback.
