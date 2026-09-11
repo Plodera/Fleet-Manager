@@ -201,6 +201,9 @@ describe("email delivery providers", () => {
       host: "smtp.example.com",
       port: 587,
       secure: false,
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
       auth: {
         user: "fleet@example.com",
         pass: "smtp-password",
@@ -213,5 +216,32 @@ describe("email delivery providers", () => {
         subject: "Test Email - FleetCmd Transport Management",
       }),
     );
+  });
+
+  it("reports an actionable error when the SMTP connection times out", async () => {
+    getEmailSettingsMock.mockResolvedValue(smtpSettings);
+    sendMailMock.mockRejectedValue(
+      Object.assign(new Error("Connection timeout"), { code: "ETIMEDOUT" }),
+    );
+
+    await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({
+      success: false,
+      error: "SMTP connection to smtp.example.com:587 timed out. Check the SMTP host, port, firewall, and network connectivity, then try again.",
+    });
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports an actionable error when the SMTP socket times out", async () => {
+    getEmailSettingsMock.mockResolvedValue(smtpSettings);
+    sendMailMock.mockRejectedValue(
+      Object.assign(new Error("Socket timed out while sending"), { code: "ESOCKET" }),
+    );
+
+    await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({
+      success: false,
+      error: "SMTP connection to smtp.example.com:587 timed out. Check the SMTP host, port, firewall, and network connectivity, then try again.",
+    });
   });
 });

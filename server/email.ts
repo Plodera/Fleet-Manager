@@ -11,6 +11,9 @@ interface EmailContent {
 type EmailSettings = NonNullable<Awaited<ReturnType<typeof storage.getEmailSettings>>>;
 
 const MICROSOFT_GRAPH_TIMEOUT_MS = 10_000;
+const SMTP_CONNECTION_TIMEOUT_MS = 10_000;
+const SMTP_GREETING_TIMEOUT_MS = 10_000;
+const SMTP_SOCKET_TIMEOUT_MS = 15_000;
 
 async function fetchMicrosoftGraph(
   url: string,
@@ -111,18 +114,35 @@ async function sendWithSmtp(settings: EmailSettings, emailContent: EmailContent)
     host: settings.smtpHost,
     port: settings.smtpPort,
     secure: settings.smtpSecure,
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
     auth: {
       user: settings.smtpUser,
       pass: settings.smtpPass,
     },
   });
 
-  await transporter.sendMail({
-    from: `"${settings.fromName}" <${settings.fromEmail}>`,
-    to: emailContent.to,
-    subject: emailContent.subject,
-    text: emailContent.body,
-  });
+  try {
+    await transporter.sendMail({
+      from: `"${settings.fromName}" <${settings.fromEmail}>`,
+      to: emailContent.to,
+      subject: emailContent.subject,
+      text: emailContent.body,
+    });
+  } catch (error) {
+    const smtpError = error as NodeJS.ErrnoException;
+    if (
+      smtpError.code === "ETIMEDOUT"
+      || smtpError.code === "ESOCKET"
+      || /\b(?:time[ -]?out|timed out)\b/i.test(smtpError.message ?? "")
+    ) {
+      throw new Error(
+        `SMTP connection to ${settings.smtpHost}:${settings.smtpPort} timed out. Check the SMTP host, port, firewall, and network connectivity, then try again.`,
+      );
+    }
+    throw error;
+  }
 }
 
 async function deliverEmail(settings: EmailSettings, emailContent: EmailContent): Promise<void> {
