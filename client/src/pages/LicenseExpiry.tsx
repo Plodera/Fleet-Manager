@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Bell, CalendarClock, Check, Download, Eye, FileSpreadsheet, Pencil, Plus, Search, Trash2, Upload, UserCheck, X } from "lucide-react";
+import { Bell, CalendarClock, Check, ChevronDown, Download, Eye, FileSpreadsheet, Pencil, Plus, Search, ShieldCheck, Trash2, Upload, UserCheck, X } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { useLanguage } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
@@ -116,6 +116,7 @@ export default function LicenseExpiry() {
   const [complianceFilter, setComplianceFilter] = useState<"all" | ComplianceState>("all");
   const [editingCompliance, setEditingCompliance] = useState<Resource | null>(null);
   const [documentVehicle, setDocumentVehicle] = useState<Resource | null>(null);
+  const [selectedComplianceId, setSelectedComplianceId] = useState<number | null>(null);
   const [complianceForm, setComplianceForm] = useState(blankCompliance);
   const [importDialog, setImportDialog] = useState(false);
   const [importRows, setImportRows] = useState<ParsedComplianceRow[]>([]);
@@ -269,6 +270,15 @@ export default function LicenseExpiry() {
     if (states.includes("valid")) return "valid";
     return "missing";
   };
+  const nearestExpiry = (vehicle: Resource) => {
+    const dates = [
+      { date: vehicle.licenseExpiryDate, label: le.vehicleLicenseExpiry },
+      { date: vehicle.ownershipExpiryDate, label: le.dateLimit },
+      { date: vehicle.insuranceExpiryDate, label: le.insuranceExpiry },
+      { date: vehicle.ivmExpiryDate, label: le.ivmExpiry },
+    ].filter((item): item is { date: string; label: string } => Boolean(item.date));
+    return dates.sort((a, b) => new Date(`${a.date}T00:00:00`).getTime() - new Date(`${b.date}T00:00:00`).getTime())[0] || null;
+  };
   const filteredComplianceVehicles = complianceVehicles.filter(vehicle => {
     const query = complianceSearch.trim().toLowerCase();
     const matchesSearch = !query || [vehicle.licensePlate, vehicle.make, vehicle.model, vehicle.insuranceNumber, vehicle.ivmNumber]
@@ -384,10 +394,10 @@ export default function LicenseExpiry() {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input className="pl-9" value={complianceSearch} onChange={event => setComplianceSearch(event.target.value)} placeholder={le.searchCompliance} />
+                  <Input aria-label={le.searchCompliance} className="pl-9" value={complianceSearch} onChange={event => setComplianceSearch(event.target.value)} placeholder={le.searchCompliance} />
                 </div>
                 <Select value={complianceFilter} onValueChange={value => setComplianceFilter(value as typeof complianceFilter)}>
-                  <SelectTrigger className="sm:w-52"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label={le.filterCompliance} className="sm:w-52"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{le.allStatuses}</SelectItem>
                     <SelectItem value="expired">{le.complianceStates.expired}</SelectItem>
@@ -399,42 +409,53 @@ export default function LicenseExpiry() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto rounded-md border">
-                <Table className="min-w-[1250px]">
-                  <TableHeader><TableRow>
-                    <TableHead>{le.vehicle}</TableHead>
-                    <TableHead>{le.vehicleLicenseExpiry}</TableHead>
-                    <TableHead>{le.ownership}</TableHead>
-                    <TableHead>{le.dateLimit}</TableHead>
-                    <TableHead>{le.insuranceNumber}</TableHead>
-                    <TableHead>{le.policyNumber}</TableHead>
-                    <TableHead>{le.insuranceExpiry}</TableHead>
-                    <TableHead>{le.ivmNumber}</TableHead>
-                    <TableHead>{le.ivmPaymentTerms}</TableHead>
-                    <TableHead>{le.ivmExpiry}</TableHead>
-                    {isAdmin && <TableHead className="text-right">{le.actions}</TableHead>}
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {filteredComplianceVehicles.map(vehicle => <TableRow key={vehicle.id}>
-                      <TableCell>
-                        <p className="font-medium">{vehicle.licensePlate}</p>
-                        <p className="text-xs text-muted-foreground">{[vehicle.make, vehicle.model, vehicle.color].filter(Boolean).join(" · ")}</p>
-                        {vehicle.vehicleTypeLabel && <p className="text-xs text-muted-foreground">{vehicle.vehicleTypeLabel}</p>}
-                      </TableCell>
-                      <TableCell><div className="space-y-1"><span className="text-xs">{vehicle.licenseExpiryDate || "—"}</span><ComplianceBadge date={vehicle.licenseExpiryDate} labels={le} /></div></TableCell>
-                      <TableCell>{vehicle.ownershipDocumentType || "—"}</TableCell>
-                      <TableCell><div className="space-y-1"><span className="text-xs">{vehicle.ownershipExpiryDate || "—"}</span><ComplianceBadge date={vehicle.ownershipExpiryDate} labels={le} /></div></TableCell>
-                      <TableCell>{vehicle.insuranceNumber || "—"}</TableCell>
-                      <TableCell>{vehicle.insurancePolicyNumber || "—"}</TableCell>
-                      <TableCell><div className="space-y-1"><span className="text-xs">{vehicle.insuranceExpiryDate || "—"}</span><ComplianceBadge date={vehicle.insuranceExpiryDate} labels={le} />{vehicle.insuranceImportedStatus && <p className="text-xs text-muted-foreground">{le.imported}: {vehicle.insuranceImportedStatus}</p>}</div></TableCell>
-                      <TableCell>{vehicle.ivmNumber || "—"}</TableCell>
-                      <TableCell>{vehicle.ivmPaymentTerms || "—"}</TableCell>
-                      <TableCell><div className="space-y-1"><span className="text-xs">{vehicle.ivmExpiryDate || "—"}</span><ComplianceBadge date={vehicle.ivmExpiryDate} labels={le} />{vehicle.ivmImportedStatus && <p className="text-xs text-muted-foreground">{le.imported}: {vehicle.ivmImportedStatus}</p>}</div></TableCell>
-                      {isAdmin && <TableCell className="text-right"><div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={() => setDocumentVehicle(vehicle)}><FileSpreadsheet className="mr-1 h-3.5 w-3.5" />{le.documents}</Button><Button size="sm" variant="outline" onClick={() => openCompliance(vehicle)}><Pencil className="mr-1 h-3.5 w-3.5" />{t.buttons.edit}</Button></div></TableCell>}
-                    </TableRow>)}
-                    {filteredComplianceVehicles.length === 0 && <TableRow><TableCell colSpan={11} className="h-28 text-center text-muted-foreground">{le.noComplianceRecords}</TableCell></TableRow>}
-                  </TableBody>
-                </Table>
+              <div className="space-y-2">
+                <div className="hidden items-center gap-4 rounded-lg bg-muted/45 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_32px]">
+                  <span>{le.vehicle}</span><span>{le.status}</span><span>{le.priorityExpiry}</span><span />
+                </div>
+                {filteredComplianceVehicles.map(vehicle => {
+                  const state = overallState(vehicle);
+                  const selected = selectedComplianceId === vehicle.id;
+                   const urgentExpiry = nearestExpiry(vehicle);
+                  const stateClass = state === "expired" ? "border-red-200 bg-red-50/45 dark:border-red-900/60 dark:bg-red-950/15" : state === "expiring" ? "border-amber-200 bg-amber-50/45 dark:border-amber-900/60 dark:bg-amber-950/15" : state === "valid" ? "border-emerald-200 bg-emerald-50/35 dark:border-emerald-900/60 dark:bg-emerald-950/15" : "border-border bg-card";
+                  const detailRows = [
+                    [le.vehicleLicenseExpiry, vehicle.licenseExpiryDate, true],
+                    [le.ownership, vehicle.ownershipDocumentType, false],
+                    [le.dateLimit, vehicle.ownershipExpiryDate, true],
+                    [le.insuranceNumber, vehicle.insuranceNumber, false],
+                    [le.policyNumber, vehicle.insurancePolicyNumber, false],
+                    [le.insuranceExpiry, vehicle.insuranceExpiryDate, true],
+                    [`${le.imported} · ${le.insuranceExpiry}`, vehicle.insuranceImportedStatus, false],
+                    [le.ivmNumber, vehicle.ivmNumber, false],
+                    [le.ivmPaymentTerms, vehicle.ivmPaymentTerms, false],
+                    [le.ivmExpiry, vehicle.ivmExpiryDate, true],
+                    [`${le.imported} · ${le.ivmExpiry}`, vehicle.ivmImportedStatus, false],
+                  ] as Array<[string, string | null | undefined, boolean]>;
+                  return <div key={vehicle.id} className={`overflow-hidden rounded-xl border transition-colors ${stateClass}`}>
+                    <button type="button" className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 text-left md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_32px]" onClick={() => setSelectedComplianceId(selected ? null : vehicle.id)} aria-expanded={selected} aria-controls={`compliance-details-${vehicle.id}`}>
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2"><span className="font-semibold tracking-wide">{vehicle.licensePlate || le.vehicle}</span>{vehicle.vehicleTypeLabel && <span className="hidden rounded-full bg-background/70 px-2 py-0.5 text-[11px] text-muted-foreground sm:inline">{vehicle.vehicleTypeLabel}</span>}</span>
+                        <span className="mt-0.5 block truncate text-sm text-muted-foreground">{[vehicle.make, vehicle.model, vehicle.color].filter(Boolean).join(" · ") || "—"}</span>
+                      </span>
+                      <span className="col-start-1 row-start-2 min-w-0 md:col-start-auto md:row-start-auto"><ComplianceBadge date={state === "missing" ? null : urgentExpiry?.date} labels={le} /></span>
+                      <span className="col-start-2 row-start-2 min-w-0 text-right text-sm md:col-start-auto md:row-start-auto md:text-left"><span className="block truncate text-xs text-muted-foreground">{urgentExpiry?.label || le.priorityExpiry}</span><span className="font-medium">{urgentExpiry?.date || "—"}</span></span>
+                      <ChevronDown className={`col-start-2 row-start-1 h-4 w-4 justify-self-end text-muted-foreground transition-transform md:col-start-auto md:row-start-auto ${selected ? "rotate-180" : ""}`} />
+                    </button>
+                    {selected && <div id={`compliance-details-${vehicle.id}`} role="region" aria-label={`${le.details}: ${vehicle.licensePlate || le.vehicle}`} className="border-t border-inherit bg-background/60 px-4 py-4">
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{le.vehicle}</p><p className="text-lg font-semibold">{[vehicle.make, vehicle.model].filter(Boolean).join(" ") || vehicle.licensePlate} <span className="text-muted-foreground">· {vehicle.licensePlate}</span></p></div>
+                        <div className="flex flex-wrap gap-2">
+                          {isAdmin && <><Button size="sm" variant="outline" onClick={() => setDocumentVehicle(vehicle)}><FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />{le.documents}</Button><Button size="sm" onClick={() => openCompliance(vehicle)}><Pencil className="mr-1.5 h-3.5 w-3.5" />{t.buttons.edit}</Button></>}
+                        </div>
+                      </div>
+                      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {detailRows.map(([label, value, date]) => <div key={label} className="min-w-0"><p className="text-xs font-medium text-muted-foreground">{label}</p><div className="mt-1 flex flex-wrap items-center gap-2 text-sm">{value || "—"}{date && value && <ComplianceBadge date={value} labels={le} />}</div></div>)}
+                      </div>
+                      <div className="mt-4 flex items-center gap-2 border-t pt-3 text-xs text-muted-foreground"><ShieldCheck className="h-4 w-4 text-primary" />{le.vehicleComplianceDescription}</div>
+                    </div>}
+                  </div>;
+                })}
+                {filteredComplianceVehicles.length === 0 && <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">{le.noComplianceRecords}</div>}
               </div>
             </CardContent>
           </Card>
