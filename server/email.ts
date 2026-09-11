@@ -14,6 +14,73 @@ const MICROSOFT_GRAPH_TIMEOUT_MS = 10_000;
 const SMTP_CONNECTION_TIMEOUT_MS = 10_000;
 const SMTP_GREETING_TIMEOUT_MS = 10_000;
 const SMTP_SOCKET_TIMEOUT_MS = 15_000;
+export const EMAIL_DELIVERY_FAILURE_THRESHOLD = 3;
+
+export interface EmailDeliveryHealth {
+  status: "healthy" | "warning";
+  consecutiveFailures: number;
+  failureThreshold: number;
+  warningSince: string | null;
+  lastFailureAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+}
+
+let emailDeliveryHealth: EmailDeliveryHealth = {
+  status: "healthy",
+  consecutiveFailures: 0,
+  failureThreshold: EMAIL_DELIVERY_FAILURE_THRESHOLD,
+  warningSince: null,
+  lastFailureAt: null,
+  lastSuccessAt: null,
+  lastError: null,
+};
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown email provider error";
+}
+
+function recordDeliveryFailure(error: unknown): void {
+  const now = new Date().toISOString();
+  const consecutiveFailures = emailDeliveryHealth.consecutiveFailures + 1;
+  const warningActive = consecutiveFailures >= EMAIL_DELIVERY_FAILURE_THRESHOLD;
+  emailDeliveryHealth = {
+    ...emailDeliveryHealth,
+    status: warningActive ? "warning" : "healthy",
+    consecutiveFailures,
+    warningSince: warningActive ? (emailDeliveryHealth.warningSince ?? now) : null,
+    lastFailureAt: now,
+    lastError: errorMessage(error),
+  };
+}
+
+function recordDeliverySuccess(): void {
+  emailDeliveryHealth = {
+    status: "healthy",
+    consecutiveFailures: 0,
+    failureThreshold: EMAIL_DELIVERY_FAILURE_THRESHOLD,
+    warningSince: null,
+    lastFailureAt: emailDeliveryHealth.lastFailureAt,
+    lastSuccessAt: new Date().toISOString(),
+    lastError: null,
+  };
+}
+
+export function getEmailDeliveryHealth(): EmailDeliveryHealth {
+  return { ...emailDeliveryHealth };
+}
+
+export function resetEmailDeliveryHealth(): void {
+  emailDeliveryHealth = {
+    status: "healthy",
+    consecutiveFailures: 0,
+    failureThreshold: EMAIL_DELIVERY_FAILURE_THRESHOLD,
+    warningSince: null,
+    lastFailureAt: null,
+    lastSuccessAt: null,
+    lastError: null,
+  };
+}
 
 async function fetchMicrosoftGraph(
   url: string,
@@ -146,11 +213,17 @@ async function sendWithSmtp(settings: EmailSettings, emailContent: EmailContent)
 }
 
 async function deliverEmail(settings: EmailSettings, emailContent: EmailContent): Promise<void> {
-  if (settings.provider === "microsoft_graph") {
-    await sendWithMicrosoftGraph(settings, emailContent);
-    return;
+  try {
+    if (settings.provider === "microsoft_graph") {
+      await sendWithMicrosoftGraph(settings, emailContent);
+    } else {
+      await sendWithSmtp(settings, emailContent);
+    }
+    recordDeliverySuccess();
+  } catch (error) {
+    recordDeliveryFailure(error);
+    throw error;
   }
-  await sendWithSmtp(settings, emailContent);
 }
 
 export async function sendEmail(emailContent: EmailContent): Promise<boolean> {

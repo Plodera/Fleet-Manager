@@ -1,13 +1,15 @@
 import { useEffect } from "react";
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, Link } from "wouter";
 import { queryClient, SESSION_INVALIDATED_EVENT } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Sidebar } from "@/components/Sidebar";
 import { LanguageProvider, useLanguage } from "@/lib/i18n";
+import { AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Pages
 import Dashboard from "@/pages/Dashboard";
@@ -41,6 +43,38 @@ import FactoryMachines from "@/pages/FactoryMachines";
 import FactoryMachineTypeConfig from "@/pages/FactoryMachineTypeConfig";
 import MachineStatus from "@/pages/MachineStatus";
 import LicenseExpiry from "@/pages/LicenseExpiry";
+
+type EmailDeliveryHealth = {
+  status: "healthy" | "warning";
+  consecutiveFailures: number;
+  lastError: string | null;
+};
+
+function AdminEmailHealthWarning() {
+  const { data } = useQuery<EmailDeliveryHealth>({
+    queryKey: ["/api/settings/email/health"],
+    refetchInterval: 30_000,
+  });
+
+  if (data?.status !== "warning") return null;
+
+  return (
+    <Alert variant="destructive" className="mb-6 bg-destructive/5" data-testid="alert-email-delivery-health">
+      <AlertTriangle className="h-4 w-4" />
+      <AlertTitle>Email delivery is failing</AlertTitle>
+      <AlertDescription>
+        <p>
+          The email provider has failed {data.consecutiveFailures} consecutive delivery attempts.
+          Important notifications may not be reaching recipients.
+        </p>
+        {data.lastError && <p className="mt-1">Latest error: {data.lastError}</p>}
+        <Link href="/settings" className="mt-2 inline-block font-medium underline underline-offset-4">
+          Review email settings
+        </Link>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 function PrivateRoute({ component: Component, adminOnly = false, requiredPermission, anyPermission, driverOnly = false, noShell = false }: { component: React.ComponentType, adminOnly?: boolean, requiredPermission?: string, anyPermission?: string[], driverOnly?: boolean, noShell?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -77,6 +111,7 @@ function PrivateRoute({ component: Component, adminOnly = false, requiredPermiss
       <Sidebar />
       <main className="flex-1 p-8 overflow-y-auto h-screen w-full">
         <div className="max-w-7xl mx-auto pb-12">
+          {user.role === "admin" && <AdminEmailHealthWarning />}
           <Component />
         </div>
       </main>

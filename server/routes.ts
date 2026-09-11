@@ -7,7 +7,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { sendBookingNotification, sendBookingStatusUpdate, sendTripStatusToApprover, sendBreakdownAlertEmail } from "./email";
+import { getEmailDeliveryHealth, sendBookingNotification, sendBookingStatusUpdate, sendTripStatusToApprover, sendBreakdownAlertEmail } from "./email";
 import { scheduleTrackerNotifications, runChecksForTracker } from "./trackerNotifications";
 import { scheduleLicenseExpiryNotifications, runLicenseExpiryChecks } from "./licenseExpiryNotifications";
 import type { User } from "@shared/schema";
@@ -944,6 +944,13 @@ export async function registerRoutes(
     } else {
       res.json(null);
     }
+  });
+
+  app.get("/api/settings/email/health", (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== "admin") return res.status(403).send("Forbidden");
+    res.json(getEmailDeliveryHealth());
   });
 
   app.put("/api/settings/email", async (req, res) => {

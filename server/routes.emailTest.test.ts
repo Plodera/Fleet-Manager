@@ -3,12 +3,13 @@ import express from "express";
 import http from "http";
 import request from "supertest";
 
-const { authState, sendTestEmailMock } = vi.hoisted(() => ({
+const { authState, sendTestEmailMock, getEmailDeliveryHealthMock } = vi.hoisted(() => ({
   authState: {
     authenticated: false,
     user: undefined as { id: number; role: string; permissions: string[] } | undefined,
   },
   sendTestEmailMock: vi.fn(),
+  getEmailDeliveryHealthMock: vi.fn(),
 }));
 
 vi.mock("./storage", () => ({
@@ -40,6 +41,7 @@ vi.mock("./email", () => ({
   sendBreakdownAlertEmail: vi.fn(),
   sendTestEmail: sendTestEmailMock,
   getMicrosoftGraphStatus: vi.fn(),
+  getEmailDeliveryHealth: getEmailDeliveryHealthMock,
 }));
 
 vi.mock("./trackerNotifications", () => ({
@@ -67,6 +69,15 @@ describe("POST /api/settings/email/test", () => {
     vi.clearAllMocks();
     authState.authenticated = true;
     authState.user = { id: 1, role: "admin", permissions: [] };
+    getEmailDeliveryHealthMock.mockReturnValue({
+      status: "warning",
+      consecutiveFailures: 3,
+      failureThreshold: 3,
+      warningSince: "2026-09-11T10:00:00.000Z",
+      lastFailureAt: "2026-09-11T10:00:00.000Z",
+      lastSuccessAt: null,
+      lastError: "Provider unavailable",
+    });
   });
 
   afterAll(() => {
@@ -165,5 +176,25 @@ describe("POST /api/settings/email/test", () => {
       success: false,
       message: "Microsoft Graph is unavailable",
     });
+  });
+
+  it("returns email delivery health to administrators", async () => {
+    const response = await request(app).get("/api/settings/email/health");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      status: "warning",
+      consecutiveFailures: 3,
+      lastError: "Provider unavailable",
+    });
+  });
+
+  it("does not expose email delivery health to non-admin users", async () => {
+    authState.user = { id: 2, role: "user", permissions: [] };
+
+    const response = await request(app).get("/api/settings/email/health");
+
+    expect(response.status).toBe(403);
+    expect(response.text).toBe("Forbidden");
   });
 });

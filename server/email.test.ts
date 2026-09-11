@@ -21,7 +21,12 @@ vi.mock("./storage", () => ({
   },
 }));
 
-import { sendTestEmail } from "./email";
+import {
+  EMAIL_DELIVERY_FAILURE_THRESHOLD,
+  getEmailDeliveryHealth,
+  resetEmailDeliveryHealth,
+  sendTestEmail,
+} from "./email";
 
 const graphSettings = {
   id: 1,
@@ -58,6 +63,7 @@ function mockJsonResponse(status: number, payload: unknown) {
 describe("email delivery providers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetEmailDeliveryHealth();
     vi.stubGlobal("fetch", vi.fn());
     vi.stubEnv("MICROSOFT_GRAPH_TENANT_ID", "tenant-id");
     vi.stubEnv("MICROSOFT_GRAPH_CLIENT_ID", "client-id");
@@ -243,5 +249,46 @@ describe("email delivery providers", () => {
       success: false,
       error: "SMTP connection to smtp.example.com:587 timed out. Check the SMTP host, port, firewall, and network connectivity, then try again.",
     });
+  });
+
+  it("raises a warning after repeated provider failures without throwing", async () => {
+    getEmailSettingsMock.mockResolvedValue(smtpSettings);
+    sendMailMock.mockRejectedValue(new Error("Provider unavailable"));
+
+    for (let attempt = 1; attempt <= EMAIL_DELIVERY_FAILURE_THRESHOLD; attempt += 1) {
+      await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({
+        success: false,
+        error: "Provider unavailable",
+      });
+    }
+
+    expect(getEmailDeliveryHealth()).toMatchObject({
+      status: "warning",
+      consecutiveFailures: EMAIL_DELIVERY_FAILURE_THRESHOLD,
+      failureThreshold: EMAIL_DELIVERY_FAILURE_THRESHOLD,
+      lastError: "Provider unavailable",
+    });
+    expect(getEmailDeliveryHealth().warningSince).not.toBeNull();
+  });
+
+  it("clears the warning after a successful delivery", async () => {
+    getEmailSettingsMock.mockResolvedValue(smtpSettings);
+    sendMailMock.mockRejectedValue(new Error("Provider unavailable"));
+
+    for (let attempt = 0; attempt < EMAIL_DELIVERY_FAILURE_THRESHOLD; attempt += 1) {
+      await sendTestEmail("recipient@example.com");
+    }
+    expect(getEmailDeliveryHealth().status).toBe("warning");
+
+    sendMailMock.mockResolvedValueOnce({ messageId: "recovered" });
+    await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({ success: true });
+
+    expect(getEmailDeliveryHealth()).toMatchObject({
+      status: "healthy",
+      consecutiveFailures: 0,
+      warningSince: null,
+      lastError: null,
+    });
+    expect(getEmailDeliveryHealth().lastSuccessAt).not.toBeNull();
   });
 });
