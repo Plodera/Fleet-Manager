@@ -1,0 +1,238 @@
+aiscoweb@aiscoweb:~$ cd /opt/fleetcmd
+git pull origin main
+pnpm install
+pnpm run check
+pnpm run build
+pm2 restart fleetcmd --update-env
+pm2 logs fleetcmd --lines 50
+remote: Enumerating objects: 46, done.
+remote: Counting objects: 100% (46/46), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 27 (delta 19), reused 27 (delta 19), pack-reused 0 (from 0)
+Unpacking objects: 100% (27/27), 235.55 KiB | 332.00 KiB/s, done.
+From https://github.com/Plodera/Fleet-Manager
+ * branch            main       -> FETCH_HEAD
+   7f1b526..eba39f3  main       -> origin/main
+Updating 7f1b526..eba39f3
+Fast-forward
+ .agents/memory/microsoft-365-email.md       |   4 +-
+ attached_assets/image_1789088308308.png     | Bin 0 -> 150964 bytes
+ attached_assets/image_1789088944670.png     | Bin 0 -> 105468 bytes
+ client/src/pages/Settings.tsx               |  83 +++++++++++++++++++++-------
+ screenshots/graph-settings-admin-fields.jpg | Bin 0 -> 29784 bytes
+ server/credentialEncryption.test.ts         |  24 ++++++++
+ server/credentialEncryption.ts              |  34 ++++++++++++
+ server/db.ts                                |   3 +
+ server/email.test.ts                        |   3 +
+ server/email.ts                             |  29 +++++++---
+ server/routes.ts                            |  33 ++++++++++-
+ shared/schema.ts                            |   3 +
+ sql/add_it_network_monitoring.sql           |   5 +-
+ 13 files changed, 189 insertions(+), 32 deletions(-)
+ create mode 100644 attached_assets/image_1789088308308.png
+ create mode 100644 attached_assets/image_1789088944670.png
+ create mode 100644 screenshots/graph-settings-admin-fields.jpg
+ create mode 100644 server/credentialEncryption.test.ts
+ create mode 100644 server/credentialEncryption.ts
+Already up to date
+Done in 43ms using pnpm v11.24.0
+$ tsc
+server/vite.ts:7:24 - error TS2307: Cannot find module 'nanoid' or its corresponding type declarations.
+
+7 import { nanoid } from "nanoid";
+                         ~~~~~~~~
+
+
+Found 1 error in server/vite.ts:7
+
+[ELIFECYCLE] Command failed with exit code 2.
+$ tsx script/build.ts
+building client...
+vite v7.3.6 building client environment for production...
+✓ 3003 modules transformed.
+../dist/public/index.html                                     2.07 kB │ gzip:   0.81 kB
+../dist/public/assets/index-B2PGRnsm.css                     99.69 kB │ gzip:  16.25 kB
+../dist/public/assets/purify.es-CC4Brkr_.js                  27.95 kB │ gzip:  10.57 kB
+../dist/public/assets/jspdf.plugin.autotable-BBLUVd7n.js     30.93 kB │ gzip:   9.87 kB
+../dist/public/assets/index.es-Dz4FgwJ0.js                  158.20 kB │ gzip:  52.57 kB
+../dist/public/assets/html2canvas.esm-DXEQVQnt.js           201.04 kB │ gzip:  47.43 kB
+../dist/public/assets/jspdf.es.min-1sceUdga.js              380.21 kB │ gzip: 124.71 kB
+../dist/public/assets/xlsx-CNerDvZX.js                      429.19 kB │ gzip: 142.94 kB
+../dist/public/assets/index-CWCaZJqi.js                   1,744.59 kB │ gzip: 454.60 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 14.81s
+building server...
+
+  dist/index.cjs  1.8mb ⚠️
+
+⚡ Done in 174ms
+[PM2] Applying action restartProcessId on app [fleetcmd](ids: [ 1 ])
+[PM2] [fleetcmd](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ fleetcmd           │ fork     │ 5    │ online    │ 0%       │ 18.0mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+Module
+┌────┬────────────────────┬──────────┬──────────┬──────────┐
+│ id │ name               │ status   │ cpu      │ mem      │
+├────┼────────────────────┼──────────┼──────────┼──────────┤
+│ 0  │ pm2-logrotate      │ online   │ 0%       │ 69.4mb   │
+└────┴────────────────────┴──────────┴──────────┴──────────┘
+[TAILING] Tailing last 50 lines for [fleetcmd] process (change the value with --lines option)
+/home/aiscoweb/.pm2/logs/fleetcmd-out.log last 50 lines:
+1|fleetcmd | 2:08:26 AM [express] POST /api/settings/email/test 200 in 28ms :: {"success":false,"error":"Microsoft Graph is not fully configured. Set the tenant ID, client ID, and client secret."}
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:08:34 AM [express] POST /api/tv-dashboards/1/ping 204 in 13ms
+1|fleetcmd | 2:08:38 AM [express] GET /api/settings/email/health 200 in 14ms :: {"status":"warning","consecutiveFailures":8,"failureThreshold":3,"warningSince":"2026-09-11T01:57:00.564Z","lastFailureAt":"2026-09-11T02:08:26.681Z","lastSuccessAt":null,"lastError":"Microsoft Graph ...
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:09:26 AM [express] GET /api/tv-dashboards/1/display 304 in 26ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":15,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:09:34 AM [express] POST /api/tv-dashboards/1/ping 204 in 13ms
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:10:26 AM [express] GET /api/tv-dashboards/1/display 304 in 29ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":15,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:10:34 AM [express] POST /api/tv-dashboards/1/ping 204 in 13ms
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:11:27 AM [express] GET /api/tv-dashboards/1/display 304 in 27ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":15,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:11:34 AM [express] POST /api/tv-dashboards/1/ping 204 in 12ms
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:12:27 AM [express] GET /api/tv-dashboards/1/display 304 in 27ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":15,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [fortigateSync] wan1 TX=2760.55 RX=30492.15 kbps, wan2 TX=5919.35 RX=30743.80 kbps
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:12:34 AM [express] POST /api/tv-dashboards/1/ping 204 in 11ms
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:13:27 AM [express] GET /api/tv-dashboards/1/display 304 in 26ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":15,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:13:34 AM [express] POST /api/tv-dashboards/1/ping 204 in 11ms
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:14:27 AM [express] GET /api/tv-dashboards/1/display 304 in 29ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":15,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:14:34 AM [express] POST /api/tv-dashboards/1/ping 204 in 10ms
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:15:27 AM [express] GET /api/tv-dashboards/1/display 304 in 25ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":15,"kpiTransitionSty...
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | 2:15:34 AM [express] POST /api/tv-dashboards/1/ping 204 in 13ms
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+
+/home/aiscoweb/.pm2/logs/fleetcmd-error.log last 50 lines:
+1|fleetcmd |     schema: undefined,
+1|fleetcmd |     table: undefined,
+1|fleetcmd |     column: undefined,
+1|fleetcmd |     dataType: undefined,
+1|fleetcmd |     constraint: undefined,
+1|fleetcmd |     file: 'parse_relation.c',
+1|fleetcmd |     line: '1449',
+1|fleetcmd |     routine: 'parserOpenTable'
+1|fleetcmd |   }
+1|fleetcmd | }
+1|fleetcmd | [server] Received SIGINT — ignoring to keep server alive
+1|fleetcmd | [glpiSync] Auth failed: fetch failed
+1|fleetcmd | [trackerNotifications] Error during checks: t [Error]: Failed query: select "id", "tracker_id", "trigger_type", "threshold_days", "recipients", "is_active", "last_run_at", "last_match_count", "created_at" from "tracker_notification_rules" where "tracker_notification_rules"."is_active" = $1
+1|fleetcmd | params: true
+1|fleetcmd |     at zd.queryWithCache (/opt/fleetcmd/dist/index.cjs:58:37179)
+1|fleetcmd |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|fleetcmd |     at async /opt/fleetcmd/dist/index.cjs:66:32511
+1|fleetcmd |     at async d0.getAllActiveTrackerNotificationRules (/opt/fleetcmd/dist/index.cjs:266:2944)
+1|fleetcmd |     at async OM (/opt/fleetcmd/dist/index.cjs:460:199) {
+1|fleetcmd |   query: 'select "id", "tracker_id", "trigger_type", "threshold_days", "recipients", "is_active", "last_run_at", "last_match_count", "created_at" from "tracker_notification_rules" where "tracker_notification_rules"."is_active" = $1',
+1|fleetcmd |   params: [ true ],
+1|fleetcmd |   cause: error: relation "tracker_notification_rules" does not exist
+1|fleetcmd |       at /opt/fleetcmd/dist/index.cjs:66:15801
+1|fleetcmd |       at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|fleetcmd |       at async /opt/fleetcmd/dist/index.cjs:66:32720
+1|fleetcmd |       at async zd.queryWithCache (/opt/fleetcmd/dist/index.cjs:58:37154)
+1|fleetcmd |       at async /opt/fleetcmd/dist/index.cjs:66:32511
+1|fleetcmd |       at async d0.getAllActiveTrackerNotificationRules (/opt/fleetcmd/dist/index.cjs:266:2944)
+1|fleetcmd |       at async OM (/opt/fleetcmd/dist/index.cjs:460:199) {
+1|fleetcmd |     length: 126,
+1|fleetcmd |     severity: 'ERROR',
+1|fleetcmd |     code: '42P01',
+1|fleetcmd |     detail: undefined,
+1|fleetcmd |     hint: undefined,
+1|fleetcmd |     position: '142',
+1|fleetcmd |     internalPosition: undefined,
+1|fleetcmd |     internalQuery: undefined,
+1|fleetcmd |     where: undefined,
+1|fleetcmd |     schema: undefined,
+1|fleetcmd |     table: undefined,
+1|fleetcmd |     column: undefined,
+1|fleetcmd |     dataType: undefined,
+1|fleetcmd |     constraint: undefined,
+1|fleetcmd |     file: 'parse_relation.c',
+1|fleetcmd |     line: '1449',
+1|fleetcmd |     routine: 'parserOpenTable'
+1|fleetcmd |   }
+1|fleetcmd | }
+1|fleetcmd | [glpiSync] Auth failed: fetch failed
+1|fleetcmd | [server] Received SIGINT — ignoring to keep server alive
+
+1|fleetcmd  | > rest-express@1.0.0 start
+1|fleetcmd  | > NODE_ENV=production node dist/index.cjs
+1|fleetcmd  | Database: Using local PostgreSQL driver
+1|fleetcmd  | [itMonitor] Starting IT monitor (30s interval)
+1|fleetcmd  | 2:16:13 AM [express] serving on port 5000
+1|fleetcmd  | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd  | [glpiSync] Auth failed: fetch failed
+1|fleetcmd  | [itMonitor] Check complete: 65/65 online
+1|fleetcmd  | [trackerNotifications] Error during checks: t [Error]: Failed query: select "id", "tracker_id", "trigger_type", "threshold_days", "recipients", "is_active", "last_run_at", "last_match_count", "created_at" from "tracker_notification_rules" where "tracker_notification_rules"."is_active" = $1
+1|fleetcmd  | params: true
+1|fleetcmd  |     at $d.queryWithCache (/opt/fleetcmd/dist/index.cjs:58:37179)
+1|fleetcmd  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|fleetcmd  |     at async /opt/fleetcmd/dist/index.cjs:66:32511
+1|fleetcmd  |     at async m0.getAllActiveTrackerNotificationRules (/opt/fleetcmd/dist/index.cjs:266:2944)
+1|fleetcmd  |     at async qM (/opt/fleetcmd/dist/index.cjs:460:199) {
+1|fleetcmd  |   query: 'select "id", "tracker_id", "trigger_type", "threshold_days", "recipients", "is_active", "last_run_at", "last_match_count", "created_at" from "tracker_notification_rules" where "tracker_notification_rules"."is_active" = $1',
+1|fleetcmd  |   params: [ true ],
+1|fleetcmd  |   cause: error: relation "tracker_notification_rules" does not exist
+1|fleetcmd  |       at /opt/fleetcmd/dist/index.cjs:66:15801
+1|fleetcmd  |       at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+1|fleetcmd  |       at async /opt/fleetcmd/dist/index.cjs:66:32720
+1|fleetcmd  |       at async $d.queryWithCache (/opt/fleetcmd/dist/index.cjs:58:37154)
+1|fleetcmd  |       at async /opt/fleetcmd/dist/index.cjs:66:32511
+1|fleetcmd  |       at async m0.getAllActiveTrackerNotificationRules (/opt/fleetcmd/dist/index.cjs:266:2944)
+1|fleetcmd  |       at async qM (/opt/fleetcmd/dist/index.cjs:460:199) {
+1|fleetcmd  |     length: 126,
+1|fleetcmd  |     severity: 'ERROR',
+1|fleetcmd  |     code: '42P01',
+1|fleetcmd  |     detail: undefined,
+1|fleetcmd  |     hint: undefined,
+1|fleetcmd  |     position: '142',
+1|fleetcmd  |     internalPosition: undefined,
+1|fleetcmd  |     internalQuery: undefined,
+1|fleetcmd  |     where: undefined,
+1|fleetcmd  |     schema: undefined,
+1|fleetcmd  |     table: undefined,
+1|fleetcmd  |     column: undefined,
+1|fleetcmd  |     dataType: undefined,
+1|fleetcmd  |     constraint: undefined,
+1|fleetcmd  |     file: 'parse_relation.c',
+1|fleetcmd  |     line: '1449',
+1|fleetcmd  |     routine: 'parserOpenTable'
+1|fleetcmd  |   }
+1|fleetcmd  | }
+1|fleetcmd  | [fortigateSync] wan1 TX=709.62 RX=11333.58 kbps, wan2 TX=8200.03 RX=20692.42 kbps
+1|fleetcmd  | [licenseExpiry] Completed startup check (0 match(es)).
+1|fleetcmd  | 2:16:27 AM [express] GET /api/tv-dashboards/1/display 304 in 30ms :: {"id":1,"name":"SMS Dept.","departmentId":7,"labelEn":"SMS","labelPt":"SMS","isActive":true,"showVideo":true,"videoPosition":"top-right","videoSizePercent":65,"kpiRotationSeconds":15,"kpiTransitionSty...
+

@@ -942,6 +942,8 @@ export async function registerRoutes(
       const { getMicrosoftGraphStatus } = await import("./email");
       res.json({
         ...settings,
+        graphTenantId: settings.graphTenantId || "",
+        graphClientId: settings.graphClientId || "",
         smtpPass: settings.smtpPass ? "********" : "",
         graphClientSecret: settings.graphClientSecret ? "********" : "",
         graphStatus: getMicrosoftGraphStatus(settings),
@@ -1003,6 +1005,8 @@ export async function registerRoutes(
       const { getMicrosoftGraphStatus } = await import("./email");
       res.json({
         ...settings,
+        graphTenantId: settings.graphTenantId || "",
+        graphClientId: settings.graphClientId || "",
         smtpPass: settings.smtpPass ? "********" : "",
         graphClientSecret: settings.graphClientSecret ? "********" : "",
         graphStatus: getMicrosoftGraphStatus(settings),
