@@ -169,6 +169,16 @@ export const emailSettings = pgTable("email_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const emailDeliveryHealth = pgTable("email_delivery_health", {
+  id: integer("id").primaryKey(),
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  warningSince: timestamp("warning_since"),
+  lastFailureAt: timestamp("last_failure_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const departments = pgTable("departments", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
@@ -513,6 +523,7 @@ export type FuelRecord = typeof fuelRecords.$inferSelect;
 export type InsertFuel = z.infer<typeof insertFuelSchema>;
 export type EmailSettings = typeof emailSettings.$inferSelect;
 export type InsertEmailSettings = z.infer<typeof insertEmailSettingsSchema>;
+export type EmailDeliveryHealthRecord = typeof emailDeliveryHealth.$inferSelect;
 export type Department = typeof departments.$inferSelect;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 export type SharedTrip = typeof sharedTrips.$inferSelect;

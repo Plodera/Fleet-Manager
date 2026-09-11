@@ -176,6 +176,17 @@ export async function initDatabase() {
     await _pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS it_network_issues_open_dedupe_idx
       ON it_network_issues(host_id, issue_type) WHERE status <> 'resolved' AND host_id IS NOT NULL`).catch(() => {});
     await _pool.query(`ALTER TABLE email_settings ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'smtp'`).catch(() => {});
+    await _pool.query(`
+      CREATE TABLE IF NOT EXISTS email_delivery_health (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        consecutive_failures INTEGER NOT NULL DEFAULT 0,
+        warning_since TIMESTAMP,
+        last_failure_at TIMESTAMP,
+        last_success_at TIMESTAMP,
+        last_error TEXT,
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
 
     // Add breakdown alert recipients to factory_machines if not present
     await _pool.query(`ALTER TABLE factory_machines ADD COLUMN IF NOT EXISTS breakdown_alert_recipients TEXT[] NOT NULL DEFAULT '{}'`).catch(() => {});

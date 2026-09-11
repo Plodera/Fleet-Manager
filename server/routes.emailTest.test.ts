@@ -69,7 +69,7 @@ describe("POST /api/settings/email/test", () => {
     vi.clearAllMocks();
     authState.authenticated = true;
     authState.user = { id: 1, role: "admin", permissions: [] };
-    getEmailDeliveryHealthMock.mockReturnValue({
+    getEmailDeliveryHealthMock.mockResolvedValue({
       status: "warning",
       consecutiveFailures: 3,
       failureThreshold: 3,

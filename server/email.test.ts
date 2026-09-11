@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createTransportMock, getEmailSettingsMock, sendMailMock } = vi.hoisted(() => {
+const { createTransportMock, getEmailSettingsMock, healthState, sendMailMock } = vi.hoisted(() => {
   const sendMailMock = vi.fn();
+  const healthState = { current: undefined as any };
   return {
     createTransportMock: vi.fn(() => ({ sendMail: sendMailMock })),
     getEmailSettingsMock: vi.fn(),
+    healthState,
     sendMailMock,
   };
 });
@@ -18,13 +20,45 @@ vi.mock("nodemailer", () => ({
 vi.mock("./storage", () => ({
   storage: {
     getEmailSettings: getEmailSettingsMock,
+    getEmailDeliveryHealth: vi.fn(async () => healthState.current),
+    recordEmailDeliveryFailure: vi.fn(async (error: string, threshold: number) => {
+      const now = new Date();
+      const consecutiveFailures = (healthState.current?.consecutiveFailures ?? 0) + 1;
+      healthState.current = {
+        id: 1,
+        consecutiveFailures,
+        warningSince: consecutiveFailures >= threshold
+          ? (healthState.current?.warningSince ?? now)
+          : null,
+        lastFailureAt: now,
+        lastSuccessAt: healthState.current?.lastSuccessAt ?? null,
+        lastError: error,
+        updatedAt: now,
+      };
+      return healthState.current;
+    }),
+    recordEmailDeliverySuccess: vi.fn(async () => {
+      const now = new Date();
+      healthState.current = {
+        id: 1,
+        consecutiveFailures: 0,
+        warningSince: null,
+        lastFailureAt: healthState.current?.lastFailureAt ?? null,
+        lastSuccessAt: now,
+        lastError: null,
+        updatedAt: now,
+      };
+      return healthState.current;
+    }),
+    resetEmailDeliveryHealth: vi.fn(async () => {
+      healthState.current = undefined;
+    }),
   },
 }));
 
 import {
   EMAIL_DELIVERY_FAILURE_THRESHOLD,
   getEmailDeliveryHealth,
-  resetEmailDeliveryHealth,
   sendTestEmail,
 } from "./email";
 
@@ -63,7 +97,7 @@ function mockJsonResponse(status: number, payload: unknown) {
 describe("email delivery providers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetEmailDeliveryHealth();
+    healthState.current = undefined;
     vi.stubGlobal("fetch", vi.fn());
     vi.stubEnv("MICROSOFT_GRAPH_TENANT_ID", "tenant-id");
     vi.stubEnv("MICROSOFT_GRAPH_CLIENT_ID", "client-id");
@@ -262,13 +296,13 @@ describe("email delivery providers", () => {
       });
     }
 
-    expect(getEmailDeliveryHealth()).toMatchObject({
+    expect(await getEmailDeliveryHealth()).toMatchObject({
       status: "warning",
       consecutiveFailures: EMAIL_DELIVERY_FAILURE_THRESHOLD,
       failureThreshold: EMAIL_DELIVERY_FAILURE_THRESHOLD,
       lastError: "Provider unavailable",
     });
-    expect(getEmailDeliveryHealth().warningSince).not.toBeNull();
+    expect((await getEmailDeliveryHealth()).warningSince).not.toBeNull();
   });
 
   it("clears the warning after a successful delivery", async () => {
@@ -278,17 +312,40 @@ describe("email delivery providers", () => {
     for (let attempt = 0; attempt < EMAIL_DELIVERY_FAILURE_THRESHOLD; attempt += 1) {
       await sendTestEmail("recipient@example.com");
     }
-    expect(getEmailDeliveryHealth().status).toBe("warning");
+    expect((await getEmailDeliveryHealth()).status).toBe("warning");
 
     sendMailMock.mockResolvedValueOnce({ messageId: "recovered" });
     await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({ success: true });
 
-    expect(getEmailDeliveryHealth()).toMatchObject({
+    expect(await getEmailDeliveryHealth()).toMatchObject({
       status: "healthy",
       consecutiveFailures: 0,
       warningSince: null,
       lastError: null,
     });
-    expect(getEmailDeliveryHealth().lastSuccessAt).not.toBeNull();
+    expect((await getEmailDeliveryHealth()).lastSuccessAt).not.toBeNull();
+  });
+
+  it("reads persisted failures after a simulated server restart", async () => {
+    const failedAt = new Date("2026-09-11T10:00:00.000Z");
+    healthState.current = {
+      id: 1,
+      consecutiveFailures: EMAIL_DELIVERY_FAILURE_THRESHOLD,
+      warningSince: failedAt,
+      lastFailureAt: failedAt,
+      lastSuccessAt: null,
+      lastError: "Provider unavailable",
+      updatedAt: failedAt,
+    };
+
+    await vi.resetModules();
+    const restartedEmailModule = await import("./email");
+
+    await expect(restartedEmailModule.getEmailDeliveryHealth()).resolves.toMatchObject({
+      status: "warning",
+      consecutiveFailures: EMAIL_DELIVERY_FAILURE_THRESHOLD,
+      warningSince: failedAt.toISOString(),
+      lastError: "Provider unavailable",
+    });
   });
 });

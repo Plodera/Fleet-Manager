@@ -1,5 +1,5 @@
 import { 
-  users, userStatusHistory, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
+  users, userStatusHistory, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, emailDeliveryHealth, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
   machineTypeRecordTypeConfigs,
   indents, indentItems, indentApproverDepartments,
@@ -20,7 +20,7 @@ import {
   type MachineRecord, type InsertMachineRecord,
   type User, type InsertUser, type UserStatusHistory, type ItIssueAssignee, type Vehicle, type InsertVehicle,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
-  type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings,
+  type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings, type EmailDeliveryHealthRecord,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
   type ItHostType, type InsertItHostType, type ItMonitoredHost, type InsertItMonitoredHost, type ItHostStatus, type ItKpi, type InsertItKpi, type ItKpiValue, type InsertItKpiValue, type ItHostWithStatus,
   type ItHostCheck, type ItNetworkIssue, type ItNetworkIssueUpdate, type ItMonitoringSettings, type ItMonitoringReport, type ItMonthlyNetworkReport, type FortigateInterfaceStatus,
@@ -118,6 +118,10 @@ export interface IStorage {
 
   getEmailSettings(): Promise<EmailSettings | undefined>;
   upsertEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings>;
+  getEmailDeliveryHealth(): Promise<EmailDeliveryHealthRecord | undefined>;
+  recordEmailDeliveryFailure(error: string, failureThreshold: number): Promise<EmailDeliveryHealthRecord>;
+  recordEmailDeliverySuccess(): Promise<EmailDeliveryHealthRecord>;
+  resetEmailDeliveryHealth(): Promise<void>;
 
   getDepartments(): Promise<Department[]>;
   createDepartment(dept: InsertDepartment): Promise<Department>;
@@ -572,6 +576,61 @@ export class DatabaseStorage implements IStorage {
       const [created] = await getDb().insert(emailSettings).values(settings).returning();
       return created;
     }
+  }
+
+  async getEmailDeliveryHealth(): Promise<EmailDeliveryHealthRecord | undefined> {
+    const [health] = await getDb()
+      .select()
+      .from(emailDeliveryHealth)
+      .where(eq(emailDeliveryHealth.id, 1));
+    return health;
+  }
+
+  async recordEmailDeliveryFailure(error: string, failureThreshold: number): Promise<EmailDeliveryHealthRecord> {
+    const result = await getPool().query(
+      `INSERT INTO email_delivery_health (
+         id, consecutive_failures, warning_since, last_failure_at, last_error, updated_at
+       ) VALUES (1, 1, CASE WHEN $2 <= 1 THEN NOW() ELSE NULL END, NOW(), $1, NOW())
+       ON CONFLICT (id) DO UPDATE SET
+         consecutive_failures = email_delivery_health.consecutive_failures + 1,
+         warning_since = CASE
+           WHEN email_delivery_health.consecutive_failures + 1 >= $2
+             THEN COALESCE(email_delivery_health.warning_since, NOW())
+           ELSE NULL
+         END,
+         last_failure_at = NOW(),
+         last_error = $1,
+         updated_at = NOW()
+       RETURNING id, consecutive_failures AS "consecutiveFailures",
+         warning_since AS "warningSince", last_failure_at AS "lastFailureAt",
+         last_success_at AS "lastSuccessAt", last_error AS "lastError",
+         updated_at AS "updatedAt"`,
+      [error, failureThreshold],
+    );
+    return result.rows[0] as EmailDeliveryHealthRecord;
+  }
+
+  async recordEmailDeliverySuccess(): Promise<EmailDeliveryHealthRecord> {
+    const result = await getPool().query(
+      `INSERT INTO email_delivery_health (
+         id, consecutive_failures, warning_since, last_success_at, last_error, updated_at
+       ) VALUES (1, 0, NULL, NOW(), NULL, NOW())
+       ON CONFLICT (id) DO UPDATE SET
+         consecutive_failures = 0,
+         warning_since = NULL,
+         last_success_at = NOW(),
+         last_error = NULL,
+         updated_at = NOW()
+       RETURNING id, consecutive_failures AS "consecutiveFailures",
+         warning_since AS "warningSince", last_failure_at AS "lastFailureAt",
+         last_success_at AS "lastSuccessAt", last_error AS "lastError",
+         updated_at AS "updatedAt"`,
+    );
+    return result.rows[0] as EmailDeliveryHealthRecord;
+  }
+
+  async resetEmailDeliveryHealth(): Promise<void> {
+    await getDb().delete(emailDeliveryHealth).where(eq(emailDeliveryHealth.id, 1));
   }
 
   async getDepartments(): Promise<Department[]> {
@@ -2315,6 +2374,10 @@ export const storage = {
   deleteUser: (...args: Parameters<DatabaseStorage['deleteUser']>) => getStorage().deleteUser(...args),
   getEmailSettings: () => getStorage().getEmailSettings(),
   upsertEmailSettings: (...args: Parameters<DatabaseStorage['upsertEmailSettings']>) => getStorage().upsertEmailSettings(...args),
+  getEmailDeliveryHealth: () => getStorage().getEmailDeliveryHealth(),
+  recordEmailDeliveryFailure: (...args: Parameters<DatabaseStorage['recordEmailDeliveryFailure']>) => getStorage().recordEmailDeliveryFailure(...args),
+  recordEmailDeliverySuccess: () => getStorage().recordEmailDeliverySuccess(),
+  resetEmailDeliveryHealth: () => getStorage().resetEmailDeliveryHealth(),
   getDepartments: () => getStorage().getDepartments(),
   createDepartment: (...args: Parameters<DatabaseStorage['createDepartment']>) => getStorage().createDepartment(...args),
   deleteDepartment: (...args: Parameters<DatabaseStorage['deleteDepartment']>) => getStorage().deleteDepartment(...args),

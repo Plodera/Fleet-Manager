@@ -26,7 +26,7 @@ export interface EmailDeliveryHealth {
   lastError: string | null;
 }
 
-let emailDeliveryHealth: EmailDeliveryHealth = {
+const HEALTHY_EMAIL_DELIVERY: EmailDeliveryHealth = {
   status: "healthy",
   consecutiveFailures: 0,
   failureThreshold: EMAIL_DELIVERY_FAILURE_THRESHOLD,
@@ -40,46 +40,38 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown email provider error";
 }
 
-function recordDeliveryFailure(error: unknown): void {
-  const now = new Date().toISOString();
-  const consecutiveFailures = emailDeliveryHealth.consecutiveFailures + 1;
-  const warningActive = consecutiveFailures >= EMAIL_DELIVERY_FAILURE_THRESHOLD;
-  emailDeliveryHealth = {
-    ...emailDeliveryHealth,
-    status: warningActive ? "warning" : "healthy",
-    consecutiveFailures,
-    warningSince: warningActive ? (emailDeliveryHealth.warningSince ?? now) : null,
-    lastFailureAt: now,
-    lastError: errorMessage(error),
-  };
-}
-
-function recordDeliverySuccess(): void {
-  emailDeliveryHealth = {
-    status: "healthy",
-    consecutiveFailures: 0,
+function toEmailDeliveryHealth(
+  record: Awaited<ReturnType<typeof storage.getEmailDeliveryHealth>>,
+): EmailDeliveryHealth {
+  if (!record) return { ...HEALTHY_EMAIL_DELIVERY };
+  return {
+    status: record.consecutiveFailures >= EMAIL_DELIVERY_FAILURE_THRESHOLD ? "warning" : "healthy",
+    consecutiveFailures: record.consecutiveFailures,
     failureThreshold: EMAIL_DELIVERY_FAILURE_THRESHOLD,
-    warningSince: null,
-    lastFailureAt: emailDeliveryHealth.lastFailureAt,
-    lastSuccessAt: new Date().toISOString(),
-    lastError: null,
+    warningSince: record.warningSince?.toISOString() ?? null,
+    lastFailureAt: record.lastFailureAt?.toISOString() ?? null,
+    lastSuccessAt: record.lastSuccessAt?.toISOString() ?? null,
+    lastError: record.lastError,
   };
 }
 
-export function getEmailDeliveryHealth(): EmailDeliveryHealth {
-  return { ...emailDeliveryHealth };
+async function recordDeliveryFailure(error: unknown): Promise<void> {
+  await storage.recordEmailDeliveryFailure(
+    errorMessage(error),
+    EMAIL_DELIVERY_FAILURE_THRESHOLD,
+  );
 }
 
-export function resetEmailDeliveryHealth(): void {
-  emailDeliveryHealth = {
-    status: "healthy",
-    consecutiveFailures: 0,
-    failureThreshold: EMAIL_DELIVERY_FAILURE_THRESHOLD,
-    warningSince: null,
-    lastFailureAt: null,
-    lastSuccessAt: null,
-    lastError: null,
-  };
+async function recordDeliverySuccess(): Promise<void> {
+  await storage.recordEmailDeliverySuccess();
+}
+
+export async function getEmailDeliveryHealth(): Promise<EmailDeliveryHealth> {
+  return toEmailDeliveryHealth(await storage.getEmailDeliveryHealth());
+}
+
+export async function resetEmailDeliveryHealth(): Promise<void> {
+  await storage.resetEmailDeliveryHealth();
 }
 
 async function fetchMicrosoftGraph(
@@ -219,11 +211,11 @@ async function deliverEmail(settings: EmailSettings, emailContent: EmailContent)
     } else {
       await sendWithSmtp(settings, emailContent);
     }
-    recordDeliverySuccess();
   } catch (error) {
-    recordDeliveryFailure(error);
+    await recordDeliveryFailure(error);
     throw error;
   }
+  await recordDeliverySuccess();
 }
 
 export async function sendEmail(emailContent: EmailContent): Promise<boolean> {

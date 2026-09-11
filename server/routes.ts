@@ -946,11 +946,11 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/settings/email/health", (req, res) => {
+  app.get("/api/settings/email/health", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
     if (user.role !== "admin") return res.status(403).send("Forbidden");
-    res.json(getEmailDeliveryHealth());
+    res.json(await getEmailDeliveryHealth());
   });
 
   app.put("/api/settings/email", async (req, res) => {
