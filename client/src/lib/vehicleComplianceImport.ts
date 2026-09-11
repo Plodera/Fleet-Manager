@@ -68,6 +68,13 @@ export function parseComplianceDate(value: unknown): { value?: string; error?: s
     return { value: utc.toISOString().slice(0, 10) };
   }
   const raw = String(value).trim();
+  if (!raw || /^definitive$/i.test(raw)) return {};
+
+  // Some insurance registers store a coverage period rather than a single
+  // expiry date. The final date is the expiry used for compliance reminders.
+  const dateRange = raw.split(/\s+(?:to|até)\s+/i);
+  if (dateRange.length === 2 && dateRange[1]) return parseComplianceDate(dateRange[1]);
+
   const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(raw);
   if (iso) {
     const parsed = isoDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));

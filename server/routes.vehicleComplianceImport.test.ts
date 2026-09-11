@@ -303,6 +303,38 @@ describe("POST /api/vehicle-compliance/import", () => {
     }));
   });
 
+  it("accepts blank optional date cells during preview", async () => {
+    const preview = await request(app)
+      .post("/api/vehicle-compliance/import")
+      .send(importPayload([{
+        rowNumber: 2,
+        licensePlate: "DATE-BLANK-1",
+        make: "New",
+        model: "Vehicle",
+        ownershipExpiryDate: "",
+        insuranceExpiryDate: "",
+        ivmExpiryDate: "",
+      }], { mode: "preview" }));
+
+    expect(preview.status).toBe(200);
+    expect(preview.body.summary).toEqual({ total: 1, create: 1, update: 0, error: 0 });
+  });
+
+  it("identifies the spreadsheet row and column for invalid date payloads", async () => {
+    const preview = await request(app)
+      .post("/api/vehicle-compliance/import")
+      .send(importPayload([{
+        rowNumber: 19,
+        licensePlate: "DATE-ERROR-1",
+        make: "New",
+        model: "Vehicle",
+        insuranceExpiryDate: "30/03/2027",
+      }], { mode: "preview" }));
+
+    expect(preview.status).toBe(400);
+    expect(preview.body.message).toBe("Insurance Expiration Date in spreadsheet row 19 must use YYYY-MM-DD or be blank");
+  });
+
   it("updates an existing plate on a repeat import instead of creating a duplicate", async () => {
     const first = await request(app)
       .post("/api/vehicle-compliance/import")

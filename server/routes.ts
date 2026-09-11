@@ -312,6 +312,10 @@ export async function registerRoutes(
     res.sendStatus(204);
   });
 
+  const optionalComplianceDate = z.preprocess(
+    value => typeof value === "string" && !value.trim() ? undefined : value,
+    z.string().date().optional(),
+  );
   const complianceImportRowSchema = z.object({
     rowNumber: z.number().int().positive(),
     licensePlate: z.string().max(100),
@@ -320,14 +324,14 @@ export async function registerRoutes(
     color: z.string().max(100).optional(),
     vehicleTypeLabel: z.string().max(200).optional(),
     ownershipDocumentType: z.string().max(200).optional(),
-    ownershipExpiryDate: z.string().date().optional(),
+    ownershipExpiryDate: optionalComplianceDate,
     insuranceNumber: z.string().max(200).optional(),
     insurancePolicyNumber: z.string().max(200).optional(),
-    insuranceExpiryDate: z.string().date().optional(),
+    insuranceExpiryDate: optionalComplianceDate,
     insuranceImportedStatus: z.string().max(100).optional(),
     ivmNumber: z.string().max(200).optional(),
     ivmPaymentTerms: z.string().max(200).optional(),
-    ivmExpiryDate: z.string().date().optional(),
+    ivmExpiryDate: optionalComplianceDate,
     ivmImportedStatus: z.string().max(100).optional(),
     errors: z.array(z.string().max(500)).optional(),
   });
@@ -337,13 +341,31 @@ export async function registerRoutes(
     const user = req.user as User;
     if (user.role !== "admin") return res.status(403).json({ message: "Admin only" });
     try {
-      const input = z.object({
+      const importRequestSchema = z.object({
         mode: z.enum(["preview", "apply"]),
         createUnmatched: z.boolean().default(true),
         replaceBlanks: z.boolean().default(false),
         sourceFilename: z.string().max(500).default("vehicle-compliance-import"),
         rows: z.array(complianceImportRowSchema).min(1).max(5000),
-      }).parse(req.body);
+      });
+      const parsedInput = importRequestSchema.safeParse(req.body);
+      if (!parsedInput.success) {
+        const dateFields: Record<string, string> = {
+          ownershipExpiryDate: "Date Limit",
+          insuranceExpiryDate: "Insurance Expiration Date",
+          ivmExpiryDate: "IVM Expiration Date",
+        };
+        const dateIssue = parsedInput.error.issues.find(issue => typeof issue.path[2] === "string" && issue.path[2] in dateFields);
+        if (dateIssue) {
+          const rowIndex = typeof dateIssue.path[1] === "number" ? dateIssue.path[1] : undefined;
+          const submittedRow = rowIndex === undefined ? undefined : req.body?.rows?.[rowIndex]?.rowNumber;
+          const label = dateFields[String(dateIssue.path[2])];
+          const row = typeof submittedRow === "number" ? submittedRow : (rowIndex ?? 0) + 2;
+          return res.status(400).json({ message: `${label} in spreadsheet row ${row} must use YYYY-MM-DD or be blank` });
+        }
+        return res.status(400).json({ message: "Invalid vehicle compliance import data" });
+      }
+      const input = parsedInput.data;
       const existingVehicles = await storage.getVehicles();
       const preview = previewVehicleComplianceImport(input.rows, existingVehicles, input.createUnmatched);
       const summary = {

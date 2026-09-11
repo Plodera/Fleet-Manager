@@ -13,6 +13,11 @@ describe("vehicle compliance spreadsheet parser", () => {
     expect(parseComplianceDate("3/4/2027").error).toContain("Ambiguous");
   });
 
+  it("treats definitive ownership as having no expiry and uses the end of a coverage range", () => {
+    expect(parseComplianceDate("Definitive")).toEqual({});
+    expect(parseComplianceDate("31/03/20 TO 30/03/27").value).toBe("2027-03-30");
+  });
+
   it("maps the supplied spreadsheet headings", () => {
     const [row] = parseVehicleComplianceRows([{
       "Vehicle Plate": "LDA-59-70-AI",
