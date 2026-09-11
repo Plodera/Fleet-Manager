@@ -21,6 +21,7 @@ import {
   complianceRollbackDecision,
   safeCsvCell,
 } from "./vehicleComplianceImport";
+import { canAccessVehicleComplianceDocuments, validateComplianceDocument } from "./vehicleComplianceDocuments";
 
 const scryptAsync = promisify(scrypt);
 
@@ -67,6 +68,17 @@ const upload = multer({
     const allowed = /video\/|image\//;
     cb(null, allowed.test(file.mimetype));
   },
+});
+
+const complianceDocumentsDir = path.resolve(process.env.VEHICLE_DOCUMENTS_DIR || path.join(process.cwd(), "data", "vehicle-documents"));
+if (!fs.existsSync(complianceDocumentsDir)) fs.mkdirSync(complianceDocumentsDir, { recursive: true, mode: 0o750 });
+const complianceDocumentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, complianceDocumentsDir),
+    filename: (_req, file, cb) => cb(null, `${Date.now()}-${randomBytes(12).toString("hex")}${path.extname(file.originalname).toLowerCase()}`),
+  }),
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, _file, cb) => cb(null, true),
 });
 
 // In-memory store tracking when each TV dashboard was last viewed on a TV screen.
@@ -222,6 +234,80 @@ export async function registerRoutes(
     const user = req.user as User;
     if (user.role !== 'admin' && !hasPermission(user, 'manage_vehicles')) return res.status(403).send("Access denied");
     await storage.deleteVehicle(Number(req.params.id));
+    res.sendStatus(204);
+  });
+
+  const vehicleDocumentTypeSchema = z.enum(["ownership", "insurance", "ivm"]);
+  const removeComplianceFile = async (storedFilename: string) => {
+    await fs.promises.unlink(path.join(complianceDocumentsDir, path.basename(storedFilename))).catch(error => {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    });
+  };
+
+  app.get("/api/vehicles/:id/compliance-documents", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (!canAccessVehicleComplianceDocuments(req.user as User)) return res.status(403).json({ message: "Forbidden" });
+    if (!await storage.getVehicle(Number(req.params.id))) return res.status(404).json({ message: "Vehicle not found" });
+    res.json(await storage.getVehicleComplianceDocuments(Number(req.params.id)));
+  });
+
+  app.get("/api/vehicles/:id/compliance-documents/:type/file", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (!canAccessVehicleComplianceDocuments(req.user as User)) return res.status(403).json({ message: "Forbidden" });
+    const type = vehicleDocumentTypeSchema.safeParse(req.params.type);
+    if (!type.success) return res.status(400).json({ message: "Invalid document type" });
+    const document = await storage.getVehicleComplianceDocument(Number(req.params.id), type.data);
+    if (!document) return res.status(404).json({ message: "Document not found" });
+    const filePath = path.join(complianceDocumentsDir, path.basename(document.storedFilename));
+    if (!fs.existsSync(filePath)) return res.status(410).json({ message: "Document file is missing from storage" });
+    res.type(document.mimeType);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "sandbox; default-src 'none'");
+    res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(document.originalFilename)}`);
+    res.sendFile(filePath);
+  });
+
+  app.put("/api/vehicles/:id/compliance-documents/:type", (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (!canAccessVehicleComplianceDocuments(req.user as User)) return res.status(403).json({ message: "Forbidden" });
+    const type = vehicleDocumentTypeSchema.safeParse(req.params.type);
+    if (!type.success) return res.status(400).json({ message: "Invalid document type" });
+    complianceDocumentUpload.single("file")(req, res, async error => {
+      if (error) return res.status(400).json({ message: error instanceof multer.MulterError ? error.message : "Only PDF, JPEG, PNG, and WebP files are allowed" });
+      if (!req.file) return res.status(400).json({ message: "A document file is required" });
+      try {
+        const validation = validateComplianceDocument(await fs.promises.readFile(req.file.path));
+        if (!validation.valid) {
+          await removeComplianceFile(req.file.filename);
+          return res.status(400).json({ message: validation.message });
+        }
+        if (!await storage.getVehicle(Number(req.params.id))) {
+          await removeComplianceFile(req.file.filename);
+          return res.status(404).json({ message: "Vehicle not found" });
+        }
+        const previous = await storage.getVehicleComplianceDocument(Number(req.params.id), type.data);
+        const document = await storage.replaceVehicleComplianceDocument({
+          vehicleId: Number(req.params.id), documentType: type.data,
+          originalFilename: path.basename(req.file.originalname), storedFilename: req.file.filename,
+          mimeType: validation.mimeType, sizeBytes: req.file.size, uploadedById: (req.user as User).id,
+        });
+        if (previous) await removeComplianceFile(previous.storedFilename);
+        res.json(document);
+      } catch (uploadError) {
+        await removeComplianceFile(req.file.filename);
+        res.status(500).json({ message: "Failed to save document" });
+      }
+    });
+  });
+
+  app.delete("/api/vehicles/:id/compliance-documents/:type", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (!canAccessVehicleComplianceDocuments(req.user as User)) return res.status(403).json({ message: "Forbidden" });
+    const type = vehicleDocumentTypeSchema.safeParse(req.params.type);
+    if (!type.success) return res.status(400).json({ message: "Invalid document type" });
+    const document = await storage.deleteVehicleComplianceDocument(Number(req.params.id), type.data);
+    if (!document) return res.status(404).json({ message: "Document not found" });
+    await removeComplianceFile(document.storedFilename);
     res.sendStatus(204);
   });
 

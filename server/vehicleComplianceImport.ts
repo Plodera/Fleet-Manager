@@ -26,8 +26,8 @@ export type VehicleCompliancePreviewRow = VehicleComplianceImportRow & {
   messages: string[];
 };
 
-export function normalizeVehiclePlate(value: string): string {
-  return value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+export function normalizeVehiclePlate(value: string | null | undefined): string {
+  return (value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
 function nonBlank(value: string | undefined): string | undefined {

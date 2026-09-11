@@ -119,6 +119,22 @@ export const vehicles = pgTable("vehicles", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const vehicleComplianceDocumentTypeEnum = pgEnum("vehicle_compliance_document_type", ["ownership", "insurance", "ivm"]);
+
+export const vehicleComplianceDocuments = pgTable("vehicle_compliance_documents", {
+  id: serial("id").primaryKey(),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "cascade" }).notNull(),
+  documentType: vehicleComplianceDocumentTypeEnum("document_type").notNull(),
+  originalFilename: text("original_filename").notNull(),
+  storedFilename: text("stored_filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  uploadedById: integer("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+}, (table) => ({
+  vehicleDocumentUnique: uniqueIndex("vehicle_compliance_documents_vehicle_type_unique").on(table.vehicleId, table.documentType),
+}));
+
 /** Audit trail for compliance spreadsheet imports.  Values are JSON so the
  * audit remains useful when a new compliance column is added. */
 export const vehicleComplianceImports = pgTable("vehicle_compliance_imports", {
@@ -560,6 +576,7 @@ export type UserStatusHistory = typeof userStatusHistory.$inferSelect;
 export type ItIssueAssignee = Pick<User, "id" | "fullName">;
 export type UserPermissions = typeof PERMISSIONS[keyof typeof PERMISSIONS];
 export type Vehicle = typeof vehicles.$inferSelect;
+export type VehicleComplianceDocument = typeof vehicleComplianceDocuments.$inferSelect;
 export type VehicleComplianceImport = typeof vehicleComplianceImports.$inferSelect;
 export type VehicleComplianceImportRow = typeof vehicleComplianceImportRows.$inferSelect;
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;

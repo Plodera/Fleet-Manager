@@ -26,6 +26,14 @@ describe("vehicle compliance import", () => {
     expect(results.every(result => result.action === "error")).toBe(true);
   });
 
+  it("reports a blank vehicle plate without failing the complete preview", () => {
+    const [result] = previewVehicleComplianceImport([
+      { rowNumber: 2, licensePlate: null as any, make: "A", model: "B" },
+    ], [], true);
+    expect(result).toMatchObject({ action: "error" });
+    expect(result.messages).toContain("Vehicle Plate is required");
+  });
+
   it("preserves existing values for blank cells unless replacement is requested", () => {
     const row = { rowNumber: 2, licensePlate: "ABC", color: "", insuranceNumber: " 123 " };
     expect(vehicleComplianceUpdates(row, false)).toEqual({ insuranceNumber: "123" });

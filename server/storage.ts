@@ -1,5 +1,5 @@
 import { 
-  users, userStatusHistory, vehicles, vehicleComplianceImports, vehicleComplianceImportRows, bookings, maintenanceRecords, fuelRecords, emailSettings, emailDeliveryHealth, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
+  users, userStatusHistory, vehicles, vehicleComplianceDocuments, vehicleComplianceImports, vehicleComplianceImportRows, bookings, maintenanceRecords, fuelRecords, emailSettings, emailDeliveryHealth, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
   machineTypeRecordTypeConfigs,
   indents, indentItems, indentApproverDepartments,
@@ -18,7 +18,7 @@ import {
   type FactoryMachineType, type InsertFactoryMachineType,
   type FactoryMachine, type InsertFactoryMachine,
   type MachineRecord, type InsertMachineRecord,
-  type User, type InsertUser, type UserStatusHistory, type ItIssueAssignee, type Vehicle, type InsertVehicle,
+  type User, type InsertUser, type UserStatusHistory, type ItIssueAssignee, type Vehicle, type InsertVehicle, type VehicleComplianceDocument,
   type VehicleComplianceImport, type VehicleComplianceImportRow,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings, type EmailDeliveryHealthRecord,
@@ -88,6 +88,10 @@ export interface IStorage {
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
   updateVehicle(id: number, vehicle: Partial<InsertVehicle>): Promise<Vehicle>;
   deleteVehicle(id: number): Promise<void>;
+  getVehicleComplianceDocuments(vehicleId: number): Promise<VehicleComplianceDocument[]>;
+  getVehicleComplianceDocument(vehicleId: number, documentType: string): Promise<VehicleComplianceDocument | undefined>;
+  replaceVehicleComplianceDocument(input: Omit<VehicleComplianceDocument, "id" | "uploadedAt">): Promise<VehicleComplianceDocument>;
+  deleteVehicleComplianceDocument(vehicleId: number, documentType: string): Promise<VehicleComplianceDocument | undefined>;
   createVehicleComplianceImport(input: { actorId: number; actorName: string; sourceFilename: string; options: unknown }): Promise<VehicleComplianceImport>;
   createVehicleComplianceImportRow(input: { importId: number; rowNumber: number; vehicleId?: number | null; auditedVehicleId?: number | null; action: string; beforeValues?: unknown; afterValues?: unknown; changedFields: string[]; success?: boolean; message?: string }): Promise<VehicleComplianceImportRow>;
   applyVehicleComplianceImportUpdate(input: { importId: number; rowNumber: number; vehicleId: number; updates: Partial<InsertVehicle> }): Promise<{ vehicle: Vehicle; changedFields: string[] }>;
@@ -430,6 +434,41 @@ export class DatabaseStorage implements IStorage {
 
   async deleteVehicle(id: number): Promise<void> {
     await getDb().delete(vehicles).where(eq(vehicles.id, id));
+  }
+
+  async getVehicleComplianceDocuments(vehicleId: number): Promise<VehicleComplianceDocument[]> {
+    return getDb().select().from(vehicleComplianceDocuments).where(eq(vehicleComplianceDocuments.vehicleId, vehicleId));
+  }
+
+  async getVehicleComplianceDocument(vehicleId: number, documentType: string): Promise<VehicleComplianceDocument | undefined> {
+    const [document] = await getDb().select().from(vehicleComplianceDocuments).where(and(
+      eq(vehicleComplianceDocuments.vehicleId, vehicleId),
+      eq(vehicleComplianceDocuments.documentType, documentType as any),
+    ));
+    return document;
+  }
+
+  async replaceVehicleComplianceDocument(input: Omit<VehicleComplianceDocument, "id" | "uploadedAt">): Promise<VehicleComplianceDocument> {
+    const [document] = await getDb().insert(vehicleComplianceDocuments).values(input).onConflictDoUpdate({
+      target: [vehicleComplianceDocuments.vehicleId, vehicleComplianceDocuments.documentType],
+      set: {
+        originalFilename: input.originalFilename,
+        storedFilename: input.storedFilename,
+        mimeType: input.mimeType,
+        sizeBytes: input.sizeBytes,
+        uploadedById: input.uploadedById,
+        uploadedAt: new Date(),
+      },
+    }).returning();
+    return document;
+  }
+
+  async deleteVehicleComplianceDocument(vehicleId: number, documentType: string): Promise<VehicleComplianceDocument | undefined> {
+    const [document] = await getDb().delete(vehicleComplianceDocuments).where(and(
+      eq(vehicleComplianceDocuments.vehicleId, vehicleId),
+      eq(vehicleComplianceDocuments.documentType, documentType as any),
+    )).returning();
+    return document;
   }
 
   async createVehicleComplianceImport(input: { actorId: number; actorName: string; sourceFilename: string; options: unknown }) {
@@ -2463,6 +2502,10 @@ export const storage = {
   createVehicle: (...args: Parameters<DatabaseStorage['createVehicle']>) => getStorage().createVehicle(...args),
   updateVehicle: (...args: Parameters<DatabaseStorage['updateVehicle']>) => getStorage().updateVehicle(...args),
   deleteVehicle: (...args: Parameters<DatabaseStorage['deleteVehicle']>) => getStorage().deleteVehicle(...args),
+  getVehicleComplianceDocuments: (...args: Parameters<DatabaseStorage['getVehicleComplianceDocuments']>) => getStorage().getVehicleComplianceDocuments(...args),
+  getVehicleComplianceDocument: (...args: Parameters<DatabaseStorage['getVehicleComplianceDocument']>) => getStorage().getVehicleComplianceDocument(...args),
+  replaceVehicleComplianceDocument: (...args: Parameters<DatabaseStorage['replaceVehicleComplianceDocument']>) => getStorage().replaceVehicleComplianceDocument(...args),
+  deleteVehicleComplianceDocument: (...args: Parameters<DatabaseStorage['deleteVehicleComplianceDocument']>) => getStorage().deleteVehicleComplianceDocument(...args),
   createVehicleComplianceImport: (...args: Parameters<DatabaseStorage['createVehicleComplianceImport']>) => getStorage().createVehicleComplianceImport(...args),
   createVehicleComplianceImportRow: (...args: Parameters<DatabaseStorage['createVehicleComplianceImportRow']>) => getStorage().createVehicleComplianceImportRow(...args),
   applyVehicleComplianceImportUpdate: (...args: Parameters<DatabaseStorage['applyVehicleComplianceImportUpdate']>) => getStorage().applyVehicleComplianceImportUpdate(...args),

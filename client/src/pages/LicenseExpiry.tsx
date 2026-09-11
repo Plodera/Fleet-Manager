@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Bell, CalendarClock, Check, Download, FileSpreadsheet, Pencil, Plus, Search, Trash2, Upload, UserCheck, X } from "lucide-react";
+import { Bell, CalendarClock, Check, Download, Eye, FileSpreadsheet, Pencil, Plus, Search, Trash2, Upload, UserCheck, X } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { useLanguage } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
@@ -41,6 +41,8 @@ type Resource = {
   ivmExpiryDate?: string | null;
   ivmImportedStatus?: string | null;
 };
+type ComplianceDocumentType = "ownership" | "insurance" | "ivm";
+type VehicleComplianceDocument = { id: number; vehicleId: number; documentType: ComplianceDocumentType; originalFilename: string; mimeType: string; sizeBytes: number; uploadedAt: string };
 type CompanyDocument = { id: number; name: string; documentType: string | null; expiryDate: string; notes: string | null; isActive: boolean; accessUserIds?: number[] };
 type Recipient = { id?: number; userId: number | null; email: string | null };
 type Rule = { id: number; entityType: string; triggerType: string; thresholdDays: number | null; sendEmail: boolean; sendInApp: boolean; isActive: boolean; recipients: Recipient[] };
@@ -113,6 +115,7 @@ export default function LicenseExpiry() {
   const [complianceSearch, setComplianceSearch] = useState("");
   const [complianceFilter, setComplianceFilter] = useState<"all" | ComplianceState>("all");
   const [editingCompliance, setEditingCompliance] = useState<Resource | null>(null);
+  const [documentVehicle, setDocumentVehicle] = useState<Resource | null>(null);
   const [complianceForm, setComplianceForm] = useState(blankCompliance);
   const [importDialog, setImportDialog] = useState(false);
   const [importRows, setImportRows] = useState<ParsedComplianceRow[]>([]);
@@ -126,6 +129,10 @@ export default function LicenseExpiry() {
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const { data: overview } = useQuery<{ vehicles: Resource[]; drivers: Resource[] }>({ queryKey: ["/api/license-expiry/overview"], enabled: canLicenses });
+  const { data: vehicleDocuments = [] } = useQuery<VehicleComplianceDocument[]>({
+    queryKey: ["/api/vehicles", documentVehicle?.id, "compliance-documents"],
+    enabled: Boolean(documentVehicle),
+  });
   const { data: documents = [] } = useQuery<CompanyDocument[]>({ queryKey: ["/api/company-documents"], enabled: canDocuments });
   const { data: rules = [] } = useQuery<Rule[]>({ queryKey: ["/api/expiry-notification-rules"], enabled: isAdmin });
   const { data: users = [] } = useQuery<AppUser[]>({ queryKey: ["/api/users"], enabled: isAdmin });
@@ -175,6 +182,30 @@ export default function LicenseExpiry() {
     },
     onSuccess: () => { refresh(); queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] }); setEditingCompliance(null); toast({ title: le.complianceSaved }); },
     onError: (error: Error) => toast({ title: le.saveFailed, description: error.message, variant: "destructive" }),
+  });
+  const uploadVehicleDocument = useMutation({
+    mutationFn: async ({ type, file }: { type: ComplianceDocumentType; file: File }) => {
+      if (!documentVehicle) return;
+      const body = new FormData();
+      body.append("file", file);
+      const response = await fetch(`/api/vehicles/${documentVehicle.id}/compliance-documents/${type}`, { method: "PUT", body, credentials: "include" });
+      if (!response.ok) throw new Error((await response.text()) || le.documentUploadFailed);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles", documentVehicle?.id, "compliance-documents"] });
+      toast({ title: le.documentUploaded });
+    },
+    onError: (error: Error) => toast({ title: le.documentUploadFailed, description: error.message, variant: "destructive" }),
+  });
+  const removeVehicleDocument = useMutation({
+    mutationFn: async (type: ComplianceDocumentType) => {
+      if (!documentVehicle) return;
+      return apiRequest("DELETE", `/api/vehicles/${documentVehicle.id}/compliance-documents/${type}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles", documentVehicle?.id, "compliance-documents"] });
+      toast({ title: le.documentRemoved });
+    },
   });
   const importMutation = useMutation({
     mutationFn: async (mode: "preview" | "apply") => {
@@ -268,6 +299,11 @@ export default function LicenseExpiry() {
     [{ key: "ivmNumber", label: le.ivmNumber }, { key: "ivmPaymentTerms", label: le.ivmPaymentTerms }],
     [{ key: "ivmExpiryDate", label: le.ivmExpiry, type: "date" }, { key: "ivmImportedStatus", label: le.importedIvmStatus }],
   ];
+  const complianceDocumentTypes: Array<{ type: ComplianceDocumentType; label: string }> = [
+    { type: "ownership", label: le.ownershipDocument },
+    { type: "insurance", label: le.insuranceDocument },
+    { type: "ivm", label: le.ivmDocument },
+  ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -357,7 +393,7 @@ export default function LicenseExpiry() {
                       <TableCell>{vehicle.ivmNumber || "—"}</TableCell>
                       <TableCell>{vehicle.ivmPaymentTerms || "—"}</TableCell>
                       <TableCell><div className="space-y-1"><span className="text-xs">{vehicle.ivmExpiryDate || "—"}</span><ComplianceBadge date={vehicle.ivmExpiryDate} labels={le} />{vehicle.ivmImportedStatus && <p className="text-xs text-muted-foreground">{le.imported}: {vehicle.ivmImportedStatus}</p>}</div></TableCell>
-                      {isAdmin && <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => openCompliance(vehicle)}><Pencil className="mr-1 h-3.5 w-3.5" />{t.buttons.edit}</Button></TableCell>}
+                      {isAdmin && <TableCell className="text-right"><div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={() => setDocumentVehicle(vehicle)}><FileSpreadsheet className="mr-1 h-3.5 w-3.5" />{le.documents}</Button><Button size="sm" variant="outline" onClick={() => openCompliance(vehicle)}><Pencil className="mr-1 h-3.5 w-3.5" />{t.buttons.edit}</Button></div></TableCell>}
                     </TableRow>)}
                     {filteredComplianceVehicles.length === 0 && <TableRow><TableCell colSpan={11} className="h-28 text-center text-muted-foreground">{le.noComplianceRecords}</TableCell></TableRow>}
                   </TableBody>
@@ -408,6 +444,27 @@ export default function LicenseExpiry() {
             <Button variant="outline" onClick={() => setEditingCompliance(null)}>{t.buttons.cancel}</Button>
             <Button onClick={() => complianceMutation.mutate()} disabled={complianceMutation.isPending}>{t.buttons.save}</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(documentVehicle)} onOpenChange={open => !open && setDocumentVehicle(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{le.vehicleDocuments} · {documentVehicle?.licensePlate}</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">{le.vehicleDocumentsHint}</p>
+          <div className="space-y-3">
+            {complianceDocumentTypes.map(({ type, label }) => {
+              const document = vehicleDocuments.find(item => item.documentType === type);
+              return <div key={type} className="rounded-lg border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><p className="font-medium">{label}</p>{document ? <p className="text-xs text-muted-foreground">{document.originalFilename} · {(document.sizeBytes / 1024 / 1024).toFixed(1)} MB</p> : <p className="text-xs text-muted-foreground">{le.noFileAttached}</p>}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {document && <Button size="sm" variant="outline" onClick={() => window.open(`/api/vehicles/${documentVehicle!.id}/compliance-documents/${type}/file`, "_blank")}><Eye className="mr-1 h-3.5 w-3.5" />{le.viewFile}</Button>}
+                    <Button size="sm" variant="outline" asChild><Label className="cursor-pointer"><Upload className="mr-1 h-3.5 w-3.5" />{document ? le.replaceFile : le.uploadFile}<Input className="hidden" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" disabled={uploadVehicleDocument.isPending} onChange={event => { const file = event.target.files?.[0]; if (file) uploadVehicleDocument.mutate({ type, file }); event.target.value = ""; }} /></Label></Button>
+                    {document && <Button size="sm" variant="destructive" disabled={removeVehicleDocument.isPending} onClick={() => removeVehicleDocument.mutate(type)}><Trash2 className="mr-1 h-3.5 w-3.5" />{le.removeFile}</Button>}
+                  </div>
+                </div>
+              </div>;
+            })}
+          </div>
         </DialogContent>
       </Dialog>
 
