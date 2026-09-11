@@ -119,6 +119,10 @@ export default function LicenseExpiry() {
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [createUnmatched, setCreateUnmatched] = useState(true);
   const [replaceBlanks, setReplaceBlanks] = useState(false);
+  const [importFilename, setImportFilename] = useState("");
+  const [selectedImport, setSelectedImport] = useState<number | null>(null);
+  const { data: importHistory = [] } = useQuery<any[]>({ queryKey: ["/api/vehicle-compliance/import-history"], enabled: isAdmin });
+  const { data: importDetail } = useQuery<any>({ queryKey: ["/api/vehicle-compliance/import-history", selectedImport], enabled: isAdmin && selectedImport !== null });
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const { data: overview } = useQuery<{ vehicles: Resource[]; drivers: Resource[] }>({ queryKey: ["/api/license-expiry/overview"], enabled: canLicenses });
@@ -128,7 +132,7 @@ export default function LicenseExpiry() {
   const { data: alerts = [] } = useQuery<Alert[]>({ queryKey: ["/api/expiry-notifications/mine"] });
 
   const refresh = () => {
-    ["/api/company-documents", "/api/expiry-notification-rules", "/api/license-expiry/overview", "/api/expiry-notifications/mine"].forEach(key => queryClient.invalidateQueries({ queryKey: [key] }));
+    ["/api/company-documents", "/api/expiry-notification-rules", "/api/license-expiry/overview", "/api/expiry-notifications/mine", "/api/vehicle-compliance/import-history"].forEach(key => queryClient.invalidateQueries({ queryKey: [key] }));
   };
   const documentMutation = useMutation({
     mutationFn: async () => {
@@ -174,7 +178,7 @@ export default function LicenseExpiry() {
   });
   const importMutation = useMutation({
     mutationFn: async (mode: "preview" | "apply") => {
-      const response = await apiRequest("POST", "/api/vehicle-compliance/import", { mode, rows: importRows, createUnmatched, replaceBlanks });
+      const response = await apiRequest("POST", "/api/vehicle-compliance/import", { mode, rows: importRows, createUnmatched, replaceBlanks, sourceFilename: importFilename || "vehicle-compliance-import" });
       return response.json();
     },
     onSuccess: (data, mode) => {
@@ -423,6 +427,7 @@ export default function LicenseExpiry() {
             onChange={event => {
               const file = event.target.files?.[0];
               if (file) void handleImportFile(file);
+               if (file) setImportFilename(file.name);
               event.target.value = "";
             }}
           />
@@ -431,7 +436,8 @@ export default function LicenseExpiry() {
               <FileSpreadsheet className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
               <p className="font-medium">{le.chooseSpreadsheet}</p>
               <p className="mb-4 text-sm text-muted-foreground">{le.supportedFormats}</p>
-              <Button variant="outline" onClick={() => importFileRef.current?.click()}><Upload className="mr-2 h-4 w-4" />{le.chooseFile}</Button>
+               <Button variant="outline" onClick={() => importFileRef.current?.click()}><Upload className="mr-2 h-4 w-4" />{le.chooseFile}</Button>
+               <Input className="mx-auto mt-3 max-w-md" value={importFilename} onChange={event => setImportFilename(event.target.value)} placeholder="Source filename" />
               {importRows.length > 0 && <p className="mt-3 text-sm text-emerald-700">{le.rowsLoaded.replace("{count}", String(importRows.length))}</p>}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -467,6 +473,17 @@ export default function LicenseExpiry() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {isAdmin && <Card>
+        <CardHeader><CardTitle className="text-base">Compliance import history</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {importHistory.map((item: any) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3">
+            <div><p className="font-medium">{item.sourceFilename}</p><p className="text-xs text-muted-foreground">{item.actorName} · {new Date(item.appliedAt).toLocaleString()}</p></div>
+             <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setSelectedImport(item.id)}>Inspect</Button><Button size="sm" variant="outline" onClick={() => window.open(`/api/vehicle-compliance/import-history/${item.id}/report`, "_blank")}>Download report</Button><Button size="sm" variant="destructive" disabled={Boolean(item.undoStatus)} onClick={async () => { if (!window.confirm("Undo this import? Later edits will be preserved.")) return; const response = await apiRequest("POST", `/api/vehicle-compliance/import-history/${item.id}/undo`); const result = await response.json(); refresh(); queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] }); toast({ title: "Import undo complete", description: `${result.restoredCount} restored, ${result.skippedCount} skipped${result.skipped?.[0] ? `. ${result.skipped[0].warning}` : ""}` }); }}>{item.undoStatus ? `Undo ${item.undoStatus}` : "Undo"}</Button></div>
+          </div>)}
+          {importHistory.length === 0 && <p className="text-sm text-muted-foreground">No imports recorded.</p>}
+        </CardContent>
+      </Card>}
+      <Dialog open={selectedImport !== null} onOpenChange={open => !open && setSelectedImport(null)}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>Import details</DialogTitle></DialogHeader>{importDetail && <div className="space-y-3"><div className="rounded border p-3 text-sm"><p><span className="font-medium">Source:</span> {importDetail.import.sourceFilename}</p><p><span className="font-medium">Run by:</span> {importDetail.import.actorName} · {new Date(importDetail.import.appliedAt).toLocaleString()}</p><p><span className="font-medium">Options:</span> create unmatched {importDetail.import.options?.createUnmatched ? "on" : "off"}, replace blanks {importDetail.import.options?.replaceBlanks ? "on" : "off"}</p></div>{importDetail.rows.map((row: any) => <div key={row.id} className="rounded border p-3 text-sm"><span className="font-medium">Row {row.rowNumber} · {row.action}</span><span className="ml-2">{row.success ? "Applied" : row.message || "Failed"}</span>{row.changedFields?.length > 0 && <div className="mt-2 overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Field</TableHead><TableHead>Before</TableHead><TableHead>After</TableHead></TableRow></TableHeader><TableBody>{row.changedFields.map((field: string) => <TableRow key={field}><TableCell>{field}</TableCell><TableCell>{String(row.beforeValues?.[field] ?? "—")}</TableCell><TableCell>{String(row.afterValues?.[field] ?? "—")}</TableCell></TableRow>)}</TableBody></Table></div>}</div>)}</div>}</DialogContent></Dialog>
     </div>
   );
 }

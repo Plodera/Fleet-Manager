@@ -103,3 +103,53 @@ export function vehicleComplianceUpdates(
   }
   return updates as Partial<InsertVehicle>;
 }
+
+export type ComplianceRollbackRow = {
+  vehicleId?: number | null;
+  action: string;
+  beforeValues?: Record<string, unknown> | null;
+  afterValues?: Record<string, unknown> | null;
+  changedFields?: string[];
+};
+
+export type ComplianceRollbackDecision = {
+  updates: Record<string, unknown>;
+  canDelete: boolean;
+  warning?: string;
+};
+
+export function safeCsvCell(value: unknown): string {
+  let text = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value);
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+const comparable = (value: unknown) => value == null ? null : value;
+
+/** Decide which fields can safely be restored.  A field is restored only if
+ * nobody changed it since this import (current still equals import-after). */
+export function complianceRollbackDecision(
+  row: ComplianceRollbackRow,
+  current: Record<string, unknown> | undefined,
+): ComplianceRollbackDecision {
+  if (!current) return { updates: {}, canDelete: false, warning: "Vehicle no longer exists" };
+  const after = row.afterValues || {};
+  const before = row.beforeValues || {};
+  const fields = row.changedFields || Object.keys(after);
+  const conflicts = fields.filter(field => comparable(current[field]) !== comparable(after[field]));
+  if (row.action === "create") {
+    if (conflicts.length || fields.some(field => field === "id" ? false : !(field in current))) {
+      return { updates: {}, canDelete: false, warning: `Created vehicle has later changes: ${conflicts.join(", ") || "vehicle state changed"}` };
+    }
+    return { updates: {}, canDelete: true };
+  }
+  const updates: Record<string, unknown> = {};
+  for (const field of fields) {
+    if (!conflicts.includes(field)) updates[field] = before[field] ?? null;
+  }
+  return {
+    updates,
+    canDelete: false,
+    warning: conflicts.length ? `Skipped conflicting fields: ${conflicts.join(", ")}` : undefined,
+  };
+}

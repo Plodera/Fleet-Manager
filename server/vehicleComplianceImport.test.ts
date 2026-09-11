@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeVehiclePlate, previewVehicleComplianceImport, vehicleComplianceUpdates } from "./vehicleComplianceImport";
+import { normalizeVehiclePlate, previewVehicleComplianceImport, vehicleComplianceUpdates, complianceRollbackDecision, safeCsvCell } from "./vehicleComplianceImport";
 
 const vehicle = {
   id: 1,
@@ -30,5 +30,31 @@ describe("vehicle compliance import", () => {
     const row = { rowNumber: 2, licensePlate: "ABC", color: "", insuranceNumber: " 123 " };
     expect(vehicleComplianceUpdates(row, false)).toEqual({ insuranceNumber: "123" });
     expect(vehicleComplianceUpdates(row, true)).toMatchObject({ color: null, insuranceNumber: "123" });
+  });
+
+  it("restores only fields that were not changed after import", () => {
+    const decision = complianceRollbackDecision({
+      action: "update", vehicleId: 1,
+      beforeValues: { color: "red", insuranceNumber: "old" },
+      afterValues: { color: "blue", insuranceNumber: "new" },
+      changedFields: ["color", "insuranceNumber"],
+    }, { color: "green", insuranceNumber: "new" });
+    expect(decision.updates).toEqual({ insuranceNumber: "old" });
+    expect(decision.warning).toContain("color");
+  });
+
+  it("deletes a created vehicle only when every imported value is unchanged", () => {
+    const row = { action: "create", beforeValues: {}, afterValues: { make: "A", model: "B" }, changedFields: ["make", "model"] };
+    expect(complianceRollbackDecision(row, { make: "A", model: "B" }).canDelete).toBe(true);
+    expect(complianceRollbackDecision(row, { make: "A", model: "Changed" }).canDelete).toBe(false);
+  });
+
+  it("neutralizes spreadsheet formulas and escapes CSV quotes", () => {
+    expect(safeCsvCell("=HYPERLINK(\"https://example.com\")")).toBe(
+      "\"'=HYPERLINK(\"\"https://example.com\"\")\"",
+    );
+    expect(safeCsvCell(["color", "insuranceNumber"])).toBe(
+      "\"[\"\"color\"\",\"\"insuranceNumber\"\"]\"",
+    );
   });
 });

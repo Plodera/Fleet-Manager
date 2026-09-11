@@ -18,6 +18,8 @@ import {
   categoryFromVehicleType,
   previewVehicleComplianceImport,
   vehicleComplianceUpdates,
+  complianceRollbackDecision,
+  safeCsvCell,
 } from "./vehicleComplianceImport";
 
 const scryptAsync = promisify(scrypt);
@@ -252,6 +254,7 @@ export async function registerRoutes(
         mode: z.enum(["preview", "apply"]),
         createUnmatched: z.boolean().default(true),
         replaceBlanks: z.boolean().default(false),
+        sourceFilename: z.string().max(500).default("vehicle-compliance-import"),
         rows: z.array(complianceImportRowSchema).min(1).max(5000),
       }).parse(req.body);
       const existingVehicles = await storage.getVehicles();
@@ -264,19 +267,32 @@ export async function registerRoutes(
       };
       if (input.mode === "preview") return res.json({ summary, rows: preview });
 
-      const results: Array<{ rowNumber: number; action: string; success: boolean; message?: string; vehicleId?: number }> = [];
+       const audit = await storage.createVehicleComplianceImport({
+         actorId: user.id, actorName: user.fullName, sourceFilename: input.sourceFilename,
+         options: { createUnmatched: input.createUnmatched, replaceBlanks: input.replaceBlanks },
+       });
+       const results: Array<{ rowNumber: number; action: string; success: boolean; message?: string; vehicleId?: number }> = [];
       for (const row of preview) {
         if (row.action === "error") {
           results.push({ rowNumber: row.rowNumber, action: "error", success: false, message: row.messages.join("; ") });
+          await storage.createVehicleComplianceImportRow({ importId: audit.id, rowNumber: row.rowNumber, action: "error", changedFields: [], success: false, message: row.messages.join("; ") });
           continue;
         }
         try {
           const updates = vehicleComplianceUpdates(row, input.replaceBlanks);
           if (row.action === "update" && row.vehicleId) {
-            const vehicle = await storage.updateVehicle(row.vehicleId, updates);
+            const { vehicle } = await storage.applyVehicleComplianceImportUpdate({
+              importId: audit.id,
+              rowNumber: row.rowNumber,
+              vehicleId: row.vehicleId,
+              updates,
+            });
             results.push({ rowNumber: row.rowNumber, action: "update", success: true, vehicleId: vehicle.id });
           } else {
-            const vehicle = await storage.createVehicle({
+            const vehicle = await storage.applyVehicleComplianceImportCreate({
+              importId: audit.id,
+              rowNumber: row.rowNumber,
+              vehicle: {
               make: row.make!.trim(),
               model: row.model!.trim(),
               year: new Date().getFullYear(),
@@ -289,6 +305,7 @@ export async function registerRoutes(
               capacity: 5,
               licenseExpiryDate: null,
               ...updates,
+              },
             });
             results.push({ rowNumber: row.rowNumber, action: "create", success: true, vehicleId: vehicle.id });
           }
@@ -299,6 +316,7 @@ export async function registerRoutes(
             success: false,
             message: error instanceof Error ? error.message : "Import failed",
           });
+          await storage.createVehicleComplianceImportRow({ importId: audit.id, rowNumber: row.rowNumber, vehicleId: row.vehicleId, action: row.action, changedFields: [], success: false, message: error instanceof Error ? error.message : "Import failed" });
         }
       }
       res.json({
@@ -307,6 +325,7 @@ export async function registerRoutes(
           applied: results.filter(result => result.success).length,
           failed: results.filter(result => !result.success).length,
         },
+        importId: audit.id,
         results,
       });
     } catch (error) {
@@ -314,6 +333,84 @@ export async function registerRoutes(
       console.error("[vehicleCompliance] Import failed:", error);
       res.status(500).json({ message: "Vehicle compliance import failed" });
     }
+  });
+
+  app.get("/api/vehicle-compliance/import-history", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    res.json(await storage.getVehicleComplianceImports());
+  });
+  app.get("/api/vehicle-compliance/import-history/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const detail = await storage.getVehicleComplianceImport(Number(req.params.id));
+    if (!detail) return res.status(404).json({ message: "Import not found" });
+    res.json(detail);
+  });
+  app.get("/api/vehicle-compliance/import-history/:id/report", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const detail = await storage.getVehicleComplianceImport(Number(req.params.id));
+    if (!detail) return res.status(404).json({ message: "Import not found" });
+    const csvRows = detail.rows.map((row: any) => [
+      row.rowNumber, row.action, row.auditedVehicleId ?? row.vehicleId ?? "", row.success,
+      row.message || "", row.changedFields || [], row.beforeValues || {}, row.afterValues || {},
+      row.undoStatus || "", row.undoWarning || "",
+    ].map(safeCsvCell).join(","));
+    const importValues = [
+      detail.import.id, detail.import.sourceFilename, detail.import.actorName,
+      detail.import.appliedAt.toISOString(), detail.import.options,
+      detail.import.undoStatus || "", detail.import.undoAt?.toISOString() || "",
+      detail.import.undoActorName || "",
+    ].map(safeCsvCell).join(",");
+    const csv = [
+      "importId,sourceFilename,actorName,appliedAt,options,undoStatus,undoAt,undoActorName",
+      importValues, "",
+      "rowNumber,action,auditedVehicleId,success,message,changedFields,beforeValues,afterValues,undoStatus,undoWarning",
+      ...csvRows,
+    ].join("\n");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="vehicle-compliance-import-${detail.import.id}.csv"`);
+    res.send(csv);
+  });
+  app.post("/api/vehicle-compliance/import-history/:id/undo", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const detail = await storage.getVehicleComplianceImport(Number(req.params.id));
+    if (!detail) return res.status(404).json({ message: "Import not found" });
+    const undoUser = req.user as User;
+    const claimed = await storage.beginVehicleComplianceImportUndo(detail.import.id, undoUser.id, undoUser.fullName);
+    if (!claimed) return res.status(409).json({ message: "Import undo has already started or completed" });
+    const restored: number[] = [], skipped: Array<{ rowNumber: number; warning: string }> = [];
+    for (const row of detail.rows) {
+      if (!row.success) continue;
+      if (!row.vehicleId) {
+        const warning = `Vehicle ${row.auditedVehicleId ?? "from this row"} no longer exists`;
+        skipped.push({ rowNumber: row.rowNumber, warning });
+        await storage.updateVehicleComplianceImportRowUndo(row.id, "skipped", warning);
+        continue;
+      }
+      try {
+        const vehicle = await storage.getVehicle(row.vehicleId);
+        const decision = complianceRollbackDecision(row, vehicle as any);
+        if (decision.canDelete) {
+          const deleted = await storage.deleteVehicleIfUnchanged(row.vehicleId, row.afterValues as any || {});
+          if (deleted) { restored.push(row.rowNumber); await storage.updateVehicleComplianceImportRowUndo(row.id, "deleted"); }
+          else throw new Error("Created vehicle changed or is referenced by later records");
+        } else if (Object.keys(decision.updates).length) {
+          const changed = await storage.updateVehicleIfUnchanged(row.vehicleId, decision.updates, row.afterValues as any || {});
+          if (changed) {
+            restored.push(row.rowNumber);
+            await storage.updateVehicleComplianceImportRowUndo(row.id, decision.warning ? "partial" : "restored", decision.warning);
+            if (decision.warning) skipped.push({ rowNumber: row.rowNumber, warning: decision.warning });
+          } else throw new Error("Vehicle changed while undo was running");
+        } else if (decision.warning) {
+          throw new Error(decision.warning);
+        }
+      } catch (error) {
+        const warning = error instanceof Error ? error.message : "Undo failed";
+        skipped.push({ rowNumber: row.rowNumber, warning });
+        await storage.updateVehicleComplianceImportRowUndo(row.id, "skipped", warning);
+      }
+    }
+    await storage.updateVehicleComplianceImportUndo(detail.import.id, undoUser.id, undoUser.fullName, skipped.length ? "partial" : "completed");
+    res.json({ restored, skipped, restoredCount: restored.length, skippedCount: skipped.length });
   });
 
   // Bookings

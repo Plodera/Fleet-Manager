@@ -191,6 +191,29 @@ export async function initDatabase() {
     await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_payment_terms TEXT`).catch(() => {});
     await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_expiry_date DATE`).catch(() => {});
     await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_imported_status TEXT`).catch(() => {});
+    await _pool.query(`CREATE TABLE IF NOT EXISTS vehicle_compliance_imports (
+      id SERIAL PRIMARY KEY, actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      actor_name TEXT NOT NULL, source_filename TEXT NOT NULL, options JSONB NOT NULL,
+      applied_at TIMESTAMP NOT NULL DEFAULT NOW(), undo_at TIMESTAMP,
+      undo_actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL, undo_actor_name TEXT, undo_status TEXT
+    )`).catch(() => {});
+    await _pool.query(`CREATE TABLE IF NOT EXISTS vehicle_compliance_import_rows (
+      id SERIAL PRIMARY KEY, import_id INTEGER NOT NULL REFERENCES vehicle_compliance_imports(id) ON DELETE CASCADE,
+      row_number INTEGER NOT NULL, vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL,
+      audited_vehicle_id INTEGER, action TEXT NOT NULL, before_values JSONB, after_values JSONB,
+      changed_fields JSONB NOT NULL, success BOOLEAN NOT NULL DEFAULT TRUE, message TEXT,
+      undo_status TEXT, undo_warning TEXT
+    )`).catch(() => {});
+    for (const query of [
+      `ALTER TABLE vehicle_compliance_imports ADD COLUMN IF NOT EXISTS undo_at TIMESTAMP`,
+      `ALTER TABLE vehicle_compliance_imports ADD COLUMN IF NOT EXISTS undo_actor_id INTEGER`,
+      `ALTER TABLE vehicle_compliance_imports ADD COLUMN IF NOT EXISTS undo_actor_name TEXT`,
+      `ALTER TABLE vehicle_compliance_imports ADD COLUMN IF NOT EXISTS undo_status TEXT`,
+      `ALTER TABLE vehicle_compliance_import_rows ADD COLUMN IF NOT EXISTS audited_vehicle_id INTEGER`,
+      `ALTER TABLE vehicle_compliance_import_rows ADD COLUMN IF NOT EXISTS undo_status TEXT`,
+      `ALTER TABLE vehicle_compliance_import_rows ADD COLUMN IF NOT EXISTS undo_warning TEXT`,
+    ]) await _pool.query(query).catch(() => {});
+    await _pool.query(`CREATE INDEX IF NOT EXISTS vehicle_compliance_import_rows_import_idx ON vehicle_compliance_import_rows(import_id)`).catch(() => {});
     await _pool.query(`
       CREATE TABLE IF NOT EXISTS email_delivery_health (
         id INTEGER PRIMARY KEY CHECK (id = 1),

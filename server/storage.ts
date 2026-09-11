@@ -1,5 +1,5 @@
 import { 
-  users, userStatusHistory, vehicles, bookings, maintenanceRecords, fuelRecords, emailSettings, emailDeliveryHealth, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
+  users, userStatusHistory, vehicles, vehicleComplianceImports, vehicleComplianceImportRows, bookings, maintenanceRecords, fuelRecords, emailSettings, emailDeliveryHealth, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
   machineTypeRecordTypeConfigs,
   indents, indentItems, indentApproverDepartments,
@@ -19,6 +19,7 @@ import {
   type FactoryMachine, type InsertFactoryMachine,
   type MachineRecord, type InsertMachineRecord,
   type User, type InsertUser, type UserStatusHistory, type ItIssueAssignee, type Vehicle, type InsertVehicle,
+  type VehicleComplianceImport, type VehicleComplianceImportRow,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings, type EmailDeliveryHealthRecord,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
@@ -56,7 +57,7 @@ import {
   type TeamsKpiMapping, type InsertTeamsKpiMapping,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
-import { eq, desc, sql, and, gte, lt, ne, asc } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lt, ne, asc, isNull } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -87,6 +88,17 @@ export interface IStorage {
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
   updateVehicle(id: number, vehicle: Partial<InsertVehicle>): Promise<Vehicle>;
   deleteVehicle(id: number): Promise<void>;
+  createVehicleComplianceImport(input: { actorId: number; actorName: string; sourceFilename: string; options: unknown }): Promise<VehicleComplianceImport>;
+  createVehicleComplianceImportRow(input: { importId: number; rowNumber: number; vehicleId?: number | null; auditedVehicleId?: number | null; action: string; beforeValues?: unknown; afterValues?: unknown; changedFields: string[]; success?: boolean; message?: string }): Promise<VehicleComplianceImportRow>;
+  applyVehicleComplianceImportUpdate(input: { importId: number; rowNumber: number; vehicleId: number; updates: Partial<InsertVehicle> }): Promise<{ vehicle: Vehicle; changedFields: string[] }>;
+  applyVehicleComplianceImportCreate(input: { importId: number; rowNumber: number; vehicle: InsertVehicle }): Promise<Vehicle>;
+  getVehicleComplianceImports(): Promise<VehicleComplianceImport[]>;
+  getVehicleComplianceImport(id: number): Promise<{ import: VehicleComplianceImport; rows: VehicleComplianceImportRow[] } | undefined>;
+  beginVehicleComplianceImportUndo(id: number, actorId: number, actorName: string): Promise<boolean>;
+  updateVehicleIfUnchanged(id: number, updates: Record<string, unknown>, afterValues: Record<string, unknown>): Promise<boolean>;
+  updateVehicleComplianceImportUndo(id: number, actorId: number, actorName: string, status: string): Promise<void>;
+  updateVehicleComplianceImportRowUndo(id: number, status: string, warning?: string): Promise<void>;
+  deleteVehicleIfUnchanged(id: number, afterValues: Record<string, unknown>): Promise<boolean>;
 
   getBookings(): Promise<(Booking & { vehicle: Vehicle; user: User; approver?: User })[]>;
   getBooking(id: number): Promise<Booking | undefined>;
@@ -418,6 +430,109 @@ export class DatabaseStorage implements IStorage {
 
   async deleteVehicle(id: number): Promise<void> {
     await getDb().delete(vehicles).where(eq(vehicles.id, id));
+  }
+
+  async createVehicleComplianceImport(input: { actorId: number; actorName: string; sourceFilename: string; options: unknown }) {
+    const [record] = await getDb().insert(vehicleComplianceImports).values({
+      actorId: input.actorId, actorName: input.actorName, sourceFilename: input.sourceFilename, options: input.options,
+    }).returning();
+    return record;
+  }
+
+  async createVehicleComplianceImportRow(input: { importId: number; rowNumber: number; vehicleId?: number | null; auditedVehicleId?: number | null; action: string; beforeValues?: unknown; afterValues?: unknown; changedFields: string[]; success?: boolean; message?: string }) {
+    const [record] = await getDb().insert(vehicleComplianceImportRows).values({
+      importId: input.importId, rowNumber: input.rowNumber, vehicleId: input.vehicleId ?? null, auditedVehicleId: input.auditedVehicleId ?? input.vehicleId ?? null,
+      action: input.action, beforeValues: input.beforeValues ?? null, afterValues: input.afterValues ?? null,
+      changedFields: input.changedFields, success: input.success ?? true, message: input.message,
+    }).returning();
+    return record;
+  }
+
+  async applyVehicleComplianceImportUpdate(input: { importId: number; rowNumber: number; vehicleId: number; updates: Partial<InsertVehicle> }) {
+    return getDb().transaction(async (tx: any) => {
+      const [before] = await tx.select().from(vehicles).where(eq(vehicles.id, input.vehicleId)).for("update");
+      if (!before) throw new Error("Vehicle no longer exists");
+      const changedFields = Object.keys(input.updates).filter(
+        field => ((before as any)[field] ?? null) !== ((input.updates as any)[field] ?? null),
+      );
+      const [vehicle] = await tx.update(vehicles).set(input.updates).where(eq(vehicles.id, input.vehicleId)).returning();
+      await tx.insert(vehicleComplianceImportRows).values({
+        importId: input.importId,
+        rowNumber: input.rowNumber,
+        vehicleId: vehicle.id,
+        auditedVehicleId: vehicle.id,
+        action: "update",
+        beforeValues: Object.fromEntries(changedFields.map(field => [field, (before as any)[field] ?? null])),
+        afterValues: Object.fromEntries(changedFields.map(field => [field, (vehicle as any)[field] ?? null])),
+        changedFields,
+      });
+      return { vehicle, changedFields };
+    });
+  }
+
+  async applyVehicleComplianceImportCreate(input: { importId: number; rowNumber: number; vehicle: InsertVehicle }) {
+    return getDb().transaction(async (tx: any) => {
+      const cleaned = { ...input.vehicle, vin: input.vehicle.vin?.trim() || null };
+      const [vehicle] = await tx.insert(vehicles).values(cleaned).returning();
+      const changedFields = Object.keys(vehicle).filter(field => field !== "id" && field !== "createdAt");
+      await tx.insert(vehicleComplianceImportRows).values({
+        importId: input.importId,
+        rowNumber: input.rowNumber,
+        vehicleId: vehicle.id,
+        auditedVehicleId: vehicle.id,
+        action: "create",
+        beforeValues: {},
+        afterValues: Object.fromEntries(changedFields.map(field => [field, (vehicle as any)[field] ?? null])),
+        changedFields,
+      });
+      return vehicle;
+    });
+  }
+
+  async getVehicleComplianceImports() {
+    return getDb().select().from(vehicleComplianceImports).orderBy(desc(vehicleComplianceImports.appliedAt));
+  }
+
+  async getVehicleComplianceImport(id: number) {
+    const [record] = await getDb().select().from(vehicleComplianceImports).where(eq(vehicleComplianceImports.id, id));
+    if (!record) return undefined;
+    const rows = await getDb().select().from(vehicleComplianceImportRows).where(eq(vehicleComplianceImportRows.importId, id)).orderBy(asc(vehicleComplianceImportRows.rowNumber));
+    return { import: record, rows };
+  }
+
+  async updateVehicleIfUnchanged(id: number, updates: Record<string, unknown>, afterValues: Record<string, unknown>) {
+    const pool = getPool();
+    const setKeys = Object.keys(updates);
+    if (!setKeys.length) return true;
+    const params: unknown[] = [id];
+    const set = setKeys.map((key, i) => `"${key.replace(/[^\w]/g, "")}" = $${params.push(updates[key])}`).join(", ");
+    const where = setKeys.map(key => `"${key.replace(/[^\w]/g, "")}" IS NOT DISTINCT FROM $${params.push(afterValues[key])}`).join(" AND ");
+    const result = await pool.query(`UPDATE vehicles SET ${set} WHERE id = $1${where ? ` AND ${where}` : ""}`, params);
+    return result.rowCount === 1;
+  }
+
+  async beginVehicleComplianceImportUndo(id: number, actorId: number, actorName: string) {
+    const [claimed] = await getDb().update(vehicleComplianceImports).set({
+      undoAt: new Date(),
+      undoActorId: actorId,
+      undoActorName: actorName,
+      undoStatus: "in_progress",
+    }).where(and(eq(vehicleComplianceImports.id, id), isNull(vehicleComplianceImports.undoStatus))).returning({ id: vehicleComplianceImports.id });
+    return Boolean(claimed);
+  }
+
+  async updateVehicleComplianceImportUndo(id: number, actorId: number, actorName: string, status: string) {
+    await getDb().update(vehicleComplianceImports).set({ undoAt: new Date(), undoActorId: actorId, undoActorName: actorName, undoStatus: status }).where(eq(vehicleComplianceImports.id, id));
+  }
+  async updateVehicleComplianceImportRowUndo(id: number, status: string, warning?: string) {
+    await getDb().update(vehicleComplianceImportRows).set({ undoStatus: status, undoWarning: warning || null }).where(eq(vehicleComplianceImportRows.id, id));
+  }
+  async deleteVehicleIfUnchanged(id: number, afterValues: Record<string, unknown>) {
+    const pool = getPool();
+    const params: unknown[] = [id];
+    const where = Object.keys(afterValues).map(key => `"${key.replace(/[^\w]/g, "")}" IS NOT DISTINCT FROM $${params.push(afterValues[key])}`).join(" AND ");
+    const result = await pool.query(`DELETE FROM vehicles WHERE id = $1${where ? ` AND ${where}` : ""}`, params);
+    return result.rowCount === 1;
   }
 
   async getBookings(): Promise<(Booking & { vehicle: Vehicle; user: User; approver?: User })[]> {
@@ -2348,6 +2463,17 @@ export const storage = {
   createVehicle: (...args: Parameters<DatabaseStorage['createVehicle']>) => getStorage().createVehicle(...args),
   updateVehicle: (...args: Parameters<DatabaseStorage['updateVehicle']>) => getStorage().updateVehicle(...args),
   deleteVehicle: (...args: Parameters<DatabaseStorage['deleteVehicle']>) => getStorage().deleteVehicle(...args),
+  createVehicleComplianceImport: (...args: Parameters<DatabaseStorage['createVehicleComplianceImport']>) => getStorage().createVehicleComplianceImport(...args),
+  createVehicleComplianceImportRow: (...args: Parameters<DatabaseStorage['createVehicleComplianceImportRow']>) => getStorage().createVehicleComplianceImportRow(...args),
+  applyVehicleComplianceImportUpdate: (...args: Parameters<DatabaseStorage['applyVehicleComplianceImportUpdate']>) => getStorage().applyVehicleComplianceImportUpdate(...args),
+  applyVehicleComplianceImportCreate: (...args: Parameters<DatabaseStorage['applyVehicleComplianceImportCreate']>) => getStorage().applyVehicleComplianceImportCreate(...args),
+  getVehicleComplianceImports: () => getStorage().getVehicleComplianceImports(),
+  getVehicleComplianceImport: (...args: Parameters<DatabaseStorage['getVehicleComplianceImport']>) => getStorage().getVehicleComplianceImport(...args),
+  beginVehicleComplianceImportUndo: (...args: Parameters<DatabaseStorage['beginVehicleComplianceImportUndo']>) => getStorage().beginVehicleComplianceImportUndo(...args),
+  updateVehicleIfUnchanged: (...args: Parameters<DatabaseStorage['updateVehicleIfUnchanged']>) => getStorage().updateVehicleIfUnchanged(...args),
+  updateVehicleComplianceImportUndo: (...args: Parameters<DatabaseStorage['updateVehicleComplianceImportUndo']>) => getStorage().updateVehicleComplianceImportUndo(...args),
+  updateVehicleComplianceImportRowUndo: (...args: Parameters<DatabaseStorage['updateVehicleComplianceImportRowUndo']>) => getStorage().updateVehicleComplianceImportRowUndo(...args),
+  deleteVehicleIfUnchanged: (...args: Parameters<DatabaseStorage['deleteVehicleIfUnchanged']>) => getStorage().deleteVehicleIfUnchanged(...args),
   getBookings: () => getStorage().getBookings(),
   getBooking: (...args: Parameters<DatabaseStorage['getBooking']>) => getStorage().getBooking(...args),
   createBooking: (...args: Parameters<DatabaseStorage['createBooking']>) => getStorage().createBooking(...args),

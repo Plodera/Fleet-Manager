@@ -119,6 +119,37 @@ export const vehicles = pgTable("vehicles", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+/** Audit trail for compliance spreadsheet imports.  Values are JSON so the
+ * audit remains useful when a new compliance column is added. */
+export const vehicleComplianceImports = pgTable("vehicle_compliance_imports", {
+  id: serial("id").primaryKey(),
+  actorId: integer("actor_id").references(() => users.id, { onDelete: "set null" }),
+  actorName: text("actor_name").notNull(),
+  sourceFilename: text("source_filename").notNull(),
+  options: jsonb("options").notNull(),
+  appliedAt: timestamp("applied_at").defaultNow().notNull(),
+  undoAt: timestamp("undo_at"),
+  undoActorId: integer("undo_actor_id").references(() => users.id, { onDelete: "set null" }),
+  undoActorName: text("undo_actor_name"),
+  undoStatus: text("undo_status"),
+});
+
+export const vehicleComplianceImportRows = pgTable("vehicle_compliance_import_rows", {
+  id: serial("id").primaryKey(),
+  importId: integer("import_id").references(() => vehicleComplianceImports.id, { onDelete: "cascade" }).notNull(),
+  rowNumber: integer("row_number").notNull(),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+  auditedVehicleId: integer("audited_vehicle_id"),
+  action: text("action").notNull(),
+  beforeValues: jsonb("before_values"),
+  afterValues: jsonb("after_values"),
+  changedFields: jsonb("changed_fields").notNull(),
+  success: boolean("success").notNull().default(true),
+  message: text("message"),
+  undoStatus: text("undo_status"),
+  undoWarning: text("undo_warning"),
+});
+
 export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
   vehicleId: integer("vehicle_id").references(() => vehicles.id).notNull(),
@@ -529,6 +560,8 @@ export type UserStatusHistory = typeof userStatusHistory.$inferSelect;
 export type ItIssueAssignee = Pick<User, "id" | "fullName">;
 export type UserPermissions = typeof PERMISSIONS[keyof typeof PERMISSIONS];
 export type Vehicle = typeof vehicles.$inferSelect;
+export type VehicleComplianceImport = typeof vehicleComplianceImports.$inferSelect;
+export type VehicleComplianceImportRow = typeof vehicleComplianceImportRows.$inferSelect;
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
