@@ -279,12 +279,25 @@ export default function LicenseExpiry() {
     ].filter((item): item is { date: string; label: string } => Boolean(item.date));
     return dates.sort((a, b) => new Date(`${a.date}T00:00:00`).getTime() - new Date(`${b.date}T00:00:00`).getTime())[0] || null;
   };
-  const filteredComplianceVehicles = complianceVehicles.filter(vehicle => {
-    const query = complianceSearch.trim().toLowerCase();
-    const matchesSearch = !query || [vehicle.licensePlate, vehicle.make, vehicle.model, vehicle.insuranceNumber, vehicle.ivmNumber]
-      .some(value => value?.toLowerCase().includes(query));
-    return matchesSearch && (complianceFilter === "all" || overallState(vehicle) === complianceFilter);
-  });
+  const complianceStatePriority: Record<ComplianceState, number> = { expired: 0, expiring: 1, missing: 2, valid: 3 };
+  const filteredComplianceVehicles = complianceVehicles
+    .map((vehicle, apiIndex) => ({ vehicle, apiIndex }))
+    .filter(({ vehicle }) => {
+      const query = complianceSearch.trim().toLowerCase();
+      const matchesSearch = !query || [vehicle.licensePlate, vehicle.make, vehicle.model, vehicle.insuranceNumber, vehicle.ivmNumber]
+        .some(value => value?.toLowerCase().includes(query));
+      return matchesSearch && (complianceFilter === "all" || overallState(vehicle) === complianceFilter);
+    })
+    .sort((a, b) => {
+      const stateDifference = complianceStatePriority[overallState(a.vehicle)] - complianceStatePriority[overallState(b.vehicle)];
+      if (stateDifference !== 0) return stateDifference;
+      const aExpiry = nearestExpiry(a.vehicle)?.date;
+      const bExpiry = nearestExpiry(b.vehicle)?.date;
+      const expiryDifference = (aExpiry ? new Date(`${aExpiry}T00:00:00`).getTime() : Number.POSITIVE_INFINITY)
+        - (bExpiry ? new Date(`${bExpiry}T00:00:00`).getTime() : Number.POSITIVE_INFINITY);
+      return expiryDifference || a.apiIndex - b.apiIndex;
+    })
+    .map(({ vehicle }) => vehicle);
   const complianceCounts = (["expired", "expiring", "valid", "missing"] as ComplianceState[]).reduce<Record<ComplianceState, number>>(
     (counts, state) => ({ ...counts, [state]: complianceVehicles.filter(vehicle => overallState(vehicle) === state).length }),
     { expired: 0, expiring: 0, valid: 0, missing: 0 },
