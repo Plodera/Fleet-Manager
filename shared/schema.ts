@@ -98,6 +98,18 @@ export const vehicles = pgTable("vehicles", {
   year: integer("year").notNull(),
   licensePlate: text("license_plate").notNull().unique(),
   licenseExpiryDate: date("license_expiry_date"),
+  color: text("color"),
+  vehicleTypeLabel: text("vehicle_type_label"),
+  ownershipDocumentType: text("ownership_document_type"),
+  ownershipExpiryDate: date("ownership_expiry_date"),
+  insuranceNumber: text("insurance_number"),
+  insurancePolicyNumber: text("insurance_policy_number"),
+  insuranceExpiryDate: date("insurance_expiry_date"),
+  insuranceImportedStatus: text("insurance_imported_status"),
+  ivmNumber: text("ivm_number"),
+  ivmPaymentTerms: text("ivm_payment_terms"),
+  ivmExpiryDate: date("ivm_expiry_date"),
+  ivmImportedStatus: text("ivm_imported_status"),
   vin: text("vin").unique(),
   status: vehicleStatusEnum("status").default("available").notNull(),
   currentMileage: integer("current_mileage").default(0).notNull(),
@@ -814,7 +826,14 @@ export type TrackerNotificationRule = typeof trackerNotificationRules.$inferSele
 export type InsertTrackerNotificationRule = z.infer<typeof insertTrackerNotificationRuleSchema>;
 
 // License expiry monitoring
-export const EXPIRY_ENTITY_TYPES = ["vehicle_license", "driver_license", "company_document"] as const;
+export const EXPIRY_ENTITY_TYPES = [
+  "vehicle_license",
+  "vehicle_ownership",
+  "vehicle_insurance",
+  "vehicle_ivm",
+  "driver_license",
+  "company_document",
+] as const;
 export type ExpiryEntityType = typeof EXPIRY_ENTITY_TYPES[number];
 export const EXPIRY_TRIGGER_TYPES = ["expiry_approaching", "expired"] as const;
 export type ExpiryTriggerType = typeof EXPIRY_TRIGGER_TYPES[number];

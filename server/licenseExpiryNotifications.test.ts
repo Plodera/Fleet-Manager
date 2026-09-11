@@ -106,6 +106,27 @@ afterEach(() => {
 });
 
 describe("runLicenseExpiryChecks", () => {
+  it("supports ownership, insurance, and IVM reminder entity types", async () => {
+    storageMock.getVehicles.mockResolvedValue([{
+      ...vehicle,
+      licenseExpiryDate: null,
+      ownershipExpiryDate: null,
+      insuranceExpiryDate: "2026-09-27",
+      ivmExpiryDate: null,
+    }]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({ entityType: "vehicle_insurance", thresholdDays: 30 }),
+    ]);
+
+    await expect(runLicenseExpiryChecks()).resolves.toBe(1);
+    expect(storageMock.createExpiryNotification).toHaveBeenCalledWith(expect.objectContaining({
+      entityType: "vehicle_insurance",
+      entityId: vehicle.id,
+      expiryDate: "2026-09-27",
+    }));
+  });
+
   it("matches an approaching alert on its threshold day and an expired alert after its expiry date", async () => {
     storageMock.getVehicles.mockResolvedValue([
       vehicle,

@@ -3,6 +3,18 @@
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS license_expiry_date DATE;
 ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS license_expiry_date DATE;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS color TEXT;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS vehicle_type_label TEXT;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ownership_document_type TEXT;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ownership_expiry_date DATE;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_number TEXT;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_policy_number TEXT;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_expiry_date DATE;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_imported_status TEXT;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_number TEXT;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_payment_terms TEXT;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_expiry_date DATE;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_imported_status TEXT;
 
 CREATE TABLE IF NOT EXISTS company_documents (
   id            SERIAL PRIMARY KEY,

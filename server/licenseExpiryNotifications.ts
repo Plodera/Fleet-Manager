@@ -2,7 +2,7 @@ import { storage } from "./storage";
 import { sendEmail } from "./email";
 
 type ExpiryEntity = {
-  entityType: "vehicle_license" | "driver_license" | "company_document";
+  entityType: "vehicle_license" | "vehicle_ownership" | "vehicle_insurance" | "vehicle_ivm" | "driver_license" | "company_document";
   id: number;
   name: string;
   expiryDate: string | null;
@@ -36,6 +36,9 @@ function describeExpiry(expiryDate: string): string {
 
 function entityLabel(entityType: ExpiryEntity["entityType"]): string {
   if (entityType === "vehicle_license") return "Vehicle licence";
+  if (entityType === "vehicle_ownership") return "Vehicle ownership document";
+  if (entityType === "vehicle_insurance") return "Vehicle insurance";
+  if (entityType === "vehicle_ivm") return "Vehicle IVM";
   if (entityType === "driver_license") return "Driver licence";
   return "Company document";
 }
@@ -55,6 +58,24 @@ async function getEntities(): Promise<ExpiryEntity[]> {
         name: `${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})`,
         expiryDate: vehicle.licenseExpiryDate,
       })),
+    ...vehicles.map(vehicle => ({
+      entityType: "vehicle_ownership" as const,
+      id: vehicle.id,
+      name: `${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})`,
+      expiryDate: vehicle.ownershipExpiryDate,
+    })),
+    ...vehicles.map(vehicle => ({
+      entityType: "vehicle_insurance" as const,
+      id: vehicle.id,
+      name: `${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})`,
+      expiryDate: vehicle.insuranceExpiryDate,
+    })),
+    ...vehicles.map(vehicle => ({
+      entityType: "vehicle_ivm" as const,
+      id: vehicle.id,
+      name: `${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})`,
+      expiryDate: vehicle.ivmExpiryDate,
+    })),
     ...drivers
       .map(driver => ({
         entityType: "driver_license" as const,

@@ -14,6 +14,11 @@ import type { User } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import {
+  categoryFromVehicleType,
+  previewVehicleComplianceImport,
+  vehicleComplianceUpdates,
+} from "./vehicleComplianceImport";
 
 const scryptAsync = promisify(scrypt);
 
@@ -216,6 +221,99 @@ export async function registerRoutes(
     if (user.role !== 'admin' && !hasPermission(user, 'manage_vehicles')) return res.status(403).send("Access denied");
     await storage.deleteVehicle(Number(req.params.id));
     res.sendStatus(204);
+  });
+
+  const complianceImportRowSchema = z.object({
+    rowNumber: z.number().int().positive(),
+    licensePlate: z.string().max(100),
+    make: z.string().max(200).optional(),
+    model: z.string().max(200).optional(),
+    color: z.string().max(100).optional(),
+    vehicleTypeLabel: z.string().max(200).optional(),
+    ownershipDocumentType: z.string().max(200).optional(),
+    ownershipExpiryDate: z.string().date().optional(),
+    insuranceNumber: z.string().max(200).optional(),
+    insurancePolicyNumber: z.string().max(200).optional(),
+    insuranceExpiryDate: z.string().date().optional(),
+    insuranceImportedStatus: z.string().max(100).optional(),
+    ivmNumber: z.string().max(200).optional(),
+    ivmPaymentTerms: z.string().max(200).optional(),
+    ivmExpiryDate: z.string().date().optional(),
+    ivmImportedStatus: z.string().max(100).optional(),
+    errors: z.array(z.string().max(500)).optional(),
+  });
+
+  app.post('/api/vehicle-compliance/import', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const user = req.user as User;
+    if (user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+    try {
+      const input = z.object({
+        mode: z.enum(["preview", "apply"]),
+        createUnmatched: z.boolean().default(true),
+        replaceBlanks: z.boolean().default(false),
+        rows: z.array(complianceImportRowSchema).min(1).max(5000),
+      }).parse(req.body);
+      const existingVehicles = await storage.getVehicles();
+      const preview = previewVehicleComplianceImport(input.rows, existingVehicles, input.createUnmatched);
+      const summary = {
+        total: preview.length,
+        create: preview.filter(row => row.action === "create").length,
+        update: preview.filter(row => row.action === "update").length,
+        error: preview.filter(row => row.action === "error").length,
+      };
+      if (input.mode === "preview") return res.json({ summary, rows: preview });
+
+      const results: Array<{ rowNumber: number; action: string; success: boolean; message?: string; vehicleId?: number }> = [];
+      for (const row of preview) {
+        if (row.action === "error") {
+          results.push({ rowNumber: row.rowNumber, action: "error", success: false, message: row.messages.join("; ") });
+          continue;
+        }
+        try {
+          const updates = vehicleComplianceUpdates(row, input.replaceBlanks);
+          if (row.action === "update" && row.vehicleId) {
+            const vehicle = await storage.updateVehicle(row.vehicleId, updates);
+            results.push({ rowNumber: row.rowNumber, action: "update", success: true, vehicleId: vehicle.id });
+          } else {
+            const vehicle = await storage.createVehicle({
+              make: row.make!.trim(),
+              model: row.model!.trim(),
+              year: new Date().getFullYear(),
+              licensePlate: row.licensePlate.trim().toUpperCase(),
+              vin: null,
+              status: "available",
+              currentMileage: 0,
+              imageUrl: null,
+              category: categoryFromVehicleType(row.vehicleTypeLabel),
+              capacity: 5,
+              licenseExpiryDate: null,
+              ...updates,
+            });
+            results.push({ rowNumber: row.rowNumber, action: "create", success: true, vehicleId: vehicle.id });
+          }
+        } catch (error) {
+          results.push({
+            rowNumber: row.rowNumber,
+            action: row.action,
+            success: false,
+            message: error instanceof Error ? error.message : "Import failed",
+          });
+        }
+      }
+      res.json({
+        summary: {
+          ...summary,
+          applied: results.filter(result => result.success).length,
+          failed: results.filter(result => !result.success).length,
+        },
+        results,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0]?.message || "Invalid import data" });
+      console.error("[vehicleCompliance] Import failed:", error);
+      res.status(500).json({ message: "Vehicle compliance import failed" });
+    }
   });
 
   // Bookings
@@ -2213,7 +2311,7 @@ export async function registerRoutes(
     if (!canViewLicenseExpiry(user)) return res.status(403).json({ message: "Forbidden" });
     const [vehicles, drivers] = await Promise.all([storage.getVehicles(), storage.getDrivers()]);
     res.json({
-      vehicles: vehicles.filter(vehicle => vehicle.licenseExpiryDate),
+      vehicles,
       drivers: drivers.filter(driver => driver.licenseExpiryDate),
     });
   });

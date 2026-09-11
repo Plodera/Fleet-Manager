@@ -179,6 +179,18 @@ export async function initDatabase() {
     await _pool.query(`ALTER TABLE email_settings ADD COLUMN IF NOT EXISTS graph_tenant_id TEXT`).catch(() => {});
     await _pool.query(`ALTER TABLE email_settings ADD COLUMN IF NOT EXISTS graph_client_id TEXT`).catch(() => {});
     await _pool.query(`ALTER TABLE email_settings ADD COLUMN IF NOT EXISTS graph_client_secret TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS color TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS vehicle_type_label TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ownership_document_type TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ownership_expiry_date DATE`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_number TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_policy_number TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_expiry_date DATE`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_imported_status TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_number TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_payment_terms TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_expiry_date DATE`).catch(() => {});
+    await _pool.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS ivm_imported_status TEXT`).catch(() => {});
     await _pool.query(`
       CREATE TABLE IF NOT EXISTS email_delivery_health (
         id INTEGER PRIMARY KEY CHECK (id = 1),
