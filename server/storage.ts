@@ -1,5 +1,5 @@
 import { 
-  users, userStatusHistory, vehicles, vehicleComplianceDocuments, vehicleComplianceImports, vehicleComplianceImportRows, bookings, maintenanceRecords, fuelRecords, emailSettings, emailDeliveryHealth, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
+  users, userStatusHistory, vehicles, vehicleComplianceDocuments, vehicleComplianceImports, vehicleComplianceImportRows, vehicleComplianceImportUndoAttempts, vehicleComplianceImportUndoAttemptRows, bookings, maintenanceRecords, fuelRecords, emailSettings, emailDeliveryHealth, departments, sharedTrips, vehicleInspections, equipmentTypes, equipmentChecklistItems,
   maintenanceTypeConfig, shifts, activityTypes, subEquipment, vehicleTypes, workOrders, workOrderItems,
   machineTypeRecordTypeConfigs,
   indents, indentItems, indentApproverDepartments,
@@ -19,7 +19,7 @@ import {
   type FactoryMachine, type InsertFactoryMachine,
   type MachineRecord, type InsertMachineRecord,
   type User, type InsertUser, type UserStatusHistory, type ItIssueAssignee, type Vehicle, type InsertVehicle, type VehicleComplianceDocument,
-  type VehicleComplianceImport, type VehicleComplianceImportRow,
+  type VehicleComplianceImport, type VehicleComplianceImportRow, type VehicleComplianceImportUndoAttempt, type VehicleComplianceImportUndoAttemptRow,
   type Booking, type InsertBooking, type MaintenanceRecord, type InsertMaintenance,
   type FuelRecord, type InsertFuel, type EmailSettings, type InsertEmailSettings, type EmailDeliveryHealthRecord,
   type Department, type InsertDepartment, type SharedTrip, type InsertSharedTrip,
@@ -57,7 +57,7 @@ import {
   type TeamsKpiMapping, type InsertTeamsKpiMapping,
 } from "@shared/schema";
 import { getDb, getPool } from "./db";
-import { eq, desc, sql, and, gte, lt, ne, asc, isNull } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lt, ne, asc, isNull, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -97,11 +97,16 @@ export interface IStorage {
   applyVehicleComplianceImportUpdate(input: { importId: number; rowNumber: number; vehicleId: number; updates: Partial<InsertVehicle> }): Promise<{ vehicle: Vehicle; changedFields: string[] }>;
   applyVehicleComplianceImportCreate(input: { importId: number; rowNumber: number; vehicle: InsertVehicle }): Promise<Vehicle>;
   getVehicleComplianceImports(): Promise<VehicleComplianceImport[]>;
-  getVehicleComplianceImport(id: number): Promise<{ import: VehicleComplianceImport; rows: VehicleComplianceImportRow[] } | undefined>;
+  getVehicleComplianceImport(id: number): Promise<{ import: VehicleComplianceImport; rows: VehicleComplianceImportRow[]; undoAttempts: Array<VehicleComplianceImportUndoAttempt & { rows: VehicleComplianceImportUndoAttemptRow[] }> } | undefined>;
   beginVehicleComplianceImportUndo(id: number, actorId: number, actorName: string): Promise<boolean>;
+  beginVehicleComplianceImportUndoRetry(id: number, actorId: number, actorName: string): Promise<VehicleComplianceImportUndoAttempt | undefined>;
+  recordVehicleComplianceImportUndoRetryOutcome(input: { attemptId: number; importRowId: number; rowNumber: number; attemptedFields: string[]; restoredFields: string[]; skippedFields: string[]; status: string; warning?: string }): Promise<void>;
+  retryVehicleComplianceImportUndoUpdate(input: { attemptId: number; importRowId: number; rowNumber: number; vehicleId: number; updates: Record<string, unknown>; afterValues: Record<string, unknown>; attemptedFields: string[]; restoredFields: string[]; skippedFields: string[]; status: string; warning?: string }): Promise<boolean>;
+  retryVehicleComplianceImportUndoDelete(input: { attemptId: number; importRowId: number; rowNumber: number; vehicleId: number; afterValues: Record<string, unknown>; attemptedFields: string[]; status: string }): Promise<boolean>;
   updateVehicleIfUnchanged(id: number, updates: Record<string, unknown>, afterValues: Record<string, unknown>): Promise<boolean>;
   updateVehicleComplianceImportUndo(id: number, actorId: number, actorName: string, status: string): Promise<void>;
-  updateVehicleComplianceImportRowUndo(id: number, status: string, warning?: string): Promise<void>;
+  completeVehicleComplianceImportUndoRetry(id: number, attemptId: number, status: string): Promise<void>;
+  updateVehicleComplianceImportRowUndo(id: number, status: string, warning?: string, skippedFields?: string[]): Promise<void>;
   deleteVehicleIfUnchanged(id: number, afterValues: Record<string, unknown>): Promise<boolean>;
 
   getBookings(): Promise<(Booking & { vehicle: Vehicle; user: User; approver?: User })[]>;
@@ -536,7 +541,15 @@ export class DatabaseStorage implements IStorage {
     const [record] = await getDb().select().from(vehicleComplianceImports).where(eq(vehicleComplianceImports.id, id));
     if (!record) return undefined;
     const rows = await getDb().select().from(vehicleComplianceImportRows).where(eq(vehicleComplianceImportRows.importId, id)).orderBy(asc(vehicleComplianceImportRows.rowNumber));
-    return { import: record, rows };
+    const attempts: VehicleComplianceImportUndoAttempt[] = await getDb().select().from(vehicleComplianceImportUndoAttempts).where(eq(vehicleComplianceImportUndoAttempts.importId, id)).orderBy(asc(vehicleComplianceImportUndoAttempts.startedAt));
+    const attemptRows: VehicleComplianceImportUndoAttemptRow[] = attempts.length
+      ? await getDb().select().from(vehicleComplianceImportUndoAttemptRows).where(inArray(vehicleComplianceImportUndoAttemptRows.attemptId, attempts.map((attempt: VehicleComplianceImportUndoAttempt) => attempt.id))).orderBy(asc(vehicleComplianceImportUndoAttemptRows.id))
+      : [];
+    return {
+      import: record,
+      rows,
+      undoAttempts: attempts.map((attempt: VehicleComplianceImportUndoAttempt) => ({ ...attempt, rows: attemptRows.filter((row: VehicleComplianceImportUndoAttemptRow) => row.attemptId === attempt.id) })),
+    };
   }
 
   async updateVehicleIfUnchanged(id: number, updates: Record<string, unknown>, afterValues: Record<string, unknown>) {
@@ -559,12 +572,107 @@ export class DatabaseStorage implements IStorage {
     }).where(and(eq(vehicleComplianceImports.id, id), isNull(vehicleComplianceImports.undoStatus))).returning({ id: vehicleComplianceImports.id });
     return Boolean(claimed);
   }
+  async beginVehicleComplianceImportUndoRetry(id: number, actorId: number, actorName: string) {
+    return getDb().transaction(async (tx: any) => {
+      const [claimed] = await tx.update(vehicleComplianceImports).set({
+        undoStatus: "in_progress",
+      }).where(and(eq(vehicleComplianceImports.id, id), eq(vehicleComplianceImports.undoStatus, "partial"))).returning({ id: vehicleComplianceImports.id });
+      if (!claimed) return undefined;
+      const [attempt] = await tx.insert(vehicleComplianceImportUndoAttempts).values({
+        importId: id, actorId, actorName,
+      }).returning();
+      return attempt;
+    });
+  }
+  async recordVehicleComplianceImportUndoRetryOutcome(input: { attemptId: number; importRowId: number; rowNumber: number; attemptedFields: string[]; restoredFields: string[]; skippedFields: string[]; status: string; warning?: string }) {
+    await getDb().transaction(async (tx: any) => {
+      await tx.update(vehicleComplianceImportRows).set({
+        undoStatus: input.status,
+        undoWarning: input.warning || null,
+        undoSkippedFields: input.skippedFields.length ? input.skippedFields : null,
+      }).where(eq(vehicleComplianceImportRows.id, input.importRowId));
+      await tx.insert(vehicleComplianceImportUndoAttemptRows).values({
+        ...input,
+        warning: input.warning || null,
+      });
+    });
+  }
+  async retryVehicleComplianceImportUndoUpdate(input: { attemptId: number; importRowId: number; rowNumber: number; vehicleId: number; updates: Record<string, unknown>; afterValues: Record<string, unknown>; attemptedFields: string[]; restoredFields: string[]; skippedFields: string[]; status: string; warning?: string }) {
+    const pool = getPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const setKeys = Object.keys(input.updates);
+      const params: unknown[] = [input.vehicleId];
+      const set = setKeys.map(key => `"${key.replace(/[^\w]/g, "")}" = $${params.push(input.updates[key])}`).join(", ");
+      const where = setKeys.map(key => `"${key.replace(/[^\w]/g, "")}" IS NOT DISTINCT FROM $${params.push(input.afterValues[key])}`).join(" AND ");
+      const update = await client.query(`UPDATE vehicles SET ${set} WHERE id = $1${where ? ` AND ${where}` : ""}`, params);
+      if (update.rowCount !== 1) {
+        await client.query("ROLLBACK");
+        return false;
+      }
+      await client.query(
+        "UPDATE vehicle_compliance_import_rows SET undo_status = $1, undo_warning = $2, undo_skipped_fields = $3::jsonb WHERE id = $4",
+        [input.status, input.warning || null, input.skippedFields.length ? JSON.stringify(input.skippedFields) : null, input.importRowId],
+      );
+      await client.query(
+        "INSERT INTO vehicle_compliance_import_undo_attempt_rows (attempt_id, import_row_id, row_number, attempted_fields, restored_fields, skipped_fields, status, warning) VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8)",
+        [input.attemptId, input.importRowId, input.rowNumber, JSON.stringify(input.attemptedFields), JSON.stringify(input.restoredFields), JSON.stringify(input.skippedFields), input.status, input.warning || null],
+      );
+      await client.query("COMMIT");
+      return true;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  async retryVehicleComplianceImportUndoDelete(input: { attemptId: number; importRowId: number; rowNumber: number; vehicleId: number; afterValues: Record<string, unknown>; attemptedFields: string[]; status: string }) {
+    const pool = getPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const params: unknown[] = [input.vehicleId];
+      const where = Object.keys(input.afterValues).map(key => `"${key.replace(/[^\w]/g, "")}" IS NOT DISTINCT FROM $${params.push(input.afterValues[key])}`).join(" AND ");
+      const deleted = await client.query(`DELETE FROM vehicles WHERE id = $1${where ? ` AND ${where}` : ""}`, params);
+      if (deleted.rowCount !== 1) {
+        await client.query("ROLLBACK");
+        return false;
+      }
+      await client.query(
+        "UPDATE vehicle_compliance_import_rows SET undo_status = 'deleted', undo_warning = NULL, undo_skipped_fields = NULL WHERE id = $1",
+        [input.importRowId],
+      );
+      await client.query(
+        "INSERT INTO vehicle_compliance_import_undo_attempt_rows (attempt_id, import_row_id, row_number, attempted_fields, restored_fields, skipped_fields, status, warning) VALUES ($1, $2, $3, $4::jsonb, '[]'::jsonb, '[]'::jsonb, $5, NULL)",
+        [input.attemptId, input.importRowId, input.rowNumber, JSON.stringify(input.attemptedFields), input.status],
+      );
+      await client.query("COMMIT");
+      return true;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 
   async updateVehicleComplianceImportUndo(id: number, actorId: number, actorName: string, status: string) {
     await getDb().update(vehicleComplianceImports).set({ undoAt: new Date(), undoActorId: actorId, undoActorName: actorName, undoStatus: status }).where(eq(vehicleComplianceImports.id, id));
   }
-  async updateVehicleComplianceImportRowUndo(id: number, status: string, warning?: string) {
-    await getDb().update(vehicleComplianceImportRows).set({ undoStatus: status, undoWarning: warning || null }).where(eq(vehicleComplianceImportRows.id, id));
+  async completeVehicleComplianceImportUndoRetry(id: number, attemptId: number, status: string) {
+    await getDb().transaction(async (tx: any) => {
+      await tx.update(vehicleComplianceImports).set({ undoStatus: status }).where(eq(vehicleComplianceImports.id, id));
+      await tx.update(vehicleComplianceImportUndoAttempts).set({ completedAt: new Date(), status }).where(eq(vehicleComplianceImportUndoAttempts.id, attemptId));
+    });
+  }
+  async updateVehicleComplianceImportRowUndo(id: number, status: string, warning?: string, skippedFields?: string[]) {
+    await getDb().update(vehicleComplianceImportRows).set({
+      undoStatus: status,
+      undoWarning: warning || null,
+      undoSkippedFields: skippedFields?.length ? skippedFields : null,
+    }).where(eq(vehicleComplianceImportRows.id, id));
   }
   async deleteVehicleIfUnchanged(id: number, afterValues: Record<string, unknown>) {
     const pool = getPool();
@@ -2513,8 +2621,13 @@ export const storage = {
   getVehicleComplianceImports: () => getStorage().getVehicleComplianceImports(),
   getVehicleComplianceImport: (...args: Parameters<DatabaseStorage['getVehicleComplianceImport']>) => getStorage().getVehicleComplianceImport(...args),
   beginVehicleComplianceImportUndo: (...args: Parameters<DatabaseStorage['beginVehicleComplianceImportUndo']>) => getStorage().beginVehicleComplianceImportUndo(...args),
+  beginVehicleComplianceImportUndoRetry: (...args: Parameters<DatabaseStorage['beginVehicleComplianceImportUndoRetry']>) => getStorage().beginVehicleComplianceImportUndoRetry(...args),
+  recordVehicleComplianceImportUndoRetryOutcome: (...args: Parameters<DatabaseStorage['recordVehicleComplianceImportUndoRetryOutcome']>) => getStorage().recordVehicleComplianceImportUndoRetryOutcome(...args),
+  retryVehicleComplianceImportUndoUpdate: (...args: Parameters<DatabaseStorage['retryVehicleComplianceImportUndoUpdate']>) => getStorage().retryVehicleComplianceImportUndoUpdate(...args),
+  retryVehicleComplianceImportUndoDelete: (...args: Parameters<DatabaseStorage['retryVehicleComplianceImportUndoDelete']>) => getStorage().retryVehicleComplianceImportUndoDelete(...args),
   updateVehicleIfUnchanged: (...args: Parameters<DatabaseStorage['updateVehicleIfUnchanged']>) => getStorage().updateVehicleIfUnchanged(...args),
   updateVehicleComplianceImportUndo: (...args: Parameters<DatabaseStorage['updateVehicleComplianceImportUndo']>) => getStorage().updateVehicleComplianceImportUndo(...args),
+  completeVehicleComplianceImportUndoRetry: (...args: Parameters<DatabaseStorage['completeVehicleComplianceImportUndoRetry']>) => getStorage().completeVehicleComplianceImportUndoRetry(...args),
   updateVehicleComplianceImportRowUndo: (...args: Parameters<DatabaseStorage['updateVehicleComplianceImportRowUndo']>) => getStorage().updateVehicleComplianceImportRowUndo(...args),
   deleteVehicleIfUnchanged: (...args: Parameters<DatabaseStorage['deleteVehicleIfUnchanged']>) => getStorage().deleteVehicleIfUnchanged(...args),
   getBookings: () => getStorage().getBookings(),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeVehiclePlate, previewVehicleComplianceImport, vehicleComplianceUpdates, complianceRollbackDecision, safeCsvCell } from "./vehicleComplianceImport";
+import { normalizeVehiclePlate, previewVehicleComplianceImport, vehicleComplianceUpdates, complianceRollbackDecision, retryableComplianceUndoFields, safeCsvCell } from "./vehicleComplianceImport";
 
 const vehicle = {
   id: 1,
@@ -55,6 +55,21 @@ describe("vehicle compliance import", () => {
     const row = { action: "create", beforeValues: {}, afterValues: { make: "A", model: "B" }, changedFields: ["make", "model"] };
     expect(complianceRollbackDecision(row, { make: "A", model: "B" }).canDelete).toBe(true);
     expect(complianceRollbackDecision(row, { make: "A", model: "Changed" }).canDelete).toBe(false);
+  });
+
+  it("keeps only unresolved fields retryable after a partial undo", () => {
+    expect(retryableComplianceUndoFields({
+      action: "update",
+      changedFields: ["color", "insuranceNumber"],
+      undoStatus: "partial",
+      undoSkippedFields: ["insuranceNumber"],
+    })).toEqual(["insuranceNumber"]);
+    expect(retryableComplianceUndoFields({
+      action: "update",
+      changedFields: ["color", "insuranceNumber"],
+      undoStatus: "partial",
+      undoWarning: "Skipped conflicting fields: color, insuranceNumber",
+    })).toEqual(["color", "insuranceNumber"]);
   });
 
   it("neutralizes spreadsheet formulas and escapes CSV quotes", () => {

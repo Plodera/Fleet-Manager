@@ -105,16 +105,21 @@ export function vehicleComplianceUpdates(
 }
 
 export type ComplianceRollbackRow = {
+  id?: number;
   vehicleId?: number | null;
   action: string;
   beforeValues?: Record<string, unknown> | null;
   afterValues?: Record<string, unknown> | null;
   changedFields?: string[];
+  undoStatus?: string | null;
+  undoWarning?: string | null;
+  undoSkippedFields?: unknown;
 };
 
 export type ComplianceRollbackDecision = {
   updates: Record<string, unknown>;
   canDelete: boolean;
+  conflictingFields: string[];
   warning?: string;
 };
 
@@ -126,22 +131,33 @@ export function safeCsvCell(value: unknown): string {
 
 const comparable = (value: unknown) => value == null ? null : value;
 
+/** Returns only the original fields that still need an undo. */
+export function retryableComplianceUndoFields(row: ComplianceRollbackRow): string[] {
+  if (Array.isArray(row.undoSkippedFields)) {
+    return row.undoSkippedFields.filter((field): field is string => typeof field === "string");
+  }
+  if (row.undoStatus === "skipped") return row.changedFields || Object.keys(row.afterValues || {});
+  const warningFields = row.undoWarning?.match(/^Skipped conflicting fields:\s*(.+)$/)?.[1]
+    .split(",").map(field => field.trim()).filter(Boolean);
+  return warningFields || [];
+}
+
 /** Decide which fields can safely be restored.  A field is restored only if
  * nobody changed it since this import (current still equals import-after). */
 export function complianceRollbackDecision(
   row: ComplianceRollbackRow,
   current: Record<string, unknown> | undefined,
 ): ComplianceRollbackDecision {
-  if (!current) return { updates: {}, canDelete: false, warning: "Vehicle no longer exists" };
+  if (!current) return { updates: {}, canDelete: false, conflictingFields: row.changedFields || [], warning: "Vehicle no longer exists" };
   const after = row.afterValues || {};
   const before = row.beforeValues || {};
   const fields = row.changedFields || Object.keys(after);
   const conflicts = fields.filter(field => comparable(current[field]) !== comparable(after[field]));
   if (row.action === "create") {
     if (conflicts.length || fields.some(field => field === "id" ? false : !(field in current))) {
-      return { updates: {}, canDelete: false, warning: `Created vehicle has later changes: ${conflicts.join(", ") || "vehicle state changed"}` };
+      return { updates: {}, canDelete: false, conflictingFields: conflicts.length ? conflicts : fields, warning: `Created vehicle has later changes: ${conflicts.join(", ") || "vehicle state changed"}` };
     }
-    return { updates: {}, canDelete: true };
+    return { updates: {}, canDelete: true, conflictingFields: [] };
   }
   const updates: Record<string, unknown> = {};
   for (const field of fields) {
@@ -150,6 +166,7 @@ export function complianceRollbackDecision(
   return {
     updates,
     canDelete: false,
+    conflictingFields: conflicts,
     warning: conflicts.length ? `Skipped conflicting fields: ${conflicts.join(", ")}` : undefined,
   };
 }

@@ -164,6 +164,30 @@ export const vehicleComplianceImportRows = pgTable("vehicle_compliance_import_ro
   message: text("message"),
   undoStatus: text("undo_status"),
   undoWarning: text("undo_warning"),
+  undoSkippedFields: jsonb("undo_skipped_fields"),
+});
+
+/** Each retry records its own result, leaving the import's original snapshots intact. */
+export const vehicleComplianceImportUndoAttempts = pgTable("vehicle_compliance_import_undo_attempts", {
+  id: serial("id").primaryKey(),
+  importId: integer("import_id").references(() => vehicleComplianceImports.id, { onDelete: "cascade" }).notNull(),
+  actorId: integer("actor_id").references(() => users.id, { onDelete: "set null" }),
+  actorName: text("actor_name").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  status: text("status").notNull().default("in_progress"),
+});
+
+export const vehicleComplianceImportUndoAttemptRows = pgTable("vehicle_compliance_import_undo_attempt_rows", {
+  id: serial("id").primaryKey(),
+  attemptId: integer("attempt_id").references(() => vehicleComplianceImportUndoAttempts.id, { onDelete: "cascade" }).notNull(),
+  importRowId: integer("import_row_id").references(() => vehicleComplianceImportRows.id, { onDelete: "set null" }),
+  rowNumber: integer("row_number").notNull(),
+  attemptedFields: jsonb("attempted_fields").notNull(),
+  restoredFields: jsonb("restored_fields").notNull(),
+  skippedFields: jsonb("skipped_fields").notNull(),
+  status: text("status").notNull(),
+  warning: text("warning"),
 });
 
 export const bookings = pgTable("bookings", {
@@ -579,6 +603,8 @@ export type Vehicle = typeof vehicles.$inferSelect;
 export type VehicleComplianceDocument = typeof vehicleComplianceDocuments.$inferSelect;
 export type VehicleComplianceImport = typeof vehicleComplianceImports.$inferSelect;
 export type VehicleComplianceImportRow = typeof vehicleComplianceImportRows.$inferSelect;
+export type VehicleComplianceImportUndoAttempt = typeof vehicleComplianceImportUndoAttempts.$inferSelect;
+export type VehicleComplianceImportUndoAttemptRow = typeof vehicleComplianceImportUndoAttemptRows.$inferSelect;
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;

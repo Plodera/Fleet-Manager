@@ -8,8 +8,11 @@ const { authState, state, storageMock } = vi.hoisted(() => {
     vehicles: [] as any[],
     imports: [] as any[],
     importRows: [] as any[],
+    undoAttempts: [] as any[],
+    undoAttemptRows: [] as any[],
     nextVehicleId: 1,
     nextImportId: 1,
+    nextUndoAttemptId: 1,
   };
   const storageMock = {
     getUsers: vi.fn().mockResolvedValue([{ id: 1 }]),
@@ -37,6 +40,94 @@ const { authState, state, storageMock } = vi.hoisted(() => {
       const created = { id: state.nextVehicleId++, ...vehicle };
       state.vehicles.push(created);
       return created;
+    }),
+    getVehicle: vi.fn(async (id: number) => state.vehicles.find((vehicle: any) => vehicle.id === id)),
+    getVehicleComplianceImport: vi.fn(async (id: number) => {
+      const imported = state.imports.find((candidate: any) => candidate.id === id);
+      if (!imported) return undefined;
+      const attempts = state.undoAttempts
+        .filter((attempt: any) => attempt.importId === id)
+        .map((attempt: any) => ({ ...attempt, rows: state.undoAttemptRows.filter((row: any) => row.attemptId === attempt.id) }));
+      return { import: imported, rows: state.importRows.filter((row: any) => row.importId === id), undoAttempts: attempts };
+    }),
+    beginVehicleComplianceImportUndo: vi.fn(async (id: number, actorId: number, actorName: string) => {
+      const imported = state.imports.find((candidate: any) => candidate.id === id);
+      if (!imported || imported.undoStatus) return false;
+      Object.assign(imported, { undoStatus: "in_progress", undoAt: new Date(), undoActorId: actorId, undoActorName: actorName });
+      return true;
+    }),
+    beginVehicleComplianceImportUndoRetry: vi.fn(async (id: number, actorId: number, actorName: string) => {
+      const imported = state.imports.find((candidate: any) => candidate.id === id);
+      if (!imported || imported.undoStatus !== "partial") return undefined;
+      imported.undoStatus = "in_progress";
+      const attempt = { id: state.nextUndoAttemptId++, importId: id, actorId, actorName, startedAt: new Date(), status: "in_progress" };
+      state.undoAttempts.push(attempt);
+      return attempt;
+    }),
+    createVehicleComplianceImportUndoAttempt: vi.fn(async (input: any) => {
+      const attempt = { id: state.nextUndoAttemptId++, startedAt: new Date(), status: "in_progress", ...input };
+      state.undoAttempts.push(attempt);
+      return attempt;
+    }),
+    createVehicleComplianceImportUndoAttemptRow: vi.fn(async (input: any) => {
+      const record = { id: state.undoAttemptRows.length + 1, ...input };
+      state.undoAttemptRows.push(record);
+      return record;
+    }),
+    completeVehicleComplianceImportUndoAttempt: vi.fn(async (id: number, status: string) => {
+      const attempt = state.undoAttempts.find((candidate: any) => candidate.id === id);
+      Object.assign(attempt, { status, completedAt: new Date() });
+    }),
+    updateVehicleComplianceImportUndo: vi.fn(async (id: number, actorId: number, actorName: string, status: string) => {
+      const imported = state.imports.find((candidate: any) => candidate.id === id);
+      Object.assign(imported, { undoStatus: status, undoAt: new Date(), undoActorId: actorId, undoActorName: actorName });
+    }),
+    completeVehicleComplianceImportUndoRetry: vi.fn(async (id: number, attemptId: number, status: string) => {
+      const imported = state.imports.find((candidate: any) => candidate.id === id);
+      imported.undoStatus = status;
+      const attempt = state.undoAttempts.find((candidate: any) => candidate.id === attemptId);
+      Object.assign(attempt, { status, completedAt: new Date() });
+    }),
+    updateVehicleComplianceImportRowUndo: vi.fn(async (id: number, status: string, warning?: string, skippedFields?: string[]) => {
+      const row = state.importRows.find((candidate: any) => candidate.id === id);
+      Object.assign(row, { undoStatus: status, undoWarning: warning || null, undoSkippedFields: skippedFields?.length ? skippedFields : null });
+    }),
+    updateVehicleIfUnchanged: vi.fn(async (id: number, updates: Record<string, unknown>, afterValues: Record<string, unknown>) => {
+      const vehicle = state.vehicles.find((candidate: any) => candidate.id === id);
+      if (!vehicle || Object.keys(updates).some(field => (vehicle[field] ?? null) !== (afterValues[field] ?? null))) return false;
+      Object.assign(vehicle, updates);
+      return true;
+    }),
+    deleteVehicleIfUnchanged: vi.fn(async (id: number, afterValues: Record<string, unknown>) => {
+      const index = state.vehicles.findIndex((candidate: any) => candidate.id === id);
+      const vehicle = state.vehicles[index];
+      if (!vehicle || Object.keys(afterValues).some(field => (vehicle[field] ?? null) !== (afterValues[field] ?? null))) return false;
+      state.vehicles.splice(index, 1);
+      return true;
+    }),
+    recordVehicleComplianceImportUndoRetryOutcome: vi.fn(async (input: any) => {
+      const row = state.importRows.find((candidate: any) => candidate.id === input.importRowId);
+      Object.assign(row, { undoStatus: input.status, undoWarning: input.warning || null, undoSkippedFields: input.skippedFields.length ? input.skippedFields : null });
+      state.undoAttemptRows.push({ id: state.undoAttemptRows.length + 1, ...input });
+    }),
+    retryVehicleComplianceImportUndoUpdate: vi.fn(async (input: any) => {
+      const vehicle = state.vehicles.find((candidate: any) => candidate.id === input.vehicleId);
+      if (!vehicle || Object.keys(input.updates).some(field => (vehicle[field] ?? null) !== (input.afterValues[field] ?? null))) return false;
+      Object.assign(vehicle, input.updates);
+      const row = state.importRows.find((candidate: any) => candidate.id === input.importRowId);
+      Object.assign(row, { undoStatus: input.status, undoWarning: input.warning || null, undoSkippedFields: input.skippedFields.length ? input.skippedFields : null });
+      state.undoAttemptRows.push({ id: state.undoAttemptRows.length + 1, ...input });
+      return true;
+    }),
+    retryVehicleComplianceImportUndoDelete: vi.fn(async (input: any) => {
+      const index = state.vehicles.findIndex((candidate: any) => candidate.id === input.vehicleId);
+      const vehicle = state.vehicles[index];
+      if (!vehicle || Object.keys(input.afterValues).some(field => (vehicle[field] ?? null) !== (input.afterValues[field] ?? null))) return false;
+      state.vehicles.splice(index, 1);
+      const row = state.importRows.find((candidate: any) => candidate.id === input.importRowId);
+      Object.assign(row, { undoStatus: "deleted", undoWarning: null, undoSkippedFields: null });
+      state.undoAttemptRows.push({ id: state.undoAttemptRows.length + 1, ...input, restoredFields: [], skippedFields: [] });
+      return true;
     }),
   };
   return {
@@ -85,8 +176,11 @@ function resetState() {
   state.vehicles = [];
   state.imports = [];
   state.importRows = [];
+  state.undoAttempts = [];
+  state.undoAttemptRows = [];
   state.nextVehicleId = 1;
   state.nextImportId = 1;
+  state.nextUndoAttemptId = 1;
   vi.clearAllMocks();
   storageMock.getUsers.mockResolvedValue([{ id: 1 }]);
   storageMock.getBookings.mockResolvedValue([]);
@@ -272,5 +366,131 @@ describe("POST /api/vehicle-compliance/import", () => {
       insuranceNumber: null,
       insurancePolicyNumber: null,
     });
+  });
+});
+
+describe("POST /api/vehicle-compliance/import-history/:id/undo/retry", () => {
+  let app: express.Express;
+  let server: http.Server;
+
+  beforeAll(async () => {
+    app = express();
+    server = http.createServer(app);
+    const { registerRoutes } = await import("./routes");
+    await registerRoutes(server, app);
+  });
+
+  beforeEach(resetState);
+
+  afterAll(() => {
+    server.close();
+  });
+
+  it("retries only selected skipped fields and records a separate durable outcome", async () => {
+    const originalUndoAt = new Date("2026-09-10T08:00:00.000Z");
+    state.vehicles.push(existingVehicle({ id: 7, color: "Blue", insuranceNumber: "Changed later" }));
+    state.imports.push({
+      id: 1,
+      sourceFilename: "compliance.xlsx",
+      actorName: "Import Admin",
+      options: {},
+      undoStatus: "partial",
+      undoAt: originalUndoAt,
+      undoActorName: "First Admin",
+    });
+    state.importRows.push({
+      id: 11,
+      importId: 1,
+      rowNumber: 2,
+      vehicleId: 7,
+      auditedVehicleId: 7,
+      action: "update",
+      success: true,
+      beforeValues: { color: "Red", insuranceNumber: "POLICY-1" },
+      afterValues: { color: "Blue", insuranceNumber: "POLICY-2" },
+      changedFields: ["color", "insuranceNumber"],
+      undoStatus: "partial",
+      undoWarning: "Skipped conflicting fields: color",
+      undoSkippedFields: ["color"],
+    });
+
+    const response = await request(app)
+      .post("/api/vehicle-compliance/import-history/1/undo/retry")
+      .send({ rows: [{ rowId: 11, fields: ["color"] }] });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      restored: [{ rowNumber: 2, fields: ["color"] }],
+      deleted: [],
+      skipped: [],
+      status: "completed",
+    });
+    expect(state.vehicles[0]).toMatchObject({ color: "Red", insuranceNumber: "Changed later" });
+    expect(state.importRows[0]).toMatchObject({
+      beforeValues: { color: "Red", insuranceNumber: "POLICY-1" },
+      afterValues: { color: "Blue", insuranceNumber: "POLICY-2" },
+      undoStatus: "restored",
+      undoSkippedFields: null,
+    });
+    expect(state.imports[0]).toMatchObject({ undoStatus: "completed", undoAt: originalUndoAt, undoActorName: "First Admin" });
+    expect(state.undoAttempts).toHaveLength(1);
+    expect(state.undoAttemptRows).toEqual([expect.objectContaining({
+      importRowId: 11,
+      attemptedFields: ["color"],
+      restoredFields: ["color"],
+      skippedFields: [],
+      status: "restored",
+    })]);
+  });
+
+  it("does not retry fields that are not still skipped", async () => {
+    state.imports.push({ id: 1, sourceFilename: "compliance.xlsx", actorName: "Import Admin", options: {}, undoStatus: "partial" });
+    state.importRows.push({
+      id: 11, importId: 1, rowNumber: 2, vehicleId: 7, action: "update", success: true,
+      beforeValues: { color: "Red", insuranceNumber: "POLICY-1" },
+      afterValues: { color: "Blue", insuranceNumber: "POLICY-2" },
+      changedFields: ["color", "insuranceNumber"],
+      undoStatus: "partial", undoSkippedFields: ["color"],
+    });
+
+    const response = await request(app)
+      .post("/api/vehicle-compliance/import-history/1/undo/retry")
+      .send({ rows: [{ rowId: 11, fields: ["insuranceNumber"] }] });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ message: "A selected row or field is no longer retryable" });
+    expect(storageMock.beginVehicleComplianceImportUndoRetry).not.toHaveBeenCalled();
+  });
+
+  it("retries a skipped created vehicle as a complete row and records its deletion", async () => {
+    state.vehicles.push(existingVehicle({ id: 7, make: "Imported", model: "Vehicle", color: "Blue" }));
+    state.imports.push({ id: 1, sourceFilename: "compliance.xlsx", actorName: "Import Admin", options: {}, undoStatus: "partial" });
+    state.importRows.push({
+      id: 12, importId: 1, rowNumber: 3, vehicleId: 7, auditedVehicleId: 7, action: "create", success: true,
+      beforeValues: {}, afterValues: { make: "Imported", model: "Vehicle", color: "Blue" },
+      changedFields: ["make", "model", "color"],
+      undoStatus: "skipped", undoSkippedFields: ["make", "model", "color"],
+    });
+
+    const response = await request(app)
+      .post("/api/vehicle-compliance/import-history/1/undo/retry")
+      .send({ rows: [{ rowId: 12, fields: ["make", "model", "color"] }] });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      restored: [],
+      deleted: [{ rowNumber: 3 }],
+      skipped: [],
+      status: "completed",
+    });
+    expect(state.vehicles).toHaveLength(0);
+    expect(state.importRows[0]).toMatchObject({ undoStatus: "deleted", undoSkippedFields: null });
+    expect(state.undoAttemptRows).toEqual([expect.objectContaining({
+      importRowId: 12,
+      attemptedFields: ["make", "model", "color"],
+      restoredFields: [],
+      skippedFields: [],
+      status: "deleted",
+    })]);
   });
 });

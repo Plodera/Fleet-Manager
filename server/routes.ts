@@ -19,6 +19,7 @@ import {
   previewVehicleComplianceImport,
   vehicleComplianceUpdates,
   complianceRollbackDecision,
+  retryableComplianceUndoFields,
   safeCsvCell,
 } from "./vehicleComplianceImport";
 import { canAccessVehicleComplianceDocuments, validateComplianceDocument } from "./vehicleComplianceDocuments";
@@ -438,7 +439,7 @@ export async function registerRoutes(
     const csvRows = detail.rows.map((row: any) => [
       row.rowNumber, row.action, row.auditedVehicleId ?? row.vehicleId ?? "", row.success,
       row.message || "", row.changedFields || [], row.beforeValues || {}, row.afterValues || {},
-      row.undoStatus || "", row.undoWarning || "",
+      row.undoStatus || "", row.undoWarning || "", row.undoSkippedFields || [],
     ].map(safeCsvCell).join(","));
     const importValues = [
       detail.import.id, detail.import.sourceFilename, detail.import.actorName,
@@ -446,16 +447,130 @@ export async function registerRoutes(
       detail.import.undoStatus || "", detail.import.undoAt?.toISOString() || "",
       detail.import.undoActorName || "",
     ].map(safeCsvCell).join(",");
+    const retryRows = detail.undoAttempts.flatMap((attempt: any) => attempt.rows.map((row: any) => [
+      attempt.id, attempt.actorName, attempt.startedAt.toISOString(), attempt.completedAt?.toISOString() || "", attempt.status,
+      row.rowNumber, row.attemptedFields, row.restoredFields, row.skippedFields, row.status, row.warning || "",
+    ].map(safeCsvCell).join(",")));
     const csv = [
       "importId,sourceFilename,actorName,appliedAt,options,undoStatus,undoAt,undoActorName",
       importValues, "",
-      "rowNumber,action,auditedVehicleId,success,message,changedFields,beforeValues,afterValues,undoStatus,undoWarning",
+      "rowNumber,action,auditedVehicleId,success,message,changedFields,beforeValues,afterValues,undoStatus,undoWarning,undoSkippedFields",
       ...csvRows,
+      "",
+      "retryAttemptId,retryActorName,retryStartedAt,retryCompletedAt,retryStatus,rowNumber,attemptedFields,restoredFields,skippedFields,rowStatus,warning",
+      ...retryRows,
     ].join("\n");
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="vehicle-compliance-import-${detail.import.id}.csv"`);
     res.send(csv);
   });
+  type UndoOutcome = {
+    rowId: number;
+    rowNumber: number;
+    status: "restored" | "deleted" | "partial" | "skipped";
+    attemptedFields: string[];
+    restoredFields: string[];
+    skippedFields: string[];
+    warning?: string;
+  };
+  const summarizeUndo = (outcomes: UndoOutcome[]) => {
+    const restored = outcomes.filter(outcome => outcome.restoredFields.length > 0).map(outcome => ({
+      rowNumber: outcome.rowNumber, fields: outcome.restoredFields,
+    }));
+    const deleted = outcomes.filter(outcome => outcome.status === "deleted").map(outcome => ({
+      rowNumber: outcome.rowNumber,
+    }));
+    const skipped = outcomes.filter(outcome => outcome.skippedFields.length > 0).map(outcome => ({
+      rowNumber: outcome.rowNumber, fields: outcome.skippedFields, warning: outcome.warning || "Fields could not be safely restored",
+    }));
+    return {
+      restored,
+      deleted,
+      skipped,
+      restoredCount: restored.length,
+      deletedCount: deleted.length,
+      skippedCount: skipped.length,
+    };
+  };
+  const processUndoRows = async (rows: any[], selectedFields?: Map<number, string[]>, retryAttemptId?: number) => {
+    const outcomes: UndoOutcome[] = [];
+    for (const row of rows) {
+      if (!row.success) continue;
+      const retryableFields: string[] = selectedFields ? retryableComplianceUndoFields(row) : (row.changedFields || []);
+      const attemptedFields = selectedFields?.get(row.id) || retryableFields;
+      const unselectedFields = retryableFields.filter((field: string) => !attemptedFields.includes(field));
+      const remainingAfterFailure = Array.from(new Set<string>([...unselectedFields, ...attemptedFields]));
+      const persistOutcome = async (outcome: UndoOutcome) => {
+        if (retryAttemptId) {
+          await storage.recordVehicleComplianceImportUndoRetryOutcome({
+            attemptId: retryAttemptId,
+            importRowId: outcome.rowId,
+            rowNumber: outcome.rowNumber,
+            attemptedFields: outcome.attemptedFields,
+            restoredFields: outcome.restoredFields,
+            skippedFields: outcome.skippedFields,
+            status: outcome.status,
+            warning: outcome.warning,
+          });
+        } else {
+          await storage.updateVehicleComplianceImportRowUndo(outcome.rowId, outcome.status, outcome.warning, outcome.skippedFields);
+        }
+      };
+      if (!row.vehicleId) {
+        const warning = `Vehicle ${row.auditedVehicleId ?? "from this row"} no longer exists`;
+        const outcome: UndoOutcome = { rowId: row.id, rowNumber: row.rowNumber, status: "skipped", attemptedFields, restoredFields: [], skippedFields: remainingAfterFailure, warning };
+        await persistOutcome(outcome);
+        outcomes.push(outcome);
+        continue;
+      }
+      try {
+        const vehicle = await storage.getVehicle(row.vehicleId);
+        const decision = complianceRollbackDecision({ ...row, changedFields: attemptedFields }, vehicle as any);
+        if (decision.canDelete) {
+          const outcome: UndoOutcome = { rowId: row.id, rowNumber: row.rowNumber, status: "deleted", attemptedFields, restoredFields: [], skippedFields: [] };
+          const deleted = retryAttemptId
+            ? await storage.retryVehicleComplianceImportUndoDelete({
+              attemptId: retryAttemptId, importRowId: outcome.rowId, rowNumber: outcome.rowNumber,
+              vehicleId: row.vehicleId, afterValues: row.afterValues as any || {}, attemptedFields, status: "deleted",
+            })
+            : await storage.deleteVehicleIfUnchanged(row.vehicleId, row.afterValues as any || {});
+          if (!deleted) throw new Error("Created vehicle changed or is referenced by later records");
+          if (!retryAttemptId) await persistOutcome(outcome);
+          outcomes.push(outcome);
+          continue;
+        }
+        const restoredFields = Object.keys(decision.updates);
+        if (!restoredFields.length && decision.warning) {
+          throw new Error(decision.warning);
+        }
+        const skippedFields = Array.from(new Set<string>([...unselectedFields, ...decision.conflictingFields]));
+        const warning = skippedFields.length ? `Fields still not restored: ${skippedFields.join(", ")}` : undefined;
+        const status = skippedFields.length ? (restoredFields.length ? "partial" : "skipped") : "restored";
+        const outcome: UndoOutcome = { rowId: row.id, rowNumber: row.rowNumber, status, attemptedFields, restoredFields, skippedFields, warning };
+        if (restoredFields.length && retryAttemptId) {
+          const changed = await storage.retryVehicleComplianceImportUndoUpdate({
+            attemptId: retryAttemptId, importRowId: outcome.rowId, rowNumber: outcome.rowNumber, vehicleId: row.vehicleId,
+            updates: decision.updates, afterValues: row.afterValues as any || {},
+            attemptedFields, restoredFields, skippedFields, status, warning,
+          });
+          if (!changed) throw new Error("Vehicle changed while undo was running");
+        } else {
+          if (restoredFields.length) {
+            const changed = await storage.updateVehicleIfUnchanged(row.vehicleId, decision.updates, row.afterValues as any || {});
+            if (!changed) throw new Error("Vehicle changed while undo was running");
+          }
+          await persistOutcome(outcome);
+        }
+        outcomes.push(outcome);
+      } catch (error) {
+        const warning = error instanceof Error ? error.message : "Undo failed";
+        const outcome: UndoOutcome = { rowId: row.id, rowNumber: row.rowNumber, status: "skipped", attemptedFields, restoredFields: [], skippedFields: remainingAfterFailure, warning };
+        await persistOutcome(outcome);
+        outcomes.push(outcome);
+      }
+    }
+    return outcomes;
+  };
   app.post("/api/vehicle-compliance/import-history/:id/undo", async (req, res) => {
     if (!req.isAuthenticated() || (req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
     const detail = await storage.getVehicleComplianceImport(Number(req.params.id));
@@ -463,40 +578,49 @@ export async function registerRoutes(
     const undoUser = req.user as User;
     const claimed = await storage.beginVehicleComplianceImportUndo(detail.import.id, undoUser.id, undoUser.fullName);
     if (!claimed) return res.status(409).json({ message: "Import undo has already started or completed" });
-    const restored: number[] = [], skipped: Array<{ rowNumber: number; warning: string }> = [];
-    for (const row of detail.rows) {
-      if (!row.success) continue;
-      if (!row.vehicleId) {
-        const warning = `Vehicle ${row.auditedVehicleId ?? "from this row"} no longer exists`;
-        skipped.push({ rowNumber: row.rowNumber, warning });
-        await storage.updateVehicleComplianceImportRowUndo(row.id, "skipped", warning);
-        continue;
+    const result = summarizeUndo(await processUndoRows(detail.rows));
+    await storage.updateVehicleComplianceImportUndo(detail.import.id, undoUser.id, undoUser.fullName, result.skippedCount ? "partial" : "completed");
+    res.json(result);
+  });
+  app.post("/api/vehicle-compliance/import-history/:id/undo/retry", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const detail = await storage.getVehicleComplianceImport(Number(req.params.id));
+    if (!detail) return res.status(404).json({ message: "Import not found" });
+    const retryInput = z.object({
+      rows: z.array(z.object({
+        rowId: z.number().int().positive(),
+        fields: z.array(z.string().min(1).max(100)).min(1).max(100).optional(),
+      })).min(1).max(5000),
+    }).safeParse(req.body);
+    if (!retryInput.success) return res.status(400).json({ message: "Select one or more skipped fields to retry" });
+    const selectedFields = new Map<number, string[]>();
+    for (const selection of retryInput.data.rows) {
+      if (selectedFields.has(selection.rowId)) return res.status(400).json({ message: "Each row can be selected only once" });
+      const row = detail.rows.find((candidate: any) => candidate.id === selection.rowId);
+      const retryableFields = row && retryableComplianceUndoFields(row);
+      const fields = selection.fields || retryableFields || [];
+      if (!row || !row.success || !retryableFields?.length || fields.some((field: string) => !retryableFields.includes(field))) {
+        return res.status(400).json({ message: "A selected row or field is no longer retryable" });
       }
-      try {
-        const vehicle = await storage.getVehicle(row.vehicleId);
-        const decision = complianceRollbackDecision(row, vehicle as any);
-        if (decision.canDelete) {
-          const deleted = await storage.deleteVehicleIfUnchanged(row.vehicleId, row.afterValues as any || {});
-          if (deleted) { restored.push(row.rowNumber); await storage.updateVehicleComplianceImportRowUndo(row.id, "deleted"); }
-          else throw new Error("Created vehicle changed or is referenced by later records");
-        } else if (Object.keys(decision.updates).length) {
-          const changed = await storage.updateVehicleIfUnchanged(row.vehicleId, decision.updates, row.afterValues as any || {});
-          if (changed) {
-            restored.push(row.rowNumber);
-            await storage.updateVehicleComplianceImportRowUndo(row.id, decision.warning ? "partial" : "restored", decision.warning);
-            if (decision.warning) skipped.push({ rowNumber: row.rowNumber, warning: decision.warning });
-          } else throw new Error("Vehicle changed while undo was running");
-        } else if (decision.warning) {
-          throw new Error(decision.warning);
-        }
-      } catch (error) {
-        const warning = error instanceof Error ? error.message : "Undo failed";
-        skipped.push({ rowNumber: row.rowNumber, warning });
-        await storage.updateVehicleComplianceImportRowUndo(row.id, "skipped", warning);
+      if (row.action === "create" && fields.length !== retryableFields.length) {
+        return res.status(400).json({ message: "Created vehicles must be retried as a complete row" });
       }
+      selectedFields.set(row.id, Array.from(new Set<string>(fields)));
     }
-    await storage.updateVehicleComplianceImportUndo(detail.import.id, undoUser.id, undoUser.fullName, skipped.length ? "partial" : "completed");
-    res.json({ restored, skipped, restoredCount: restored.length, skippedCount: skipped.length });
+    const retryUser = req.user as User;
+    const attempt = await storage.beginVehicleComplianceImportUndoRetry(detail.import.id, retryUser.id, retryUser.fullName);
+    if (!attempt) return res.status(409).json({ message: "Import retry has already started or is no longer needed" });
+    try {
+      const outcomes = await processUndoRows(detail.rows.filter((row: any) => selectedFields.has(row.id)), selectedFields, attempt.id);
+      const updatedDetail = await storage.getVehicleComplianceImport(detail.import.id);
+      const remainsPartial = updatedDetail?.rows.some((row: any) => retryableComplianceUndoFields(row).length > 0) ?? true;
+      await storage.completeVehicleComplianceImportUndoRetry(detail.import.id, attempt.id, remainsPartial ? "partial" : "completed");
+      res.json({ ...summarizeUndo(outcomes), retryAttemptId: attempt.id, status: remainsPartial ? "partial" : "completed" });
+    } catch (error) {
+      await storage.completeVehicleComplianceImportUndoRetry(detail.import.id, attempt.id, "partial");
+      console.error("[vehicleCompliance] Undo retry failed:", error);
+      res.status(500).json({ message: "Import undo retry failed" });
+    }
   });
 
   // Bookings

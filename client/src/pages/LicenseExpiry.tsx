@@ -124,6 +124,7 @@ export default function LicenseExpiry() {
   const [replaceBlanks, setReplaceBlanks] = useState(false);
   const [importFilename, setImportFilename] = useState("");
   const [selectedImport, setSelectedImport] = useState<number | null>(null);
+  const [selectedUndoFields, setSelectedUndoFields] = useState<Record<number, string[]>>({});
   const { data: importHistory = [] } = useQuery<any[]>({ queryKey: ["/api/vehicle-compliance/import-history"], enabled: isAdmin });
   const { data: importDetail } = useQuery<any>({ queryKey: ["/api/vehicle-compliance/import-history", selectedImport], enabled: isAdmin && selectedImport !== null });
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -225,6 +226,23 @@ export default function LicenseExpiry() {
     },
     onError: (error: Error) => toast({ title: le.importFailed, description: error.message, variant: "destructive" }),
   });
+  const undoRetryMutation = useMutation({
+    mutationFn: async ({ importId, rows }: { importId: number; rows: Array<{ rowId: number; fields: string[] }> }) => {
+      const response = await apiRequest("POST", `/api/vehicle-compliance/import-history/${importId}/undo/retry`, { rows });
+      return response.json();
+    },
+    onSuccess: (result, { importId }) => {
+      refresh();
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicle-compliance/import-history", importId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+      setSelectedUndoFields({});
+      toast({
+        title: le.undoRetryComplete,
+        description: le.undoResult.replace("{restored}", String(result.restoredCount)).replace("{deleted}", String(result.deletedCount)).replace("{skipped}", String(result.skippedCount)),
+      });
+    },
+    onError: (error: Error) => toast({ title: le.undoRetryFailed, description: error.message, variant: "destructive" }),
+  });
 
   const openDocument = (document?: CompanyDocument) => {
     setEditingDocument(document || null);
@@ -304,6 +322,25 @@ export default function LicenseExpiry() {
     { type: "insurance", label: le.insuranceDocument },
     { type: "ivm", label: le.ivmDocument },
   ];
+  const retryableUndoFields = (row: any): string[] => {
+    if (Array.isArray(row.undoSkippedFields)) return row.undoSkippedFields.filter((field: unknown): field is string => typeof field === "string");
+    if (row.undoStatus === "skipped") return row.changedFields || [];
+    const warningFields = typeof row.undoWarning === "string"
+      ? row.undoWarning.match(/^Skipped conflicting fields:\s*(.+)$/)?.[1]?.split(",").map((field: string) => field.trim()).filter(Boolean)
+      : undefined;
+    return warningFields || [];
+  };
+  const openImportDetails = (importId: number) => {
+    setSelectedUndoFields({});
+    setSelectedImport(importId);
+  };
+  const toggleUndoField = (rowId: number, field: string, checked: boolean) => {
+    setSelectedUndoFields(current => {
+      const selected = current[rowId] || [];
+      const next = checked ? Array.from(new Set([...selected, field])) : selected.filter(item => item !== field);
+      return { ...current, [rowId]: next };
+    });
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -531,16 +568,16 @@ export default function LicenseExpiry() {
         </DialogContent>
       </Dialog>
       {isAdmin && <Card>
-        <CardHeader><CardTitle className="text-base">Compliance import history</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{le.importHistory}</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           {importHistory.map((item: any) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3">
             <div><p className="font-medium">{item.sourceFilename}</p><p className="text-xs text-muted-foreground">{item.actorName} · {new Date(item.appliedAt).toLocaleString()}</p></div>
-             <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setSelectedImport(item.id)}>Inspect</Button><Button size="sm" variant="outline" onClick={() => window.open(`/api/vehicle-compliance/import-history/${item.id}/report`, "_blank")}>Download report</Button><Button size="sm" variant="destructive" disabled={Boolean(item.undoStatus)} onClick={async () => { if (!window.confirm("Undo this import? Later edits will be preserved.")) return; const response = await apiRequest("POST", `/api/vehicle-compliance/import-history/${item.id}/undo`); const result = await response.json(); refresh(); queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] }); toast({ title: "Import undo complete", description: `${result.restoredCount} restored, ${result.skippedCount} skipped${result.skipped?.[0] ? `. ${result.skipped[0].warning}` : ""}` }); }}>{item.undoStatus ? `Undo ${item.undoStatus}` : "Undo"}</Button></div>
+              <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => openImportDetails(item.id)}>{le.inspectImport}</Button><Button size="sm" variant="outline" onClick={() => window.open(`/api/vehicle-compliance/import-history/${item.id}/report`, "_blank")}>{le.downloadReport}</Button>{item.undoStatus === "partial" && <Button size="sm" variant="outline" onClick={() => openImportDetails(item.id)}>{le.retrySkipped}</Button>}<Button size="sm" variant="destructive" disabled={Boolean(item.undoStatus)} onClick={async () => { if (!window.confirm(le.undoImportConfirm)) return; const response = await apiRequest("POST", `/api/vehicle-compliance/import-history/${item.id}/undo`); const result = await response.json(); refresh(); queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] }); toast({ title: le.undoImportComplete, description: le.undoResult.replace("{restored}", String(result.restoredCount)).replace("{deleted}", String(result.deletedCount)).replace("{skipped}", String(result.skippedCount)) }); }}>{item.undoStatus ? `${le.undo} ${item.undoStatus}` : le.undo}</Button></div>
           </div>)}
-          {importHistory.length === 0 && <p className="text-sm text-muted-foreground">No imports recorded.</p>}
+          {importHistory.length === 0 && <p className="text-sm text-muted-foreground">{le.noImports}</p>}
         </CardContent>
       </Card>}
-      <Dialog open={selectedImport !== null} onOpenChange={open => !open && setSelectedImport(null)}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>Import details</DialogTitle></DialogHeader>{importDetail && <div className="space-y-3"><div className="rounded border p-3 text-sm"><p><span className="font-medium">Source:</span> {importDetail.import.sourceFilename}</p><p><span className="font-medium">Run by:</span> {importDetail.import.actorName} · {new Date(importDetail.import.appliedAt).toLocaleString()}</p><p><span className="font-medium">Options:</span> create unmatched {importDetail.import.options?.createUnmatched ? "on" : "off"}, replace blanks {importDetail.import.options?.replaceBlanks ? "on" : "off"}</p></div>{importDetail.rows.map((row: any) => <div key={row.id} className="rounded border p-3 text-sm"><span className="font-medium">Row {row.rowNumber} · {row.action}</span><span className="ml-2">{row.success ? "Applied" : row.message || "Failed"}</span>{row.changedFields?.length > 0 && <div className="mt-2 overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Field</TableHead><TableHead>Before</TableHead><TableHead>After</TableHead></TableRow></TableHeader><TableBody>{row.changedFields.map((field: string) => <TableRow key={field}><TableCell>{field}</TableCell><TableCell>{String(row.beforeValues?.[field] ?? "—")}</TableCell><TableCell>{String(row.afterValues?.[field] ?? "—")}</TableCell></TableRow>)}</TableBody></Table></div>}</div>)}</div>}</DialogContent></Dialog>
+      <Dialog open={selectedImport !== null} onOpenChange={open => !open && setSelectedImport(null)}><DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle>{le.importDetails}</DialogTitle></DialogHeader>{importDetail && <div className="space-y-4"><div className="rounded border p-3 text-sm"><p><span className="font-medium">{le.source}:</span> {importDetail.import.sourceFilename}</p><p><span className="font-medium">{le.runBy}:</span> {importDetail.import.actorName} · {new Date(importDetail.import.appliedAt).toLocaleString()}</p><p><span className="font-medium">{le.options}:</span> {le.createUnmatched} {importDetail.import.options?.createUnmatched ? le.on : le.off}, {le.replaceBlanks} {importDetail.import.options?.replaceBlanks ? le.on : le.off}</p></div><div className="grid grid-cols-3 gap-2">{[{ label: le.restoredRows, value: importDetail.rows.filter((row: any) => row.undoStatus === "restored" || row.undoStatus === "partial").length }, { label: le.deletedRows, value: importDetail.rows.filter((row: any) => row.undoStatus === "deleted").length }, { label: le.skippedRows, value: importDetail.rows.filter((row: any) => retryableUndoFields(row).length > 0).length }].map(item => <div key={item.label} className="rounded border p-3 text-center"><p className="text-2xl font-semibold">{item.value}</p><p className="text-xs text-muted-foreground">{item.label}</p></div>)}</div>{importDetail.rows.map((row: any) => { const retryableFields = retryableUndoFields(row); const restoredFields = (row.changedFields || []).filter((field: string) => !retryableFields.includes(field)); return <div key={row.id} className="rounded border p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><div><span className="font-medium">{le.row} {row.rowNumber} · {row.action}</span><span className="ml-2 text-muted-foreground">{row.success ? le.applied : row.message || le.failed}</span></div>{row.undoStatus && <Badge variant={row.undoStatus === "deleted" || row.undoStatus === "restored" ? "default" : "secondary"}>{row.undoStatus}</Badge>}</div>{row.undoStatus === "deleted" && <p className="mt-2 text-emerald-700">{le.deletedRows}</p>}{restoredFields.length > 0 && <p className="mt-2 text-emerald-700">{le.restoredFields}: {restoredFields.join(", ")}</p>}{retryableFields.length > 0 && <div className="mt-3 rounded bg-amber-50 p-3 dark:bg-amber-950/20"><p className="font-medium">{le.skippedFields}</p>{row.undoWarning && <p className="mt-1 text-xs text-muted-foreground">{row.undoWarning}</p>}{row.action === "create" ? <label className="mt-2 flex items-center gap-2 text-sm"><Checkbox checked={retryableFields.every((field: string) => (selectedUndoFields[row.id] || []).includes(field))} onCheckedChange={checked => setSelectedUndoFields(current => ({ ...current, [row.id]: checked ? retryableFields : [] }))} />{le.retryEntireRow}</label> : <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">{retryableFields.map((field: string) => <label key={field} className="flex items-center gap-2 text-sm"><Checkbox checked={(selectedUndoFields[row.id] || []).includes(field)} onCheckedChange={checked => toggleUndoField(row.id, field, Boolean(checked))} />{field}</label>)}</div>}</div>}{row.changedFields?.length > 0 && <div className="mt-3 overflow-x-auto"><Table><TableHeader><TableRow><TableHead>{le.field}</TableHead><TableHead>{le.before}</TableHead><TableHead>{le.after}</TableHead></TableRow></TableHeader><TableBody>{row.changedFields.map((field: string) => <TableRow key={field}><TableCell>{field}</TableCell><TableCell>{String(row.beforeValues?.[field] ?? "—")}</TableCell><TableCell>{String(row.afterValues?.[field] ?? "—")}</TableCell></TableRow>)}</TableBody></Table></div>}</div>; })}{importDetail.undoAttempts?.length > 0 && <div className="space-y-2 border-t pt-4"><h3 className="font-medium">{le.retryHistory}</h3>{importDetail.undoAttempts.map((attempt: any) => <div key={attempt.id} className="rounded border p-3 text-sm"><p>{attempt.actorName} · {new Date(attempt.startedAt).toLocaleString()} · {attempt.status}</p>{attempt.rows.map((row: any) => <p key={row.id} className="mt-1 text-xs text-muted-foreground">{le.row} {row.rowNumber}: {row.status === "deleted" ? le.deletedRows : `${le.restoredFields} ${row.restoredFields.join(", ") || "—"}; ${le.skippedFields} ${row.skippedFields.join(", ") || "—"}`}{row.warning ? ` · ${row.warning}` : ""}</p>)}</div>)}</div>}<DialogFooter><Button variant="outline" onClick={() => setSelectedImport(null)}>{t.buttons.close}</Button><Button disabled={undoRetryMutation.isPending || Object.values(selectedUndoFields).every(fields => fields.length === 0)} onClick={() => { const rows = Object.entries(selectedUndoFields).filter(([, fields]) => fields.length > 0).map(([rowId, fields]) => ({ rowId: Number(rowId), fields })); if (selectedImport && rows.length) undoRetryMutation.mutate({ importId: selectedImport, rows }); }}>{undoRetryMutation.isPending ? le.retryingSkipped : le.retrySkipped}</Button></DialogFooter></div>}</DialogContent></Dialog>
     </div>
   );
 }
