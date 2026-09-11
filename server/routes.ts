@@ -981,9 +981,18 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const user = req.user as User;
     if (user.role !== 'admin') return res.status(401).send("Unauthorized");
+    const parsed = z.object({
+      email: z.string().trim().email(),
+    }).safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid email address is required",
+      });
+    }
     try {
       const { sendTestEmail } = await import("./email");
-      const result = await sendTestEmail(req.body.email);
+      const result = await sendTestEmail(parsed.data.email);
       res.json(result);
     } catch (err: any) {
       res.status(400).json({ success: false, message: err.message });

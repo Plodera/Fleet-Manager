@@ -98,6 +98,32 @@ describe("POST /api/settings/email/test", () => {
     expect(sendTestEmailMock).not.toHaveBeenCalled();
   });
 
+  it("rejects a missing email address before provider delivery", async () => {
+    const response = await request(app)
+      .post("/api/settings/email/test")
+      .send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      success: false,
+      message: "A valid email address is required",
+    });
+    expect(sendTestEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed email address before provider delivery", async () => {
+    const response = await request(app)
+      .post("/api/settings/email/test")
+      .send({ email: "not-an-email" });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      success: false,
+      message: "A valid email address is required",
+    });
+    expect(sendTestEmailMock).not.toHaveBeenCalled();
+  });
+
   it("returns a successful provider result", async () => {
     sendTestEmailMock.mockResolvedValueOnce({ success: true });
 
