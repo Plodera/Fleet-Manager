@@ -1,5 +1,43 @@
 # FleetCmD - Ubuntu Deployment Guide
 
+## Automated Git deployment
+
+If the project is already cloned from Git, setup is now two commands.
+
+### First deployment only
+
+```bash
+cd /path/to/your/fleetcmd
+chmod +x scripts/setup-ubuntu.sh scripts/deploy-ubuntu.sh
+sudo -E ./scripts/setup-ubuntu.sh
+```
+
+The setup asks for the PostgreSQL URL and Microsoft Graph identifiers locally.
+Secret input is hidden. It generates the session secret automatically, stores all
+configuration in `/etc/fleetcmd.env` for root and the service account only, installs a
+systemd service, builds the application, updates the database, and starts it.
+
+### Every future Git update
+
+```bash
+cd /path/to/your/fleetcmd
+./scripts/deploy-ubuntu.sh
+```
+
+This performs `git pull`, dependency installation, checks, production build,
+database synchronization, and service restart. Credentials remain on the server
+and are never stored in Git.
+
+Useful commands:
+
+```bash
+sudo systemctl status fleetcmd
+sudo journalctl -u fleetcmd -f
+```
+
+The manual instructions below remain available if you do not want to use the
+automated scripts.
+
 ## Prerequisites
 - Ubuntu 22.04 or 24.04 LTS
 - Root or sudo access
