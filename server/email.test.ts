@@ -158,6 +158,38 @@ describe("email delivery providers", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it("reports when Microsoft Graph authentication times out", async () => {
+    getEmailSettingsMock.mockResolvedValue(graphSettings);
+    const fetchMock = vi.fn().mockRejectedValue(
+      new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({
+      success: false,
+      error: "Microsoft Graph authentication request timed out after 10 seconds. Check Microsoft service availability and network connectivity, then try again.",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("reports when Microsoft Graph sendMail times out", async () => {
+    getEmailSettingsMock.mockResolvedValue(graphSettings);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(mockJsonResponse(200, { access_token: "access-token" }) as Response)
+      .mockRejectedValueOnce(
+        new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(sendTestEmail("recipient@example.com")).resolves.toEqual({
+      success: false,
+      error: "Microsoft Graph sendMail request timed out after 10 seconds. Check Microsoft service availability and network connectivity, then try again.",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it("continues to deliver through SMTP when SMTP is selected", async () => {
     getEmailSettingsMock.mockResolvedValue(smtpSettings);
     sendMailMock.mockResolvedValue({ messageId: "message-id" });

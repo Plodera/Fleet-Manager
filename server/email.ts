@@ -10,6 +10,31 @@ interface EmailContent {
 
 type EmailSettings = NonNullable<Awaited<ReturnType<typeof storage.getEmailSettings>>>;
 
+const MICROSOFT_GRAPH_TIMEOUT_MS = 10_000;
+
+async function fetchMicrosoftGraph(
+  url: string,
+  init: RequestInit,
+  operation: "authentication" | "sendMail",
+): Promise<Response> {
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(MICROSOFT_GRAPH_TIMEOUT_MS),
+    });
+  } catch (error) {
+    if (
+      error instanceof Error
+      && (error.name === "TimeoutError" || error.name === "AbortError")
+    ) {
+      throw new Error(
+        `Microsoft Graph ${operation} request timed out after ${MICROSOFT_GRAPH_TIMEOUT_MS / 1000} seconds. Check Microsoft service availability and network connectivity, then try again.`,
+      );
+    }
+    throw error;
+  }
+}
+
 function getGraphConfiguration() {
   return {
     tenantId: process.env.MICROSOFT_GRAPH_TENANT_ID?.trim(),
@@ -34,7 +59,7 @@ async function sendWithMicrosoftGraph(settings: EmailSettings, emailContent: Ema
     throw new Error("Microsoft Graph is not fully configured. Set the tenant ID, client ID, and client secret.");
   }
 
-  const tokenResponse = await fetch(
+  const tokenResponse = await fetchMicrosoftGraph(
     `https://login.microsoftonline.com/${encodeURIComponent(config.tenantId)}/oauth2/v2.0/token`,
     {
       method: "POST",
@@ -46,6 +71,7 @@ async function sendWithMicrosoftGraph(settings: EmailSettings, emailContent: Ema
         grant_type: "client_credentials",
       }),
     },
+    "authentication",
   );
 
   const tokenPayload = await tokenResponse.json() as { access_token?: string; error_description?: string };
@@ -53,7 +79,7 @@ async function sendWithMicrosoftGraph(settings: EmailSettings, emailContent: Ema
     throw new Error(tokenPayload.error_description || `Microsoft Graph authentication failed (${tokenResponse.status})`);
   }
 
-  const sendResponse = await fetch(
+  const sendResponse = await fetchMicrosoftGraph(
     `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(settings.fromEmail)}/sendMail`,
     {
       method: "POST",
@@ -71,6 +97,7 @@ async function sendWithMicrosoftGraph(settings: EmailSettings, emailContent: Ema
         saveToSentItems: true,
       }),
     },
+    "sendMail",
   );
 
   if (!sendResponse.ok) {
