@@ -3,7 +3,10 @@
 -- Safe to run repeatedly on an on-prem PostgreSQL installation.
 
 ALTER TABLE email_settings
-  ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'smtp';
+  ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'smtp',
+  ADD COLUMN IF NOT EXISTS graph_tenant_id TEXT,
+  ADD COLUMN IF NOT EXISTS graph_client_id TEXT,
+  ADD COLUMN IF NOT EXISTS graph_client_secret TEXT;
 
 CREATE TABLE IF NOT EXISTS it_host_checks (
   id SERIAL PRIMARY KEY,

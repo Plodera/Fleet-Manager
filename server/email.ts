@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import type { User, Booking, Vehicle } from "@shared/schema";
 import { storage } from "./storage";
+import { decryptCredential } from "./credentialEncryption";
 
 interface EmailContent {
   to: string;
@@ -97,16 +98,30 @@ async function fetchMicrosoftGraph(
   }
 }
 
-function getGraphConfiguration() {
+function getGraphConfiguration(settings?: EmailSettings) {
+  let storedClientSecret: string | undefined;
+  if (settings?.graphClientSecret) {
+    storedClientSecret = decryptCredential(settings.graphClientSecret);
+  }
   return {
-    tenantId: process.env.MICROSOFT_GRAPH_TENANT_ID?.trim(),
-    clientId: process.env.MICROSOFT_GRAPH_CLIENT_ID?.trim(),
-    clientSecret: process.env.MICROSOFT_GRAPH_CLIENT_SECRET?.trim(),
+    tenantId: settings?.graphTenantId?.trim() || process.env.MICROSOFT_GRAPH_TENANT_ID?.trim(),
+    clientId: settings?.graphClientId?.trim() || process.env.MICROSOFT_GRAPH_CLIENT_ID?.trim(),
+    clientSecret: storedClientSecret?.trim() || process.env.MICROSOFT_GRAPH_CLIENT_SECRET?.trim(),
   };
 }
 
-export function getMicrosoftGraphStatus() {
-  const config = getGraphConfiguration();
+export function getMicrosoftGraphStatus(settings?: EmailSettings) {
+  let config: ReturnType<typeof getGraphConfiguration>;
+  try {
+    config = getGraphConfiguration(settings);
+  } catch {
+    return {
+      configured: false,
+      tenantIdConfigured: Boolean(settings?.graphTenantId?.trim() || process.env.MICROSOFT_GRAPH_TENANT_ID?.trim()),
+      clientIdConfigured: Boolean(settings?.graphClientId?.trim() || process.env.MICROSOFT_GRAPH_CLIENT_ID?.trim()),
+      clientSecretConfigured: false,
+    };
+  }
   return {
     configured: Boolean(config.tenantId && config.clientId && config.clientSecret),
     tenantIdConfigured: Boolean(config.tenantId),
@@ -116,7 +131,7 @@ export function getMicrosoftGraphStatus() {
 }
 
 async function sendWithMicrosoftGraph(settings: EmailSettings, emailContent: EmailContent): Promise<void> {
-  const config = getGraphConfiguration();
+  const config = getGraphConfiguration(settings);
   if (!config.tenantId || !config.clientId || !config.clientSecret) {
     throw new Error("Microsoft Graph is not fully configured. Set the tenant ID, client ID, and client secret.");
   }

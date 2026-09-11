@@ -16,6 +16,9 @@ import { useState } from "react";
 
 const emailSettingsSchema = z.object({
   provider: z.enum(["smtp", "microsoft_graph"]),
+  graphTenantId: z.string(),
+  graphClientId: z.string(),
+  graphClientSecret: z.string(),
   smtpHost: z.string(),
   smtpPort: z.coerce.number().min(1).max(65535),
   smtpUser: z.string(),
@@ -26,11 +29,12 @@ const emailSettingsSchema = z.object({
   enabled: z.boolean(),
 }).superRefine((data, ctx) => {
   if (data.provider !== "smtp") return;
-  for (const [path, value, message] of [
+  const requiredFields = [
     ["smtpHost", data.smtpHost, "SMTP host is required"],
     ["smtpUser", data.smtpUser, "SMTP username is required"],
     ["smtpPass", data.smtpPass, "SMTP password is required"],
-  ] as const) {
+  ] as const;
+  for (const [path, value, message] of requiredFields) {
     if (!value.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
   }
 });
@@ -57,6 +61,9 @@ export default function Settings() {
     resolver: zodResolver(emailSettingsSchema),
     defaultValues: {
       provider: "smtp",
+      graphTenantId: "",
+      graphClientId: "",
+      graphClientSecret: "",
       smtpHost: "",
       smtpPort: 465,
       smtpUser: "",
@@ -187,23 +194,59 @@ export default function Settings() {
               />
 
               {provider === "microsoft_graph" && (
-                <div className={`rounded-lg border p-4 ${settings?.graphStatus?.configured ? "border-green-500/40 bg-green-500/5" : "border-amber-500/40 bg-amber-500/5"}`}>
-                  <p className="font-medium">
-                    Graph credentials: {settings?.graphStatus?.configured ? "Configured" : "Configuration required"}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Configure MICROSOFT_GRAPH_TENANT_ID, MICROSOFT_GRAPH_CLIENT_ID, and the secret
-                    MICROSOFT_GRAPH_CLIENT_SECRET. The Azure app requires Microsoft Graph application
-                    permission Mail.Send with administrator consent.
-                  </p>
-                  {!settings?.graphStatus?.configured && (
-                    <ul className="mt-2 text-sm text-muted-foreground list-disc pl-5">
-                      {!settings?.graphStatus?.tenantIdConfigured && <li>Tenant ID is missing</li>}
-                      {!settings?.graphStatus?.clientIdConfigured && <li>Client ID is missing</li>}
-                      {!settings?.graphStatus?.clientSecretConfigured && <li>Client secret is missing</li>}
-                    </ul>
-                  )}
-                </div>
+                <>
+                  <div className={`rounded-lg border p-4 ${settings?.graphStatus?.configured ? "border-green-500/40 bg-green-500/5" : "border-amber-500/40 bg-amber-500/5"}`}>
+                    <p className="font-medium">
+                      Graph credentials: {settings?.graphStatus?.configured ? "Configured" : "Configuration required"}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Enter the Microsoft Entra app details below. Use the client secret Value, not the Secret ID.
+                      The app requires Microsoft Graph application permission Mail.Send with administrator consent.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="graphTenantId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tenant ID</FormLabel>
+                          <FormControl>
+                            <Input placeholder="00000000-0000-0000-0000-000000000000" {...field} data-testid="input-graph-tenant-id" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="graphClientId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Application (Client) ID</FormLabel>
+                          <FormControl>
+                            <Input placeholder="00000000-0000-0000-0000-000000000000" {...field} data-testid="input-graph-client-id" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="graphClientSecret"
+                      render={({ field }) => (
+                        <FormItem className="md:col-span-2">
+                          <FormLabel>Client Secret Value</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Enter the secret Value, not the Secret ID" {...field} data-testid="input-graph-client-secret" />
+                          </FormControl>
+                          <FormDescription>The saved secret is encrypted and is never displayed again.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -221,7 +264,6 @@ export default function Settings() {
                     </FormItem>
                   )}
                 />
-                </>)}
 
                 <FormField
                   control={form.control}
@@ -265,6 +307,7 @@ export default function Settings() {
                     </FormItem>
                   )}
                 />
+                </>)}
 
                 <FormField
                   control={form.control}

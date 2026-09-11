@@ -158,6 +158,9 @@ export const fuelRecords = pgTable("fuel_records", {
 export const emailSettings = pgTable("email_settings", {
   id: serial("id").primaryKey(),
   provider: text("provider").default("smtp").notNull(),
+  graphTenantId: text("graph_tenant_id"),
+  graphClientId: text("graph_client_id"),
+  graphClientSecret: text("graph_client_secret"),
   smtpHost: text("smtp_host").notNull(),
   smtpPort: integer("smtp_port").default(465).notNull(),
   smtpUser: text("smtp_user").notNull(),

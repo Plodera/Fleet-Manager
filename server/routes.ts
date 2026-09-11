@@ -940,7 +940,12 @@ export async function registerRoutes(
     if (settings) {
       // Mask password for security
       const { getMicrosoftGraphStatus } = await import("./email");
-      res.json({ ...settings, smtpPass: settings.smtpPass ? "********" : "", graphStatus: getMicrosoftGraphStatus() });
+      res.json({
+        ...settings,
+        smtpPass: settings.smtpPass ? "********" : "",
+        graphClientSecret: settings.graphClientSecret ? "********" : "",
+        graphStatus: getMicrosoftGraphStatus(settings),
+      });
     } else {
       res.json(null);
     }
@@ -966,8 +971,24 @@ export async function registerRoutes(
       if (provider === "smtp" && (!req.body.smtpHost?.trim() || !req.body.smtpUser?.trim() || !req.body.smtpPass)) {
         return res.status(400).json({ message: "SMTP host, username, and password are required" });
       }
+      const graphTenantConfigured = Boolean(req.body.graphTenantId?.trim() || existing?.graphTenantId || process.env.MICROSOFT_GRAPH_TENANT_ID);
+      const graphClientConfigured = Boolean(req.body.graphClientId?.trim() || existing?.graphClientId || process.env.MICROSOFT_GRAPH_CLIENT_ID);
+      const graphSecretConfigured = Boolean(
+        (req.body.graphClientSecret === "********" && existing?.graphClientSecret)
+        || (req.body.graphClientSecret && req.body.graphClientSecret !== "********")
+        || process.env.MICROSOFT_GRAPH_CLIENT_SECRET,
+      );
+      if (provider === "microsoft_graph" && (!graphTenantConfigured || !graphClientConfigured || !graphSecretConfigured)) {
+        return res.status(400).json({ message: "Microsoft Graph tenant ID, client ID, and client secret are required" });
+      }
       // If password is masked, keep the existing password
       const smtpPass = req.body.smtpPass === "********" && existing ? existing.smtpPass : req.body.smtpPass;
+      const { encryptCredential } = await import("./credentialEncryption");
+      const graphClientSecret = req.body.graphClientSecret === "********" && existing
+        ? existing.graphClientSecret
+        : req.body.graphClientSecret
+          ? encryptCredential(req.body.graphClientSecret)
+          : null;
       const settings = await storage.upsertEmailSettings({
         ...req.body,
         provider,
@@ -975,9 +996,17 @@ export async function registerRoutes(
         smtpPort: Number(req.body.smtpPort) || 465,
         smtpUser: req.body.smtpUser || "",
         smtpPass: smtpPass || "",
+        graphTenantId: req.body.graphTenantId?.trim() || null,
+        graphClientId: req.body.graphClientId?.trim() || null,
+        graphClientSecret,
       });
       const { getMicrosoftGraphStatus } = await import("./email");
-      res.json({ ...settings, smtpPass: settings.smtpPass ? "********" : "", graphStatus: getMicrosoftGraphStatus() });
+      res.json({
+        ...settings,
+        smtpPass: settings.smtpPass ? "********" : "",
+        graphClientSecret: settings.graphClientSecret ? "********" : "",
+        graphStatus: getMicrosoftGraphStatus(settings),
+      });
     } catch (err) {
       console.error("Email settings error:", err);
       res.status(400).json({ message: "Failed to save email settings" });

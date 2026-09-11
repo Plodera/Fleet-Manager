@@ -65,6 +65,9 @@ import {
 const graphSettings = {
   id: 1,
   provider: "microsoft_graph",
+  graphTenantId: null,
+  graphClientId: null,
+  graphClientSecret: null,
   smtpHost: "",
   smtpPort: 465,
   smtpUser: "",
