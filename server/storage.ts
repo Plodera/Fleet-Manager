@@ -1688,8 +1688,13 @@ export class DatabaseStorage implements IStorage {
 
   async setExpiryNotificationRecipients(ruleId: number, recipients: Array<{ userId?: number; email?: string }>): Promise<void> {
     await getDb().delete(expiryNotificationRecipients).where(eq(expiryNotificationRecipients.ruleId, ruleId));
-    const uniqueRecipients = recipients.filter((recipient, index, values) =>
-      (recipient.userId || recipient.email) &&
+    const normalizedRecipients = recipients
+      .map(recipient => ({
+        userId: recipient.userId,
+        email: recipient.email?.trim().toLowerCase() || undefined,
+      }))
+      .filter(recipient => recipient.userId || recipient.email);
+    const uniqueRecipients = normalizedRecipients.filter((recipient, index, values) =>
       values.findIndex(value => value.userId === recipient.userId && value.email === recipient.email) === index,
     );
     if (uniqueRecipients.length > 0) {
@@ -1697,7 +1702,7 @@ export class DatabaseStorage implements IStorage {
         uniqueRecipients.map(recipient => ({
           ruleId,
           userId: recipient.userId ?? null,
-          email: recipient.email?.trim().toLowerCase() || null,
+          email: recipient.email ?? null,
         })),
       );
     }

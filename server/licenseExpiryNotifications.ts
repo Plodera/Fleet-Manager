@@ -133,11 +133,14 @@ export async function runLicenseExpiryChecks(): Promise<number> {
     storage.getUsers(),
   ]);
   const usersById = new Map(users.map(user => [user.id, user]));
-  const usersByEmail = new Map(
-    users
-      .filter(user => user.email)
-      .map(user => [user.email!.trim().toLowerCase(), user]),
-  );
+  const userKeysByEmail = new Map<string, string[]>();
+  for (const user of [...users].sort((left, right) => left.id - right.id)) {
+    if (!user.email) continue;
+    const email = user.email.trim().toLowerCase();
+    const userKeys = userKeysByEmail.get(email) ?? [];
+    userKeys.push(`user:${user.id}`);
+    userKeysByEmail.set(email, userKeys);
+  }
   const matchedEntities = new Set<string>();
   const scheduledDeliveries = new Set<string>();
 
@@ -230,13 +233,15 @@ export async function runLicenseExpiryChecks(): Promise<number> {
           }
 
           if (rule.sendEmail && recipientUser.email) {
-            const emailKey = `email:${recipientUser.email.trim().toLowerCase()}`;
+            const email = recipientUser.email.trim().toLowerCase();
+            const emailKey = `email:${email}`;
+            const matchingUserKeys = userKeysByEmail.get(email) ?? [userKey];
             await scheduleDelivery(
               rule.id,
               entity,
-              userKey,
-              userKey,
-              [userKey, emailKey],
+              emailKey,
+              emailKey,
+              [emailKey, ...matchingUserKeys],
               "email",
               () => sendEmail({ to: recipientUser.email!, subject, body }),
             );
@@ -246,14 +251,13 @@ export async function runLicenseExpiryChecks(): Promise<number> {
         if (rule.sendEmail && recipient.email) {
           const email = recipient.email.trim().toLowerCase();
           const emailKey = `email:${email}`;
-          const matchingUser = usersByEmail.get(email);
-          const logicalRecipientKey = matchingUser ? `user:${matchingUser.id}` : emailKey;
+          const matchingUserKeys = userKeysByEmail.get(email) ?? [];
           await scheduleDelivery(
             rule.id,
             entity,
-            logicalRecipientKey,
             emailKey,
-            [emailKey, logicalRecipientKey],
+            emailKey,
+            [emailKey, ...matchingUserKeys],
             "email",
             () => sendEmail({ to: email, subject, body }),
           );

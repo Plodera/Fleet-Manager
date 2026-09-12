@@ -992,7 +992,7 @@ export const insertExpiryNotificationRuleSchema = createInsertSchema(expiryNotif
   });
 export const expiryNotificationRecipientInputSchema = z.object({
   userId: z.coerce.number().int().positive().optional(),
-  email: z.string().email().optional(),
+  email: z.string().trim().email().transform(email => email.toLowerCase()).optional(),
 }).refine((value) => value.userId || value.email, { message: "Choose a system user or enter an email address" });
 
 export type CompanyDocument = typeof companyDocuments.$inferSelect;

@@ -259,8 +259,80 @@ describe("runLicenseExpiryChecks", () => {
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
     expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledTimes(1);
     expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledWith(expect.objectContaining({
-      recipientKey: `user:${user.id}`,
+      recipientKey: `email:${user.email}`,
     }));
+  });
+
+  it("sends one email per shared mailbox while keeping in-app alerts per account", async () => {
+    const sharedUser = { id: 2, fullName: "Second Admin", email: "ADMIN@example.com" };
+    storageMock.getVehicles.mockResolvedValue([vehicle]);
+    storageMock.getUsers.mockResolvedValue([sharedUser, user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({
+        sendEmail: true,
+        sendInApp: true,
+        recipients: [{ userId: sharedUser.id }, { userId: user.id }],
+      }),
+    ]);
+
+    await expect(runLicenseExpiryChecks()).resolves.toBe(1);
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(storageMock.createExpiryNotification).toHaveBeenCalledTimes(2);
+    expect(storageMock.createExpiryNotification).toHaveBeenCalledWith(expect.objectContaining({ userId: user.id }));
+    expect(storageMock.createExpiryNotification).toHaveBeenCalledWith(expect.objectContaining({ userId: sharedUser.id }));
+    expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      logicalRecipientKey: "email:admin@example.com",
+      recipientAliases: expect.arrayContaining(["email:admin@example.com", "user:1", "user:2"]),
+      channel: "email",
+    }));
+  });
+
+  it("maps a manual shared address to the mailbox deterministically regardless of user order", async () => {
+    const laterUser = { id: 20, fullName: "Later Account", email: "shared@example.com" };
+    const earlierUser = { id: 10, fullName: "Earlier Account", email: "SHARED@example.com" };
+    storageMock.getVehicles.mockResolvedValue([vehicle]);
+    storageMock.getUsers.mockResolvedValue([laterUser, earlierUser]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({
+        sendEmail: true,
+        sendInApp: false,
+        recipients: [{ email: " Shared@Example.com " }],
+      }),
+    ]);
+
+    await runLicenseExpiryChecks();
+
+    expect(sendEmailMock).toHaveBeenCalledOnce();
+    expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({ to: "shared@example.com" }));
+    expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      recipientKey: "email:shared@example.com",
+      logicalRecipientKey: "email:shared@example.com",
+      recipientAliases: [
+        "email:shared@example.com",
+        "user:10",
+        "user:20",
+      ],
+    }));
+  });
+
+  it("continues sending emails to distinct addresses", async () => {
+    const secondUser = { id: 2, fullName: "Second Admin", email: "second@example.com" };
+    storageMock.getVehicles.mockResolvedValue([vehicle]);
+    storageMock.getUsers.mockResolvedValue([user, secondUser]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({
+        sendEmail: true,
+        sendInApp: false,
+        recipients: [{ userId: user.id }, { userId: secondUser.id }],
+      }),
+    ]);
+
+    await runLicenseExpiryChecks();
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(2);
+    expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({ to: user.email }));
+    expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({ to: secondUser.email }));
   });
 
   it("uses the same deterministic rule claim during concurrent overlapping checks", async () => {
@@ -288,7 +360,7 @@ describe("runLicenseExpiryChecks", () => {
     expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledTimes(2);
     expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledWith(expect.objectContaining({
       ruleId: 10,
-      recipientKey: `user:${user.id}`,
+      recipientKey: `email:${user.email}`,
     }));
   });
 
@@ -373,7 +445,7 @@ describe("runLicenseExpiryChecks", () => {
         1,
         "vehicle_license",
         vehicle.id,
-        `user:${user.id}`,
+        `email:${user.email}`,
         "email",
         "2026-08-28",
       ].join(":"),
