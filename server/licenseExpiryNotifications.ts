@@ -11,10 +11,9 @@ type ExpiryEntity = {
 };
 
 function daysUntil(expiryDate: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const expiry = new Date(`${expiryDate}T00:00:00`);
-  return Math.round((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const today = Date.parse(`${dateKey()}T00:00:00Z`);
+  const expiry = Date.parse(`${expiryDate}T00:00:00Z`);
+  return Math.round((expiry - today) / (1000 * 60 * 60 * 24));
 }
 
 function dateKey(): string {
@@ -24,7 +23,7 @@ function dateKey(): string {
 function matchesRule(rule: { triggerType: string; thresholdDays: number | null }, expiryDate: string): boolean {
   const remaining = daysUntil(expiryDate);
   if (rule.triggerType === "expired") return remaining < 0;
-  return remaining === (rule.thresholdDays ?? 30);
+  return remaining <= (rule.thresholdDays ?? 30);
 }
 
 function describeExpiry(expiryDate: string): string {
@@ -99,6 +98,8 @@ async function deliverOnce(
   ruleId: number,
   entity: ExpiryEntity & { expiryDate: string },
   recipientKey: string,
+  logicalRecipientKey: string,
+  recipientAliases: string[],
   channel: "email" | "in_app",
   deliver: () => Promise<boolean>,
 ): Promise<void> {
@@ -107,6 +108,8 @@ async function deliverOnce(
     entityType: entity.entityType,
     entityId: entity.id,
     recipientKey,
+    logicalRecipientKey,
+    recipientAliases,
     channel,
     deliveryDate: dateKey(),
   };
@@ -130,7 +133,42 @@ export async function runLicenseExpiryChecks(): Promise<number> {
     storage.getUsers(),
   ]);
   const usersById = new Map(users.map(user => [user.id, user]));
-  let matches = 0;
+  const usersByEmail = new Map(
+    users
+      .filter(user => user.email)
+      .map(user => [user.email!.trim().toLowerCase(), user]),
+  );
+  const matchedEntities = new Set<string>();
+  const scheduledDeliveries = new Set<string>();
+
+  const scheduleDelivery = async (
+    ruleId: number,
+    entity: ExpiryEntity & { expiryDate: string },
+    logicalRecipientKey: string,
+    claimRecipientKey: string,
+    recipientAliases: string[],
+    channel: "email" | "in_app",
+    deliver: () => Promise<boolean>,
+  ): Promise<void> => {
+    const logicalKey = [
+      entity.entityType,
+      entity.id,
+      logicalRecipientKey,
+      channel,
+      dateKey(),
+    ].join(":");
+    if (scheduledDeliveries.has(logicalKey)) return;
+    scheduledDeliveries.add(logicalKey);
+    await deliverOnce(
+      ruleId,
+      entity,
+      claimRecipientKey,
+      logicalRecipientKey,
+      Array.from(new Set([claimRecipientKey, logicalRecipientKey, ...recipientAliases])),
+      channel,
+      deliver,
+    );
+  };
 
   for (const entity of entities) {
     await storage.resolveObsoleteExpiryNotifications(
@@ -141,14 +179,17 @@ export async function runLicenseExpiryChecks(): Promise<number> {
     );
   }
 
-  for (const rule of rules.filter(rule => rule.isActive)) {
+  const activeRules = rules.filter(rule => rule.isActive).sort((left, right) => left.id - right.id);
+  for (const rule of activeRules) {
     const matched = entities.filter((entity): entity is ExpiryEntity & { expiryDate: string } =>
       entity.expiryDate !== null &&
       entity.isActive !== false &&
       entity.entityType === rule.entityType &&
       matchesRule(rule, entity.expiryDate),
     );
-    matches += matched.length;
+    for (const entity of matched) {
+      matchedEntities.add(`${entity.entityType}:${entity.id}`);
+    }
 
     for (const entity of matched) {
       const subject = `[Licence expiry] ${entityLabel(entity.entityType)} alert: ${entity.name}`;
@@ -162,7 +203,10 @@ export async function runLicenseExpiryChecks(): Promise<number> {
         "Please log in to Fleet Management and take the required action.",
       ].join("\n");
 
-      for (const recipient of rule.recipients) {
+      const recipients = [...rule.recipients].sort((left, right) =>
+        Number(Boolean(right.userId)) - Number(Boolean(left.userId)),
+      );
+      for (const recipient of recipients) {
         if (recipient.userId) {
           const recipientUser = usersById.get(recipient.userId);
           if (!recipientUser) continue;
@@ -170,7 +214,7 @@ export async function runLicenseExpiryChecks(): Promise<number> {
           const userKey = `user:${recipientUser.id}`;
 
           if (rule.sendInApp) {
-            await deliverOnce(rule.id, entity, userKey, "in_app", async () => {
+            await scheduleDelivery(rule.id, entity, userKey, userKey, [userKey], "in_app", async () => {
               const existing = await storage.getExpiryNotificationForAlert({
                 userId: recipientUser.id, ruleId: rule.id, entityType: entity.entityType,
                 entityId: entity.id, expiryDate: entity.expiryDate,
@@ -186,10 +230,13 @@ export async function runLicenseExpiryChecks(): Promise<number> {
           }
 
           if (rule.sendEmail && recipientUser.email) {
-            await deliverOnce(
+            const emailKey = `email:${recipientUser.email.trim().toLowerCase()}`;
+            await scheduleDelivery(
               rule.id,
               entity,
               userKey,
+              userKey,
+              [userKey, emailKey],
               "email",
               () => sendEmail({ to: recipientUser.email!, subject, body }),
             );
@@ -199,10 +246,14 @@ export async function runLicenseExpiryChecks(): Promise<number> {
         if (rule.sendEmail && recipient.email) {
           const email = recipient.email.trim().toLowerCase();
           const emailKey = `email:${email}`;
-          await deliverOnce(
+          const matchingUser = usersByEmail.get(email);
+          const logicalRecipientKey = matchingUser ? `user:${matchingUser.id}` : emailKey;
+          await scheduleDelivery(
             rule.id,
             entity,
+            logicalRecipientKey,
             emailKey,
+            [emailKey, logicalRecipientKey],
             "email",
             () => sendEmail({ to: email, subject, body }),
           );
@@ -211,7 +262,7 @@ export async function runLicenseExpiryChecks(): Promise<number> {
     }
   }
 
-  return matches;
+  return matchedEntities.size;
 }
 
 export function scheduleLicenseExpiryNotifications(): void {

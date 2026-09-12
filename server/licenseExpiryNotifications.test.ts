@@ -127,7 +127,7 @@ describe("runLicenseExpiryChecks", () => {
     }));
   });
 
-  it("matches an approaching alert on its threshold day and an expired alert after its expiry date", async () => {
+  it("matches approaching alerts throughout their daily window and expired alerts after expiry", async () => {
     storageMock.getVehicles.mockResolvedValue([
       vehicle,
       {
@@ -135,6 +135,12 @@ describe("runLicenseExpiryChecks", () => {
         id: 11,
         licensePlate: "NOT-030",
         licenseExpiryDate: "2026-09-26",
+      },
+      {
+        ...vehicle,
+        id: 12,
+        licensePlate: "NOT-YET",
+        licenseExpiryDate: "2026-09-28",
       },
     ]);
     storageMock.getDrivers.mockResolvedValue([
@@ -163,9 +169,9 @@ describe("runLicenseExpiryChecks", () => {
       }),
     ]);
 
-    await expect(runLicenseExpiryChecks()).resolves.toBe(2);
+    await expect(runLicenseExpiryChecks()).resolves.toBe(3);
 
-    expect(storageMock.createExpiryNotification).toHaveBeenCalledTimes(2);
+    expect(storageMock.createExpiryNotification).toHaveBeenCalledTimes(3);
     expect(storageMock.createExpiryNotification).toHaveBeenCalledWith(expect.objectContaining({
       ruleId: 1,
       entityType: "vehicle_license",
@@ -178,11 +184,111 @@ describe("runLicenseExpiryChecks", () => {
       entityId: 20,
       expiryDate: "2026-08-27",
     }));
-    expect(storageMock.createExpiryNotification).not.toHaveBeenCalledWith(expect.objectContaining({
+    expect(storageMock.createExpiryNotification).toHaveBeenCalledWith(expect.objectContaining({
       entityId: 11,
     }));
     expect(storageMock.createExpiryNotification).not.toHaveBeenCalledWith(expect.objectContaining({
+      entityId: 12,
+    }));
+    expect(storageMock.createExpiryNotification).not.toHaveBeenCalledWith(expect.objectContaining({
       entityId: 21,
+    }));
+  });
+
+  it("keeps an approaching rule active after expiry until the date changes or is cleared", async () => {
+    storageMock.getVehicles.mockResolvedValue([{
+      ...vehicle,
+      licenseExpiryDate: "2026-08-20",
+    }]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({ sendEmail: true, sendInApp: false }),
+    ]);
+
+    await expect(runLicenseExpiryChecks()).resolves.toBe(1);
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      body: expect.stringContaining("8 day(s) overdue"),
+    }));
+  });
+
+  it("sends again on the next calendar day but not twice on the same day", async () => {
+    storageMock.getVehicles.mockResolvedValue([vehicle]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({ sendEmail: true, sendInApp: false }),
+    ]);
+
+    const claims = new Set<string>();
+    storageMock.claimExpiryNotificationDelivery.mockImplementation(async (data) => {
+      const key = deliveryKey(data);
+      if (claims.has(key)) return null;
+      claims.add(key);
+      return new Date();
+    });
+
+    await runLicenseExpiryChecks();
+    await runLicenseExpiryChecks();
+    vi.setSystemTime(new Date("2026-08-29T12:00:00Z"));
+    await runLicenseExpiryChecks();
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(2);
+    expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledTimes(3);
+    expect(new Set(
+      storageMock.claimExpiryNotificationDelivery.mock.calls.map(([data]) => data.deliveryDate),
+    )).toEqual(new Set(["2026-08-28", "2026-08-29"]));
+  });
+
+  it("suppresses overlapping rule and recipient email duplicates for the same item and day", async () => {
+    storageMock.getVehicles.mockResolvedValue([vehicle]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({ id: 1, thresholdDays: 30, sendEmail: true, sendInApp: false }),
+      rule({
+        id: 2,
+        thresholdDays: 60,
+        sendEmail: true,
+        sendInApp: false,
+        recipients: [{ userId: user.id }, { email: user.email }],
+      }),
+    ]);
+
+    await expect(runLicenseExpiryChecks()).resolves.toBe(1);
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledTimes(1);
+    expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      recipientKey: `user:${user.id}`,
+    }));
+  });
+
+  it("uses the same deterministic rule claim during concurrent overlapping checks", async () => {
+    storageMock.getVehicles.mockResolvedValue([vehicle]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({ id: 20, thresholdDays: 60, sendEmail: true, sendInApp: false }),
+      rule({ id: 10, thresholdDays: 30, sendEmail: true, sendInApp: false }),
+    ]);
+
+    const claims = new Set<string>();
+    storageMock.claimExpiryNotificationDelivery.mockImplementation(async (data) => {
+      const key = deliveryKey(data);
+      if (claims.has(key)) return null;
+      claims.add(key);
+      return new Date();
+    });
+
+    await Promise.all([
+      runLicenseExpiryChecks(),
+      runLicenseExpiryChecks(),
+    ]);
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledTimes(2);
+    expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      ruleId: 10,
+      recipientKey: `user:${user.id}`,
     }));
   });
 

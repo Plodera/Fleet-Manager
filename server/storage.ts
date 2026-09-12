@@ -72,6 +72,8 @@ type ExpiryNotificationDeliveryKey = {
   entityType: string;
   entityId: number;
   recipientKey: string;
+  logicalRecipientKey?: string;
+  recipientAliases?: string[];
   channel: string;
   deliveryDate: string;
 };
@@ -1704,25 +1706,58 @@ export class DatabaseStorage implements IStorage {
   async claimExpiryNotificationDelivery(data: ExpiryNotificationDeliveryKey): Promise<Date | null> {
     const claimedAt = new Date();
     const staleBefore = new Date(claimedAt.getTime() - EXPIRY_DELIVERY_CLAIM_LEASE_MS);
-    const claimed = await getDb().insert(expiryNotificationDeliveries)
-      .values({ ...data, success: false, createdAt: claimedAt })
-      .onConflictDoUpdate({
-        target: [
-          expiryNotificationDeliveries.ruleId,
-          expiryNotificationDeliveries.entityType,
-          expiryNotificationDeliveries.entityId,
-          expiryNotificationDeliveries.recipientKey,
-          expiryNotificationDeliveries.channel,
-          expiryNotificationDeliveries.deliveryDate,
-        ],
-        set: { success: false, createdAt: claimedAt },
-        setWhere: and(
+    const {
+      logicalRecipientKey = data.recipientKey,
+      recipientAliases = [data.recipientKey],
+      ...delivery
+    } = data;
+    const aliases = Array.from(new Set([data.recipientKey, ...recipientAliases]));
+    const logicalKey = [
+      data.entityType,
+      data.entityId,
+      logicalRecipientKey,
+      data.channel,
+      data.deliveryDate,
+    ].join(":");
+
+    return getDb().transaction(async (tx: any) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${logicalKey}, 0))`);
+
+      const [existing] = await tx.select({
+        success: expiryNotificationDeliveries.success,
+        createdAt: expiryNotificationDeliveries.createdAt,
+      })
+        .from(expiryNotificationDeliveries)
+        .where(and(
+          eq(expiryNotificationDeliveries.entityType, data.entityType),
+          eq(expiryNotificationDeliveries.entityId, data.entityId),
+          inArray(expiryNotificationDeliveries.recipientKey, aliases),
+          eq(expiryNotificationDeliveries.channel, data.channel),
+          eq(expiryNotificationDeliveries.deliveryDate, data.deliveryDate),
+        ))
+        .orderBy(desc(expiryNotificationDeliveries.success), desc(expiryNotificationDeliveries.createdAt))
+        .limit(1);
+
+      if (existing?.success || (existing?.createdAt && existing.createdAt >= staleBefore)) return null;
+
+      if (existing) {
+        await tx.delete(expiryNotificationDeliveries).where(and(
+          eq(expiryNotificationDeliveries.entityType, data.entityType),
+          eq(expiryNotificationDeliveries.entityId, data.entityId),
+          inArray(expiryNotificationDeliveries.recipientKey, aliases),
+          eq(expiryNotificationDeliveries.channel, data.channel),
+          eq(expiryNotificationDeliveries.deliveryDate, data.deliveryDate),
           eq(expiryNotificationDeliveries.success, false),
           lt(expiryNotificationDeliveries.createdAt, staleBefore),
-        ),
-      })
-      .returning({ claimedAt: expiryNotificationDeliveries.createdAt });
-    return claimed[0]?.claimedAt ?? null;
+        ));
+      }
+
+      const claimed = await tx.insert(expiryNotificationDeliveries)
+        .values({ ...delivery, success: false, createdAt: claimedAt })
+        .onConflictDoNothing()
+        .returning({ claimedAt: expiryNotificationDeliveries.createdAt });
+      return claimed[0]?.claimedAt ?? null;
+    });
   }
 
   async completeExpiryNotificationDelivery(
