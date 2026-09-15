@@ -189,7 +189,7 @@ const VideoPanel = memo(function VideoPanel({
             <img
               key={currentVideo.id}
               src={currentVideo.url}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain object-top"
               alt={currentVideo.title}
               data-testid="video-player-image"
             />
