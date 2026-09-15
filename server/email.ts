@@ -29,13 +29,21 @@ export interface EmailDeliveryHealth {
 
 export type EmailDeliveryResult = { success: true } | { success: false; error: string };
 
+export function maskEmailAddress(email: string): string {
+  const normalized = email.trim().toLowerCase();
+  const atIndex = normalized.lastIndexOf("@");
+  if (atIndex <= 0 || atIndex === normalized.length - 1) return "***";
+  return `${normalized[0]}***@${normalized.slice(atIndex + 1)}`;
+}
+
 export function sanitizeEmailProviderError(error: unknown): string {
   const message = errorMessage(error)
     .replace(/(?:Authorization\s*[=:]\s*)?Bearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Authorization: Bearer [redacted]")
     .replace(/(["']?(?:client[\s_-]?secret|password|passwd|smtp[\s_-]?pass|access[\s_-]?token|refresh[\s_-]?token|token|api[\s_-]?key|x-api-key|authorization)["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi, "$1[redacted]")
     .replace(/\b(client\s+secret|api\s+key|access\s+token|refresh\s+token|password)\s+(?:is|was|provided)\s+(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi, "$1 [redacted]")
     .replace(/\b(client\s+secret|api\s+key|access\s+token|refresh\s+token|password)\s+(?!provided\b|is\b|was\b|missing\b|configured\b)(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi, "$1 [redacted]")
-    .replace(/https?:\/\/[^@\s/]+:[^@\s/]+@/gi, "https://[redacted]@");
+    .replace(/https?:\/\/[^@\s/]+:[^@\s/]+@/gi, "https://[redacted]@")
+    .replace(/\b[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+\b/gi, match => maskEmailAddress(match));
   return message.slice(0, 500);
 }
 
@@ -260,7 +268,7 @@ export async function sendEmailWithResult(emailContent: EmailContent): Promise<E
 
   if (!settings || !settings.enabled) {
     console.log("=== EMAIL NOTIFICATION (Email disabled - logging only) ===");
-    console.log(`To: ${emailContent.to}`);
+    console.log(`To: ${maskEmailAddress(emailContent.to)}`);
     console.log(`Subject: ${emailContent.subject}`);
     console.log(`Body:\n${emailContent.body}`);
     console.log("=== END EMAIL ===");
@@ -270,7 +278,7 @@ export async function sendEmailWithResult(emailContent: EmailContent): Promise<E
   try {
     await deliverEmail(settings, emailContent);
 
-    console.log(`Email sent successfully to ${emailContent.to} using ${settings.provider}`);
+    console.log(`Email sent successfully to ${maskEmailAddress(emailContent.to)} using ${settings.provider}`);
     return { success: true };
   } catch (error) {
     console.error("Failed to send email:", sanitizeEmailProviderError(error));

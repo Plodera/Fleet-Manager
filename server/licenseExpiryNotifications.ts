@@ -1,5 +1,5 @@
 import { storage } from "./storage";
-import { sendEmailWithResult } from "./email";
+import { maskEmailAddress, sanitizeEmailProviderError, sendEmailWithResult } from "./email";
 import type { ExpiryNotificationRule, ExpiryNotificationRecipient } from "@shared/schema";
 
 type ExpiryEntity = {
@@ -55,9 +55,12 @@ export function nextDeliveryOccurrence(rule: ScheduledRule & { isActive?: boolea
   };
 }
 
-async function recordDeliveryAttempt(data: { ruleId: number; deliveryType: "scheduled" | "test"; success: boolean; error?: string | null }): Promise<void> {
+async function recordDeliveryAttempt(data: { ruleId: number; deliveryType: "scheduled" | "test"; recipientLabel: string; success: boolean; error?: string | null }): Promise<void> {
   try {
-    await storage.recordExpiryNotificationDeliveryAttempt(data);
+    await storage.recordExpiryNotificationDeliveryAttempt({
+      ...data,
+      error: data.error ? sanitizeEmailProviderError(data.error) : null,
+    });
   } catch (error) {
     console.error("[licenseExpiry] Could not record delivery attempt:", error);
   }
@@ -326,7 +329,13 @@ export async function runLicenseExpiryChecks(options: { scheduled?: boolean; now
               timing.deliveryOccurrence,
               async () => {
                 const result = await sendEmailWithResult({ to: recipientUser.email!, subject, body });
-                await recordDeliveryAttempt({ ruleId: rule.id, deliveryType: "scheduled", success: result.success, error: result.success ? null : result.error });
+                await recordDeliveryAttempt({
+                  ruleId: rule.id,
+                  deliveryType: "scheduled",
+                  recipientLabel: maskEmailAddress(email),
+                  success: result.success,
+                  error: result.success ? null : result.error,
+                });
                 return result.success;
               },
             );
@@ -348,7 +357,13 @@ export async function runLicenseExpiryChecks(options: { scheduled?: boolean; now
             timing.deliveryOccurrence,
             async () => {
               const result = await sendEmailWithResult({ to: email, subject, body });
-              await recordDeliveryAttempt({ ruleId: rule.id, deliveryType: "scheduled", success: result.success, error: result.success ? null : result.error });
+                await recordDeliveryAttempt({
+                  ruleId: rule.id,
+                  deliveryType: "scheduled",
+                  recipientLabel: maskEmailAddress(email),
+                  success: result.success,
+                  error: result.success ? null : result.error,
+                });
               return result.success;
             },
           );
@@ -397,7 +412,13 @@ export async function sendExpiryRuleTest(
       "If you received this message, this reminder rule can deliver email successfully.",
     ].join("\n"),
     });
-    await recordDeliveryAttempt({ ruleId, deliveryType: "test", success: result.success, error: result.success ? null : result.error });
+    await recordDeliveryAttempt({
+      ruleId,
+      deliveryType: "test",
+      recipientLabel: maskEmailAddress(to),
+      success: result.success,
+      error: result.success ? null : result.error,
+    });
     return result;
   }));
   const sentCount = results.filter(result => result.success).length;

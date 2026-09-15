@@ -991,6 +991,7 @@ export const expiryNotificationDeliveryAttempts = pgTable("expiry_notification_d
   ruleId: integer("rule_id").references(() => expiryNotificationRules.id, { onDelete: "cascade" }).notNull(),
   deliveryType: text("delivery_type").notNull(),
   channel: text("channel").notNull().default("email"),
+  recipientLabel: text("recipient_label"),
   success: boolean("success").notNull(),
   error: text("error"),
   attemptedAt: timestamp("attempted_at").defaultNow().notNull(),

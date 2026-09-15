@@ -352,10 +352,12 @@ export async function initDatabase() {
       rule_id INTEGER NOT NULL REFERENCES expiry_notification_rules(id) ON DELETE CASCADE,
       delivery_type TEXT NOT NULL,
       channel TEXT NOT NULL DEFAULT 'email',
+      recipient_label TEXT,
       success BOOLEAN NOT NULL,
       error TEXT,
       attempted_at TIMESTAMP NOT NULL DEFAULT NOW()
     )`);
+    await _pool.query(`ALTER TABLE expiry_notification_delivery_attempts ADD COLUMN IF NOT EXISTS recipient_label TEXT`);
     await _pool.query(`CREATE INDEX IF NOT EXISTS expiry_notification_delivery_attempts_rule_time_idx
       ON expiry_notification_delivery_attempts(rule_id, attempted_at DESC)`);
     await _pool.query(`DO $$

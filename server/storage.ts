@@ -285,7 +285,7 @@ export interface IStorage {
   setExpiryNotificationRecipients(ruleId: number, recipients: Array<{ userId?: number; email?: string }>): Promise<void>;
   claimExpiryNotificationDelivery(data: ExpiryNotificationDeliveryKey): Promise<Date | null>;
   completeExpiryNotificationDelivery(data: ExpiryNotificationDeliveryKey, claimedAt: Date, success: boolean): Promise<void>;
-  recordExpiryNotificationDeliveryAttempt(data: { ruleId: number; deliveryType: "scheduled" | "test"; channel?: string; success: boolean; error?: string | null }): Promise<void>;
+  recordExpiryNotificationDeliveryAttempt(data: { ruleId: number; deliveryType: "scheduled" | "test"; channel?: string; recipientLabel: string; success: boolean; error?: string | null }): Promise<void>;
   getRecentExpiryNotificationDeliveryAttempts(ruleIds: number[], limitPerRule?: number): Promise<ExpiryNotificationDeliveryAttempt[]>;
   getExpiryNotificationForAlert(data: { userId: number; ruleId: number; entityType: string; entityId: number; expiryDate: string }): Promise<ExpiryNotification | undefined>;
   createExpiryNotification(data: { userId: number; ruleId: number; entityType: string; entityId: number; entityName: string; expiryDate: string }): Promise<ExpiryNotification>;
@@ -1796,11 +1796,12 @@ export class DatabaseStorage implements IStorage {
       .where(and(delivery, eq(expiryNotificationDeliveries.success, false)));
   }
 
-  async recordExpiryNotificationDeliveryAttempt(data: { ruleId: number; deliveryType: "scheduled" | "test"; channel?: string; success: boolean; error?: string | null }): Promise<void> {
+  async recordExpiryNotificationDeliveryAttempt(data: { ruleId: number; deliveryType: "scheduled" | "test"; channel?: string; recipientLabel: string; success: boolean; error?: string | null }): Promise<void> {
     await getDb().insert(expiryNotificationDeliveryAttempts).values({
       ruleId: data.ruleId,
       deliveryType: data.deliveryType,
       channel: data.channel ?? "email",
+      recipientLabel: data.recipientLabel,
       success: data.success,
       error: data.error ?? null,
     });
@@ -1813,6 +1814,7 @@ export class DatabaseStorage implements IStorage {
       ruleId: expiryNotificationDeliveryAttempts.ruleId,
       deliveryType: expiryNotificationDeliveryAttempts.deliveryType,
       channel: expiryNotificationDeliveryAttempts.channel,
+      recipientLabel: expiryNotificationDeliveryAttempts.recipientLabel,
       success: expiryNotificationDeliveryAttempts.success,
       error: expiryNotificationDeliveryAttempts.error,
       attemptedAt: expiryNotificationDeliveryAttempts.attemptedAt,
@@ -1822,7 +1824,8 @@ export class DatabaseStorage implements IStorage {
       .as("ranked_attempts");
     return getDb().select({
       id: ranked.id, ruleId: ranked.ruleId, deliveryType: ranked.deliveryType,
-      channel: ranked.channel, success: ranked.success, error: ranked.error, attemptedAt: ranked.attemptedAt,
+      channel: ranked.channel, recipientLabel: ranked.recipientLabel, success: ranked.success,
+      error: ranked.error, attemptedAt: ranked.attemptedAt,
     }).from(ranked).where(sql`${ranked.rank} <= ${limitPerRule}`).orderBy(desc(ranked.attemptedAt));
   }
 

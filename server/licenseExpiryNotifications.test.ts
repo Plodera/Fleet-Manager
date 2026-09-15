@@ -18,6 +18,14 @@ vi.mock("./storage", () => ({
 
 vi.mock("./email", () => ({
   sendEmailWithResult: vi.fn(),
+  maskEmailAddress: (email: string) => {
+    const normalized = email.trim().toLowerCase();
+    const atIndex = normalized.lastIndexOf("@");
+    return atIndex > 0 && atIndex < normalized.length - 1
+      ? `${normalized[0]}***@${normalized.slice(atIndex + 1)}`
+      : "***";
+  },
+  sanitizeEmailProviderError: (error: unknown) => error instanceof Error ? error.message : String(error),
 }));
 
 import { storage } from "./storage";
@@ -556,6 +564,9 @@ describe("runLicenseExpiryChecks", () => {
     expect(storageMock.completeExpiryNotificationDelivery).toHaveBeenCalledWith(
       expect.any(Object), expect.any(Date), true,
     );
+    expect(storageMock.recordExpiryNotificationDeliveryAttempt).toHaveBeenCalledWith(expect.objectContaining({
+      recipientLabel: "a***@example.com",
+    }));
   });
 
   it("retries an abandoned delivery after its claim lease expires", async () => {
@@ -722,6 +733,9 @@ describe("sendExpiryRuleTest", () => {
     }));
     expect(storageMock.claimExpiryNotificationDelivery).not.toHaveBeenCalled();
     expect(storageMock.createExpiryNotification).not.toHaveBeenCalled();
+    expect(storageMock.recordExpiryNotificationDeliveryAttempt).toHaveBeenCalledWith(expect.objectContaining({
+      recipientLabel: "a***@example.com",
+    }));
   });
 
   it("rejects testing a rule without email delivery", async () => {
