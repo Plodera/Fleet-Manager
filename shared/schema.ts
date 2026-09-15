@@ -986,6 +986,16 @@ export const expiryNotificationDeliveries = pgTable("expiry_notification_deliver
   ),
 }));
 
+export const expiryNotificationDeliveryAttempts = pgTable("expiry_notification_delivery_attempts", {
+  id: serial("id").primaryKey(),
+  ruleId: integer("rule_id").references(() => expiryNotificationRules.id, { onDelete: "cascade" }).notNull(),
+  deliveryType: text("delivery_type").notNull(),
+  channel: text("channel").notNull().default("email"),
+  success: boolean("success").notNull(),
+  error: text("error"),
+  attemptedAt: timestamp("attempted_at").defaultNow().notNull(),
+});
+
 export const insertCompanyDocumentSchema = createInsertSchema(companyDocuments).omit({ id: true, createdAt: true });
 export const insertExpiryNotificationRuleSchema = createInsertSchema(expiryNotificationRules)
   .omit({ id: true, createdAt: true })
@@ -1016,6 +1026,7 @@ export type ExpiryNotificationRule = typeof expiryNotificationRules.$inferSelect
 export type InsertExpiryNotificationRule = z.infer<typeof insertExpiryNotificationRuleSchema>;
 export type ExpiryNotificationRecipient = typeof expiryNotificationRecipients.$inferSelect;
 export type ExpiryNotification = typeof expiryNotifications.$inferSelect;
+export type ExpiryNotificationDeliveryAttempt = typeof expiryNotificationDeliveryAttempts.$inferSelect;
 
 // IT Operations Monitor
 

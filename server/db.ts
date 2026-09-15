@@ -347,6 +347,17 @@ export async function initDatabase() {
       UNIQUE(rule_id, entity_type, entity_id, recipient_key, channel, delivery_date, delivery_occurrence)
     )`);
     await _pool.query(`ALTER TABLE expiry_notification_deliveries ADD COLUMN IF NOT EXISTS delivery_occurrence INTEGER NOT NULL DEFAULT 0`);
+    await _pool.query(`CREATE TABLE IF NOT EXISTS expiry_notification_delivery_attempts (
+      id SERIAL PRIMARY KEY,
+      rule_id INTEGER NOT NULL REFERENCES expiry_notification_rules(id) ON DELETE CASCADE,
+      delivery_type TEXT NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'email',
+      success BOOLEAN NOT NULL,
+      error TEXT,
+      attempted_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`);
+    await _pool.query(`CREATE INDEX IF NOT EXISTS expiry_notification_delivery_attempts_rule_time_idx
+      ON expiry_notification_delivery_attempts(rule_id, attempted_at DESC)`);
     await _pool.query(`DO $$
       DECLARE constraint_name TEXT;
       BEGIN

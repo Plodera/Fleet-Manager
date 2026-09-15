@@ -2688,7 +2688,14 @@ export async function registerRoutes(
   app.get('/api/expiry-notification-rules', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
-    res.json(await storage.getExpiryNotificationRules());
+    const rules = await storage.getExpiryNotificationRules();
+    const attempts = await storage.getRecentExpiryNotificationDeliveryAttempts(rules.map(rule => rule.id));
+    const { nextDeliveryOccurrence } = await import("./licenseExpiryNotifications");
+    res.json(rules.map(rule => ({
+      ...rule,
+      nextDelivery: nextDeliveryOccurrence(rule),
+      recentDeliveries: attempts.filter(attempt => attempt.ruleId === rule.id),
+    })));
   });
 
   app.post('/api/expiry-notification-rules', async (req, res) => {

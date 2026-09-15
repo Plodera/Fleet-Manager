@@ -79,5 +79,18 @@ CREATE TABLE IF NOT EXISTS expiry_notification_deliveries (
   UNIQUE(rule_id, entity_type, entity_id, recipient_key, channel, delivery_date)
 );
 
+CREATE TABLE IF NOT EXISTS expiry_notification_delivery_attempts (
+  id            SERIAL PRIMARY KEY,
+  rule_id       INTEGER NOT NULL REFERENCES expiry_notification_rules(id) ON DELETE CASCADE,
+  delivery_type TEXT NOT NULL,
+  channel       TEXT NOT NULL DEFAULT 'email',
+  success       BOOLEAN NOT NULL,
+  error         TEXT,
+  attempted_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS expiry_notification_delivery_attempts_rule_time_idx
+  ON expiry_notification_delivery_attempts(rule_id, attempted_at DESC);
+
 CREATE INDEX IF NOT EXISTS expiry_notifications_user_status_idx
   ON expiry_notifications(user_id, status, created_at DESC);

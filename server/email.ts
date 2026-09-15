@@ -27,6 +27,18 @@ export interface EmailDeliveryHealth {
   lastError: string | null;
 }
 
+export type EmailDeliveryResult = { success: true } | { success: false; error: string };
+
+export function sanitizeEmailProviderError(error: unknown): string {
+  const message = errorMessage(error)
+    .replace(/(?:Authorization\s*[=:]\s*)?Bearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Authorization: Bearer [redacted]")
+    .replace(/(["']?(?:client[\s_-]?secret|password|passwd|smtp[\s_-]?pass|access[\s_-]?token|refresh[\s_-]?token|token|api[\s_-]?key|x-api-key|authorization)["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi, "$1[redacted]")
+    .replace(/\b(client\s+secret|api\s+key|access\s+token|refresh\s+token|password)\s+(?:is|was|provided)\s+(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi, "$1 [redacted]")
+    .replace(/\b(client\s+secret|api\s+key|access\s+token|refresh\s+token|password)\s+(?!provided\b|is\b|was\b|missing\b|configured\b)(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi, "$1 [redacted]")
+    .replace(/https?:\/\/[^@\s/]+:[^@\s/]+@/gi, "https://[redacted]@");
+  return message.slice(0, 500);
+}
+
 const HEALTHY_EMAIL_DELIVERY: EmailDeliveryHealth = {
   status: "healthy",
   consecutiveFailures: 0,
@@ -58,7 +70,7 @@ function toEmailDeliveryHealth(
 
 async function recordDeliveryFailure(error: unknown): Promise<void> {
   await storage.recordEmailDeliveryFailure(
-    errorMessage(error),
+    sanitizeEmailProviderError(error),
     EMAIL_DELIVERY_FAILURE_THRESHOLD,
   );
 }
@@ -234,12 +246,16 @@ async function deliverEmail(settings: EmailSettings, emailContent: EmailContent)
 }
 
 export async function sendEmail(emailContent: EmailContent): Promise<boolean> {
+  return (await sendEmailWithResult(emailContent)).success;
+}
+
+export async function sendEmailWithResult(emailContent: EmailContent): Promise<EmailDeliveryResult> {
   let settings;
   try {
     settings = await storage.getEmailSettings();
   } catch (err) {
     console.error("Failed to fetch email settings:", err);
-    return false;
+    return { success: false, error: sanitizeEmailProviderError(err) };
   }
 
   if (!settings || !settings.enabled) {
@@ -248,17 +264,17 @@ export async function sendEmail(emailContent: EmailContent): Promise<boolean> {
     console.log(`Subject: ${emailContent.subject}`);
     console.log(`Body:\n${emailContent.body}`);
     console.log("=== END EMAIL ===");
-    return false;
+    return { success: false, error: "Email delivery is disabled" };
   }
 
   try {
     await deliverEmail(settings, emailContent);
 
     console.log(`Email sent successfully to ${emailContent.to} using ${settings.provider}`);
-    return true;
+    return { success: true };
   } catch (error) {
-    console.error("Failed to send email:", error);
-    return false;
+    console.error("Failed to send email:", sanitizeEmailProviderError(error));
+    return { success: false, error: sanitizeEmailProviderError(error) };
   }
 }
 
@@ -425,6 +441,6 @@ export async function sendTestEmail(to: string): Promise<{ success: boolean; err
 
     return { success: true };
   } catch (error: any) {
-    return { success: false, error: error.message || "Failed to send test email" };
+    return { success: false, error: sanitizeEmailProviderError(error) };
   }
 }

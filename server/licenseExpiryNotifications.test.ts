@@ -10,19 +10,21 @@ vi.mock("./storage", () => ({
     resolveObsoleteExpiryNotifications: vi.fn(),
     claimExpiryNotificationDelivery: vi.fn(),
     completeExpiryNotificationDelivery: vi.fn(),
+    recordExpiryNotificationDeliveryAttempt: vi.fn(),
     getExpiryNotificationForAlert: vi.fn(),
     createExpiryNotification: vi.fn(),
   },
 }));
 
 vi.mock("./email", () => ({
-  sendEmail: vi.fn(),
+  sendEmailWithResult: vi.fn(),
 }));
 
 import { storage } from "./storage";
-import { sendEmail } from "./email";
+import { sendEmailWithResult } from "./email";
 import {
   dueDeliveryOccurrence,
+  nextDeliveryOccurrence,
   runLicenseExpiryChecks,
   scheduledMinutes,
   sendExpiryRuleTest,
@@ -37,10 +39,11 @@ const storageMock = storage as unknown as {
   resolveObsoleteExpiryNotifications: ReturnType<typeof vi.fn>;
   claimExpiryNotificationDelivery: ReturnType<typeof vi.fn>;
   completeExpiryNotificationDelivery: ReturnType<typeof vi.fn>;
+  recordExpiryNotificationDeliveryAttempt: ReturnType<typeof vi.fn>;
   getExpiryNotificationForAlert: ReturnType<typeof vi.fn>;
   createExpiryNotification: ReturnType<typeof vi.fn>;
 };
-const sendEmailMock = sendEmail as unknown as ReturnType<typeof vi.fn>;
+const sendEmailMock = sendEmailWithResult as unknown as ReturnType<typeof vi.fn>;
 
 const vehicle = {
   id: 10,
@@ -105,9 +108,10 @@ beforeEach(() => {
   storageMock.resolveObsoleteExpiryNotifications.mockResolvedValue(undefined);
   storageMock.claimExpiryNotificationDelivery.mockResolvedValue(new Date());
   storageMock.completeExpiryNotificationDelivery.mockResolvedValue(undefined);
+  storageMock.recordExpiryNotificationDeliveryAttempt.mockResolvedValue(undefined);
   storageMock.getExpiryNotificationForAlert.mockResolvedValue(undefined);
   storageMock.createExpiryNotification.mockResolvedValue({ id: 1 });
-  sendEmailMock.mockResolvedValue(true);
+  sendEmailMock.mockResolvedValue({ success: true });
 });
 
 afterEach(() => {
@@ -469,8 +473,8 @@ describe("runLicenseExpiryChecks", () => {
       if (!success) claims.delete(deliveryKey(data));
     });
     sendEmailMock
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
+      .mockResolvedValueOnce({ success: false, error: "Provider unavailable" })
+      .mockResolvedValueOnce({ success: true });
 
     await runLicenseExpiryChecks();
     await runLicenseExpiryChecks();
@@ -487,6 +491,20 @@ describe("runLicenseExpiryChecks", () => {
       expect.any(Object),
       expect.any(Date),
       true,
+    );
+  });
+
+  it("does not release a successful delivery claim when attempt history cannot be recorded", async () => {
+    storageMock.getVehicles.mockResolvedValue([vehicle]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([rule({ sendEmail: true, sendInApp: false })]);
+    storageMock.recordExpiryNotificationDeliveryAttempt.mockRejectedValueOnce(new Error("audit database unavailable"));
+
+    await expect(runLicenseExpiryChecks()).resolves.toBe(1);
+
+    expect(sendEmailMock).toHaveBeenCalledOnce();
+    expect(storageMock.completeExpiryNotificationDelivery).toHaveBeenCalledWith(
+      expect.any(Object), expect.any(Date), true,
     );
   });
 
@@ -660,5 +678,22 @@ describe("sendExpiryRuleTest", () => {
     storageMock.getExpiryNotificationRules.mockResolvedValue([rule({ sendEmail: false })]);
     await expect(sendExpiryRuleTest(1)).rejects.toThrow("Enable email delivery");
     expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("nextDeliveryOccurrence", () => {
+  it("returns the next configured local slot and rolls to tomorrow after the final slot", () => {
+    const schedule = { preferredTime: "09:00", scheduleTimezone: "UTC", timesPerDay: 2, isActive: true };
+    expect(nextDeliveryOccurrence(schedule, new Date("2026-09-15T10:00:00Z"))).toEqual({
+      date: "2026-09-15", time: "21:00", timezone: "UTC",
+    });
+    expect(nextDeliveryOccurrence(schedule, new Date("2026-09-15T22:00:00Z"))).toEqual({
+      date: "2026-09-16", time: "09:00", timezone: "UTC",
+    });
+  });
+
+  it("does not report a next delivery for an inactive rule", () => {
+    expect(nextDeliveryOccurrence({ isActive: false })).toBeNull();
+    expect(nextDeliveryOccurrence({ isActive: true, sendEmail: false })).toBeNull();
   });
 });

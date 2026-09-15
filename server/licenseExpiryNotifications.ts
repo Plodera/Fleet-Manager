@@ -1,5 +1,5 @@
 import { storage } from "./storage";
-import { sendEmail } from "./email";
+import { sendEmailWithResult } from "./email";
 import type { ExpiryNotificationRule, ExpiryNotificationRecipient } from "@shared/schema";
 
 type ExpiryEntity = {
@@ -37,6 +37,30 @@ export function scheduledMinutes(preferredTime: string, timesPerDay: number): nu
   return Array.from({ length: count }, (_, index) =>
     (start + Math.floor(index * 1440 / count)) % 1440,
   ).sort((left, right) => left - right);
+}
+
+export function nextDeliveryOccurrence(rule: ScheduledRule & { isActive?: boolean; sendEmail?: boolean }, now = new Date()): { date: string; time: string; timezone: string } | null {
+  if (rule.isActive === false || rule.sendEmail === false) return null;
+  const timezone = rule.scheduleTimezone || "Africa/Lagos";
+  const local = zonedDateTime(now, timezone);
+  const slots = scheduledMinutes(rule.preferredTime || "09:00", rule.timesPerDay || 1);
+  const next = slots.find(minutes => minutes > local.minutes);
+  const deliveryMinutes = next ?? slots[0];
+  const localDate = new Date(`${local.date}T00:00:00Z`);
+  if (next === undefined) localDate.setUTCDate(localDate.getUTCDate() + 1);
+  return {
+    date: localDate.toISOString().slice(0, 10),
+    time: `${String(Math.floor(deliveryMinutes / 60)).padStart(2, "0")}:${String(deliveryMinutes % 60).padStart(2, "0")}`,
+    timezone,
+  };
+}
+
+async function recordDeliveryAttempt(data: { ruleId: number; deliveryType: "scheduled" | "test"; success: boolean; error?: string | null }): Promise<void> {
+  try {
+    await storage.recordExpiryNotificationDeliveryAttempt(data);
+  } catch (error) {
+    console.error("[licenseExpiry] Could not record delivery attempt:", error);
+  }
 }
 
 export function dueDeliveryOccurrence(
@@ -297,7 +321,11 @@ export async function runLicenseExpiryChecks(options: { scheduled?: boolean; now
               "email",
               timing.deliveryDate,
               timing.deliveryOccurrence,
-              () => sendEmail({ to: recipientUser.email!, subject, body }),
+              async () => {
+                const result = await sendEmailWithResult({ to: recipientUser.email!, subject, body });
+                await recordDeliveryAttempt({ ruleId: rule.id, deliveryType: "scheduled", success: result.success, error: result.success ? null : result.error });
+                return result.success;
+              },
             );
           }
         }
@@ -315,7 +343,11 @@ export async function runLicenseExpiryChecks(options: { scheduled?: boolean; now
             "email",
             timing.deliveryDate,
             timing.deliveryOccurrence,
-            () => sendEmail({ to: email, subject, body }),
+            async () => {
+              const result = await sendEmailWithResult({ to: email, subject, body });
+              await recordDeliveryAttempt({ ruleId: rule.id, deliveryType: "scheduled", success: result.success, error: result.success ? null : result.error });
+              return result.success;
+            },
           );
         }
       }
@@ -348,7 +380,8 @@ export async function sendExpiryRuleTest(
   if (addresses.length === 0) throw new Error("Add at least one recipient with a valid email address");
 
   const schedule = `${rule.timesPerDay} time(s) per day from ${rule.preferredTime} (${rule.scheduleTimezone})`;
-  const results = await Promise.all(addresses.map(to => sendEmail({
+  const results = await Promise.all(addresses.map(async to => {
+    const result = await sendEmailWithResult({
     to,
     subject: `[TEST] Licence expiry notification: ${entityLabel(rule.entityType as ExpiryEntity["entityType"])}`,
     body: [
@@ -360,8 +393,11 @@ export async function sendExpiryRuleTest(
       "",
       "If you received this message, this reminder rule can deliver email successfully.",
     ].join("\n"),
-  })));
-  const sentCount = results.filter(Boolean).length;
+    });
+    await recordDeliveryAttempt({ ruleId, deliveryType: "test", success: result.success, error: result.success ? null : result.error });
+    return result;
+  }));
+  const sentCount = results.filter(result => result.success).length;
   const failedCount = results.length - sentCount;
   return { success: failedCount === 0, sentCount, failedCount };
 }

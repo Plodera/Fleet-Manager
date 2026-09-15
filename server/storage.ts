@@ -6,7 +6,7 @@ import {
   tvDashboards, tvDashboardKpis, tvDashboardKpiValues, tvDashboardVideos, tvDashboardKpiPageVideos,
   trackers, trackerItems, trackerNotificationRules,
   companyDocuments, companyDocumentAccess, expiryNotificationRules, expiryNotificationRecipients,
-  expiryNotifications, expiryNotificationDeliveries,
+  expiryNotifications, expiryNotificationDeliveries, expiryNotificationDeliveryAttempts,
   itHostTypes, itMonitoredHosts, itHostStatus, itKpis, itKpiValues,
   itHostChecks, itNetworkIssues, itNetworkIssueUpdates, itMonitoringSettings, itMonitoringReports, itMonthlyNetworkReports,
   itDashboardSettings,
@@ -48,7 +48,7 @@ import {
   type TrackerNotificationRule, type InsertTrackerNotificationRule,
   type CompanyDocument, type InsertCompanyDocument, type CompanyDocumentAccess,
   type ExpiryNotificationRule, type InsertExpiryNotificationRule,
-  type ExpiryNotificationRecipient, type ExpiryNotification,
+  type ExpiryNotificationRecipient, type ExpiryNotification, type ExpiryNotificationDeliveryAttempt,
   type GlpiSettings, type InsertGlpiSettings,
   type HikvisionNvr, type InsertHikvisionNvr,
   type HikvisionGlobalSettings, type InsertHikvisionGlobalSettings,
@@ -285,6 +285,8 @@ export interface IStorage {
   setExpiryNotificationRecipients(ruleId: number, recipients: Array<{ userId?: number; email?: string }>): Promise<void>;
   claimExpiryNotificationDelivery(data: ExpiryNotificationDeliveryKey): Promise<Date | null>;
   completeExpiryNotificationDelivery(data: ExpiryNotificationDeliveryKey, claimedAt: Date, success: boolean): Promise<void>;
+  recordExpiryNotificationDeliveryAttempt(data: { ruleId: number; deliveryType: "scheduled" | "test"; channel?: string; success: boolean; error?: string | null }): Promise<void>;
+  getRecentExpiryNotificationDeliveryAttempts(ruleIds: number[], limitPerRule?: number): Promise<ExpiryNotificationDeliveryAttempt[]>;
   getExpiryNotificationForAlert(data: { userId: number; ruleId: number; entityType: string; entityId: number; expiryDate: string }): Promise<ExpiryNotification | undefined>;
   createExpiryNotification(data: { userId: number; ruleId: number; entityType: string; entityId: number; entityName: string; expiryDate: string }): Promise<ExpiryNotification>;
   getExpiryNotificationsForUser(userId: number): Promise<ExpiryNotification[]>;
@@ -1794,6 +1796,36 @@ export class DatabaseStorage implements IStorage {
       .where(and(delivery, eq(expiryNotificationDeliveries.success, false)));
   }
 
+  async recordExpiryNotificationDeliveryAttempt(data: { ruleId: number; deliveryType: "scheduled" | "test"; channel?: string; success: boolean; error?: string | null }): Promise<void> {
+    await getDb().insert(expiryNotificationDeliveryAttempts).values({
+      ruleId: data.ruleId,
+      deliveryType: data.deliveryType,
+      channel: data.channel ?? "email",
+      success: data.success,
+      error: data.error ?? null,
+    });
+  }
+
+  async getRecentExpiryNotificationDeliveryAttempts(ruleIds: number[], limitPerRule = 5): Promise<ExpiryNotificationDeliveryAttempt[]> {
+    if (ruleIds.length === 0) return [];
+    const ranked = getDb().select({
+      id: expiryNotificationDeliveryAttempts.id,
+      ruleId: expiryNotificationDeliveryAttempts.ruleId,
+      deliveryType: expiryNotificationDeliveryAttempts.deliveryType,
+      channel: expiryNotificationDeliveryAttempts.channel,
+      success: expiryNotificationDeliveryAttempts.success,
+      error: expiryNotificationDeliveryAttempts.error,
+      attemptedAt: expiryNotificationDeliveryAttempts.attemptedAt,
+      rank: sql<number>`row_number() over (partition by ${expiryNotificationDeliveryAttempts.ruleId} order by ${expiryNotificationDeliveryAttempts.attemptedAt} desc)`.as("rank"),
+    }).from(expiryNotificationDeliveryAttempts)
+      .where(inArray(expiryNotificationDeliveryAttempts.ruleId, ruleIds))
+      .as("ranked_attempts");
+    return getDb().select({
+      id: ranked.id, ruleId: ranked.ruleId, deliveryType: ranked.deliveryType,
+      channel: ranked.channel, success: ranked.success, error: ranked.error, attemptedAt: ranked.attemptedAt,
+    }).from(ranked).where(sql`${ranked.rank} <= ${limitPerRule}`).orderBy(desc(ranked.attemptedAt));
+  }
+
   async getExpiryNotificationForAlert(data: { userId: number; ruleId: number; entityType: string; entityId: number; expiryDate: string }): Promise<ExpiryNotification | undefined> {
     const [notification] = await getDb().select().from(expiryNotifications)
       .where(and(
@@ -2813,6 +2845,8 @@ export const storage = {
   setExpiryNotificationRecipients: (...args: Parameters<DatabaseStorage['setExpiryNotificationRecipients']>) => getStorage().setExpiryNotificationRecipients(...args),
   claimExpiryNotificationDelivery: (...args: Parameters<DatabaseStorage['claimExpiryNotificationDelivery']>) => getStorage().claimExpiryNotificationDelivery(...args),
   completeExpiryNotificationDelivery: (...args: Parameters<DatabaseStorage['completeExpiryNotificationDelivery']>) => getStorage().completeExpiryNotificationDelivery(...args),
+  recordExpiryNotificationDeliveryAttempt: (...args: Parameters<DatabaseStorage['recordExpiryNotificationDeliveryAttempt']>) => getStorage().recordExpiryNotificationDeliveryAttempt(...args),
+  getRecentExpiryNotificationDeliveryAttempts: (...args: Parameters<DatabaseStorage['getRecentExpiryNotificationDeliveryAttempts']>) => getStorage().getRecentExpiryNotificationDeliveryAttempts(...args),
   getExpiryNotificationForAlert: (...args: Parameters<DatabaseStorage['getExpiryNotificationForAlert']>) => getStorage().getExpiryNotificationForAlert(...args),
   createExpiryNotification: (...args: Parameters<DatabaseStorage['createExpiryNotification']>) => getStorage().createExpiryNotification(...args),
   getExpiryNotificationsForUser: (...args: Parameters<DatabaseStorage['getExpiryNotificationsForUser']>) => getStorage().getExpiryNotificationsForUser(...args),
