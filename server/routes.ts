@@ -9,7 +9,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { getEmailDeliveryHealth, sendBookingNotification, sendBookingStatusUpdate, sendTripStatusToApprover, sendBreakdownAlertEmail } from "./email";
 import { scheduleTrackerNotifications, runChecksForTracker } from "./trackerNotifications";
-import { scheduleLicenseExpiryNotifications, runLicenseExpiryChecks } from "./licenseExpiryNotifications";
+import { scheduleLicenseExpiryNotifications, runLicenseExpiryChecks, sendExpiryRuleTest } from "./licenseExpiryNotifications";
 import type { User } from "@shared/schema";
 import multer from "multer";
 import path from "path";
@@ -2702,6 +2702,9 @@ export async function registerRoutes(
       thresholdDays: input.triggerType === "expired" ? null : input.thresholdDays ?? 30,
       sendEmail: input.sendEmail,
       sendInApp: input.sendInApp,
+      preferredTime: input.preferredTime,
+      scheduleTimezone: input.scheduleTimezone,
+      timesPerDay: input.timesPerDay,
       isActive: input.isActive,
     });
     await storage.setExpiryNotificationRecipients(rule.id, input.recipients);
@@ -2727,6 +2730,20 @@ export async function registerRoutes(
     if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
     await storage.deleteExpiryNotificationRule(Number(req.params.id));
     res.sendStatus(204);
+  });
+
+  app.post('/api/expiry-notification-rules/:id/test', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if ((req.user as User).role !== "admin") return res.status(403).json({ message: "Admin only" });
+    try {
+      const result = await sendExpiryRuleTest(Number(req.params.id));
+      res.status(result.success ? 200 : 400).json({
+        ...result,
+        ...(result.success ? {} : { message: `Email delivery failed for ${result.failedCount} recipient(s). Check the email provider settings and delivery health.` }),
+      });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error instanceof Error ? error.message : "Test notification failed" });
+    }
   });
 
   app.post('/api/license-expiry/run-check', async (req, res) => {

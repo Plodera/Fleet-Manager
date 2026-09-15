@@ -1,5 +1,6 @@
 import { storage } from "./storage";
 import { sendEmail } from "./email";
+import type { ExpiryNotificationRule, ExpiryNotificationRecipient } from "@shared/schema";
 
 type ExpiryEntity = {
   entityType: "vehicle_license" | "vehicle_ownership" | "vehicle_insurance" | "vehicle_ivm" | "driver_license" | "company_document";
@@ -10,24 +11,60 @@ type ExpiryEntity = {
   accessUserIds?: number[];
 };
 
-function daysUntil(expiryDate: string): number {
-  const today = Date.parse(`${dateKey()}T00:00:00Z`);
+type ScheduledRule = Partial<Pick<ExpiryNotificationRule, "preferredTime" | "scheduleTimezone" | "timesPerDay">>;
+
+function zonedDateTime(now: Date, timezone: string): { date: string; minutes: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find(part => part.type === type)?.value ?? "";
+  return {
+    date: `${value("year")}-${value("month")}-${value("day")}`,
+    minutes: Number(value("hour")) * 60 + Number(value("minute")),
+  };
+}
+
+export function scheduledMinutes(preferredTime: string, timesPerDay: number): number[] {
+  const [hour, minute] = (preferredTime || "09:00").split(":").map(Number);
+  const start = hour * 60 + minute;
+  const count = timesPerDay || 1;
+  return Array.from({ length: count }, (_, index) =>
+    (start + Math.floor(index * 1440 / count)) % 1440,
+  ).sort((left, right) => left - right);
+}
+
+export function dueDeliveryOccurrence(
+  rule: ScheduledRule,
+  now = new Date(),
+): { deliveryDate: string; deliveryOccurrence: number } | null {
+  const local = zonedDateTime(now, rule.scheduleTimezone || "Africa/Lagos");
+  const due = scheduledMinutes(rule.preferredTime || "09:00", rule.timesPerDay || 1)
+    .map((minutes, occurrence) => ({ minutes, occurrence }))
+    .filter(slot => slot.minutes <= local.minutes)
+    .at(-1);
+  return due ? { deliveryDate: local.date, deliveryOccurrence: due.occurrence } : null;
+}
+
+function daysUntil(expiryDate: string, todayKey: string): number {
+  const today = Date.parse(`${todayKey}T00:00:00Z`);
   const expiry = Date.parse(`${expiryDate}T00:00:00Z`);
   return Math.round((expiry - today) / (1000 * 60 * 60 * 24));
 }
 
-function dateKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function matchesRule(rule: { triggerType: string; thresholdDays: number | null }, expiryDate: string): boolean {
-  const remaining = daysUntil(expiryDate);
+function matchesRule(rule: { triggerType: string; thresholdDays: number | null }, expiryDate: string, todayKey: string): boolean {
+  const remaining = daysUntil(expiryDate, todayKey);
   if (rule.triggerType === "expired") return remaining < 0;
   return remaining <= (rule.thresholdDays ?? 30);
 }
 
-function describeExpiry(expiryDate: string): string {
-  const remaining = daysUntil(expiryDate);
+function describeExpiry(expiryDate: string, todayKey: string): string {
+  const remaining = daysUntil(expiryDate, todayKey);
   if (remaining < 0) return `${Math.abs(remaining)} day(s) overdue`;
   if (remaining === 0) return "expires today";
   return `${remaining} day(s) remaining`;
@@ -101,6 +138,8 @@ async function deliverOnce(
   logicalRecipientKey: string,
   recipientAliases: string[],
   channel: "email" | "in_app",
+  deliveryDate: string,
+  deliveryOccurrence: number,
   deliver: () => Promise<boolean>,
 ): Promise<void> {
   const delivery = {
@@ -111,7 +150,8 @@ async function deliverOnce(
     logicalRecipientKey,
     recipientAliases,
     channel,
-    deliveryDate: dateKey(),
+    deliveryDate,
+    deliveryOccurrence,
   };
   const claimedAt = await storage.claimExpiryNotificationDelivery(delivery);
   if (!claimedAt) return;
@@ -126,7 +166,8 @@ async function deliverOnce(
   await storage.completeExpiryNotificationDelivery(delivery, claimedAt, success);
 }
 
-export async function runLicenseExpiryChecks(): Promise<number> {
+export async function runLicenseExpiryChecks(options: { scheduled?: boolean; now?: Date } = {}): Promise<number> {
+  const now = options.now ?? new Date();
   const [rules, entities, users] = await Promise.all([
     storage.getExpiryNotificationRules(),
     getEntities(),
@@ -151,6 +192,8 @@ export async function runLicenseExpiryChecks(): Promise<number> {
     claimRecipientKey: string,
     recipientAliases: string[],
     channel: "email" | "in_app",
+    deliveryDate: string,
+    deliveryOccurrence: number,
     deliver: () => Promise<boolean>,
   ): Promise<void> => {
     const logicalKey = [
@@ -158,7 +201,8 @@ export async function runLicenseExpiryChecks(): Promise<number> {
       entity.id,
       logicalRecipientKey,
       channel,
-      dateKey(),
+      deliveryDate,
+      deliveryOccurrence,
     ].join(":");
     if (scheduledDeliveries.has(logicalKey)) return;
     scheduledDeliveries.add(logicalKey);
@@ -169,6 +213,8 @@ export async function runLicenseExpiryChecks(): Promise<number> {
       logicalRecipientKey,
       Array.from(new Set([claimRecipientKey, logicalRecipientKey, ...recipientAliases])),
       channel,
+      deliveryDate,
+      deliveryOccurrence,
       deliver,
     );
   };
@@ -184,11 +230,17 @@ export async function runLicenseExpiryChecks(): Promise<number> {
 
   const activeRules = rules.filter(rule => rule.isActive).sort((left, right) => left.id - right.id);
   for (const rule of activeRules) {
+    const scheduledOccurrence = dueDeliveryOccurrence(rule, now);
+    if (options.scheduled && !scheduledOccurrence) continue;
+    const timing = scheduledOccurrence ?? {
+      deliveryDate: zonedDateTime(now, rule.scheduleTimezone || "Africa/Lagos").date,
+      deliveryOccurrence: 0,
+    };
     const matched = entities.filter((entity): entity is ExpiryEntity & { expiryDate: string } =>
       entity.expiryDate !== null &&
       entity.isActive !== false &&
       entity.entityType === rule.entityType &&
-      matchesRule(rule, entity.expiryDate),
+      matchesRule(rule, entity.expiryDate, timing.deliveryDate),
     );
     for (const entity of matched) {
       matchedEntities.add(`${entity.entityType}:${entity.id}`);
@@ -201,7 +253,7 @@ export async function runLicenseExpiryChecks(): Promise<number> {
         "",
         `Type: ${entityLabel(entity.entityType)}`,
         `Item: ${entity.name}`,
-        `Expiry date: ${entity.expiryDate} (${describeExpiry(entity.expiryDate)})`,
+        `Expiry date: ${entity.expiryDate} (${describeExpiry(entity.expiryDate, timing.deliveryDate)})`,
         "",
         "Please log in to Fleet Management and take the required action.",
       ].join("\n");
@@ -217,7 +269,7 @@ export async function runLicenseExpiryChecks(): Promise<number> {
           const userKey = `user:${recipientUser.id}`;
 
           if (rule.sendInApp) {
-            await scheduleDelivery(rule.id, entity, userKey, userKey, [userKey], "in_app", async () => {
+            await scheduleDelivery(rule.id, entity, userKey, userKey, [userKey], "in_app", timing.deliveryDate, 0, async () => {
               const existing = await storage.getExpiryNotificationForAlert({
                 userId: recipientUser.id, ruleId: rule.id, entityType: entity.entityType,
                 entityId: entity.id, expiryDate: entity.expiryDate,
@@ -243,6 +295,8 @@ export async function runLicenseExpiryChecks(): Promise<number> {
               emailKey,
               [emailKey, ...matchingUserKeys],
               "email",
+              timing.deliveryDate,
+              timing.deliveryOccurrence,
               () => sendEmail({ to: recipientUser.email!, subject, body }),
             );
           }
@@ -259,6 +313,8 @@ export async function runLicenseExpiryChecks(): Promise<number> {
             emailKey,
             [emailKey, ...matchingUserKeys],
             "email",
+            timing.deliveryDate,
+            timing.deliveryOccurrence,
             () => sendEmail({ to: email, subject, body }),
           );
         }
@@ -269,16 +325,57 @@ export async function runLicenseExpiryChecks(): Promise<number> {
   return matchedEntities.size;
 }
 
+export async function sendExpiryRuleTest(
+  ruleId: number,
+): Promise<{ success: boolean; sentCount: number; failedCount: number }> {
+  const [rules, users] = await Promise.all([
+    storage.getExpiryNotificationRules(),
+    storage.getUsers(),
+  ]);
+  const rule = rules.find(candidate => candidate.id === ruleId);
+  if (!rule) throw new Error("Reminder rule not found");
+  if (!rule.sendEmail) throw new Error("Enable email delivery before testing this rule");
+
+  const usersById = new Map(users.map(user => [user.id, user]));
+  const addresses = Array.from(new Set(
+    rule.recipients
+      .map((recipient: ExpiryNotificationRecipient) =>
+        recipient.email ?? (recipient.userId ? usersById.get(recipient.userId)?.email : null),
+      )
+      .filter((email): email is string => Boolean(email))
+      .map(email => email.trim().toLowerCase()),
+  ));
+  if (addresses.length === 0) throw new Error("Add at least one recipient with a valid email address");
+
+  const schedule = `${rule.timesPerDay} time(s) per day from ${rule.preferredTime} (${rule.scheduleTimezone})`;
+  const results = await Promise.all(addresses.map(to => sendEmail({
+    to,
+    subject: `[TEST] Licence expiry notification: ${entityLabel(rule.entityType as ExpiryEntity["entityType"])}`,
+    body: [
+      "TEST NOTIFICATION — no action is required.",
+      "",
+      `Rule: ${entityLabel(rule.entityType as ExpiryEntity["entityType"])}`,
+      `Trigger: ${rule.triggerType === "expired" ? "When expired" : `${rule.thresholdDays ?? 30} day(s) before expiry`}`,
+      `Schedule: ${schedule}`,
+      "",
+      "If you received this message, this reminder rule can deliver email successfully.",
+    ].join("\n"),
+  })));
+  const sentCount = results.filter(Boolean).length;
+  const failedCount = results.length - sentCount;
+  return { success: failedCount === 0, sentCount, failedCount };
+}
+
 export function scheduleLicenseExpiryNotifications(): void {
   setTimeout(() => {
-    runLicenseExpiryChecks()
+    runLicenseExpiryChecks({ scheduled: true })
       .then(matches => console.log(`[licenseExpiry] Completed startup check (${matches} match(es)).`))
       .catch(error => console.error("[licenseExpiry] Startup check failed:", error));
   }, 6000);
 
   setInterval(() => {
-    runLicenseExpiryChecks()
+    runLicenseExpiryChecks({ scheduled: true })
       .then(matches => console.log(`[licenseExpiry] Completed scheduled check (${matches} match(es)).`))
       .catch(error => console.error("[licenseExpiry] Scheduled check failed:", error));
-  }, 24 * 60 * 60 * 1000);
+  }, 60 * 1000);
 }

@@ -3,12 +3,13 @@ import express from "express";
 import http from "http";
 import request from "supertest";
 
-const { authState, sendTestEmailMock, getEmailDeliveryHealthMock } = vi.hoisted(() => ({
+const { authState, sendTestEmailMock, sendExpiryRuleTestMock, getEmailDeliveryHealthMock } = vi.hoisted(() => ({
   authState: {
     authenticated: false,
     user: undefined as { id: number; role: string; permissions: string[] } | undefined,
   },
   sendTestEmailMock: vi.fn(),
+  sendExpiryRuleTestMock: vi.fn(),
   getEmailDeliveryHealthMock: vi.fn(),
 }));
 
@@ -52,19 +53,24 @@ vi.mock("./trackerNotifications", () => ({
 vi.mock("./licenseExpiryNotifications", () => ({
   scheduleLicenseExpiryNotifications: vi.fn(),
   runLicenseExpiryChecks: vi.fn().mockResolvedValue(0),
+  sendExpiryRuleTest: sendExpiryRuleTestMock,
 }));
 
+let app: express.Express;
+let server: http.Server;
+
+beforeAll(async () => {
+  app = express();
+  server = http.createServer(app);
+  const { registerRoutes } = await import("./routes");
+  await registerRoutes(server, app);
+});
+
+afterAll(() => {
+  server.close();
+});
+
 describe("POST /api/settings/email/test", () => {
-  let app: express.Express;
-  let server: http.Server;
-
-  beforeAll(async () => {
-    app = express();
-    server = http.createServer(app);
-    const { registerRoutes } = await import("./routes");
-    await registerRoutes(server, app);
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     authState.authenticated = true;
@@ -78,10 +84,6 @@ describe("POST /api/settings/email/test", () => {
       lastSuccessAt: null,
       lastError: "Provider unavailable",
     });
-  });
-
-  afterAll(() => {
-    server.close();
   });
 
   it("requires authentication", async () => {
@@ -196,5 +198,42 @@ describe("POST /api/settings/email/test", () => {
 
     expect(response.status).toBe(403);
     expect(response.text).toBe("Forbidden");
+  });
+});
+
+describe("POST /api/expiry-notification-rules/:id/test", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authState.authenticated = true;
+    authState.user = { id: 1, role: "admin", permissions: [] };
+  });
+
+  it("requires an administrator", async () => {
+    authState.user = { id: 2, role: "user", permissions: [] };
+    const response = await request(app).post("/api/expiry-notification-rules/7/test");
+    expect(response.status).toBe(403);
+    expect(sendExpiryRuleTestMock).not.toHaveBeenCalled();
+  });
+
+  it("returns the rule test delivery result", async () => {
+    sendExpiryRuleTestMock.mockResolvedValueOnce({ success: true, sentCount: 2, failedCount: 0 });
+    const response = await request(app).post("/api/expiry-notification-rules/7/test");
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, sentCount: 2, failedCount: 0 });
+    expect(sendExpiryRuleTestMock).toHaveBeenCalledWith(7);
+  });
+
+  it("returns a useful error when the rule cannot be tested", async () => {
+    sendExpiryRuleTestMock.mockRejectedValueOnce(new Error("Add at least one recipient with a valid email address"));
+    const response = await request(app).post("/api/expiry-notification-rules/7/test");
+    expect(response.status).toBe(400);
+    expect(response.body.message).toContain("valid email address");
+  });
+
+  it("explains provider delivery failures", async () => {
+    sendExpiryRuleTestMock.mockResolvedValueOnce({ success: false, sentCount: 0, failedCount: 2 });
+    const response = await request(app).post("/api/expiry-notification-rules/7/test");
+    expect(response.status).toBe(400);
+    expect(response.body.message).toContain("email provider settings");
   });
 });

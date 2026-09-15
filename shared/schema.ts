@@ -941,6 +941,9 @@ export const expiryNotificationRules = pgTable("expiry_notification_rules", {
   thresholdDays: integer("threshold_days"),
   sendEmail: boolean("send_email").notNull().default(true),
   sendInApp: boolean("send_in_app").notNull().default(true),
+  preferredTime: text("preferred_time").notNull().default("09:00"),
+  scheduleTimezone: text("schedule_timezone").notNull().default("Africa/Lagos"),
+  timesPerDay: integer("times_per_day").notNull().default(1),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -974,11 +977,12 @@ export const expiryNotificationDeliveries = pgTable("expiry_notification_deliver
   recipientKey: text("recipient_key").notNull(),
   channel: text("channel").notNull(),
   deliveryDate: date("delivery_date").notNull(),
+  deliveryOccurrence: integer("delivery_occurrence").notNull().default(0),
   success: boolean("success").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
-  expiryDeliveryDayUnique: uniqueIndex("expiry_notification_delivery_day_unique").on(
-    table.ruleId, table.entityType, table.entityId, table.recipientKey, table.channel, table.deliveryDate,
+  expiryDeliveryOccurrenceUnique: uniqueIndex("expiry_notification_delivery_occurrence_unique").on(
+    table.ruleId, table.entityType, table.entityId, table.recipientKey, table.channel, table.deliveryDate, table.deliveryOccurrence,
   ),
 }));
 
@@ -989,6 +993,16 @@ export const insertExpiryNotificationRuleSchema = createInsertSchema(expiryNotif
     entityType: z.enum(EXPIRY_ENTITY_TYPES),
     triggerType: z.enum(EXPIRY_TRIGGER_TYPES),
     thresholdDays: z.coerce.number().int().min(0).optional().nullable(),
+    preferredTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a valid time"),
+    scheduleTimezone: z.string().trim().min(1).refine((timezone) => {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone: timezone }).format();
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Choose a valid timezone"),
+    timesPerDay: z.coerce.number().int().min(1).max(24),
   });
 export const expiryNotificationRecipientInputSchema = z.object({
   userId: z.coerce.number().int().positive().optional(),

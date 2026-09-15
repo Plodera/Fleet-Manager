@@ -76,6 +76,7 @@ type ExpiryNotificationDeliveryKey = {
   recipientAliases?: string[];
   channel: string;
   deliveryDate: string;
+  deliveryOccurrence?: number;
 };
 
 export interface IStorage {
@@ -1723,6 +1724,7 @@ export class DatabaseStorage implements IStorage {
       logicalRecipientKey,
       data.channel,
       data.deliveryDate,
+      data.deliveryOccurrence ?? 0,
     ].join(":");
 
     return getDb().transaction(async (tx: any) => {
@@ -1739,6 +1741,7 @@ export class DatabaseStorage implements IStorage {
           inArray(expiryNotificationDeliveries.recipientKey, aliases),
           eq(expiryNotificationDeliveries.channel, data.channel),
           eq(expiryNotificationDeliveries.deliveryDate, data.deliveryDate),
+          eq(expiryNotificationDeliveries.deliveryOccurrence, data.deliveryOccurrence ?? 0),
         ))
         .orderBy(desc(expiryNotificationDeliveries.success), desc(expiryNotificationDeliveries.createdAt))
         .limit(1);
@@ -1752,13 +1755,14 @@ export class DatabaseStorage implements IStorage {
           inArray(expiryNotificationDeliveries.recipientKey, aliases),
           eq(expiryNotificationDeliveries.channel, data.channel),
           eq(expiryNotificationDeliveries.deliveryDate, data.deliveryDate),
+          eq(expiryNotificationDeliveries.deliveryOccurrence, data.deliveryOccurrence ?? 0),
           eq(expiryNotificationDeliveries.success, false),
           lt(expiryNotificationDeliveries.createdAt, staleBefore),
         ));
       }
 
       const claimed = await tx.insert(expiryNotificationDeliveries)
-        .values({ ...delivery, success: false, createdAt: claimedAt })
+        .values({ ...delivery, deliveryOccurrence: data.deliveryOccurrence ?? 0, success: false, createdAt: claimedAt })
         .onConflictDoNothing()
         .returning({ claimedAt: expiryNotificationDeliveries.createdAt });
       return claimed[0]?.claimedAt ?? null;
@@ -1777,6 +1781,7 @@ export class DatabaseStorage implements IStorage {
       eq(expiryNotificationDeliveries.recipientKey, data.recipientKey),
       eq(expiryNotificationDeliveries.channel, data.channel),
       eq(expiryNotificationDeliveries.deliveryDate, data.deliveryDate),
+      eq(expiryNotificationDeliveries.deliveryOccurrence, data.deliveryOccurrence ?? 0),
       eq(expiryNotificationDeliveries.createdAt, claimedAt),
     );
     if (success) {

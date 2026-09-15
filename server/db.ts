@@ -320,8 +320,13 @@ export async function initDatabase() {
     await _pool.query(`CREATE TABLE IF NOT EXISTS expiry_notification_rules (
       id SERIAL PRIMARY KEY, entity_type TEXT NOT NULL, trigger_type TEXT NOT NULL, threshold_days INTEGER,
       send_email BOOLEAN NOT NULL DEFAULT TRUE, send_in_app BOOLEAN NOT NULL DEFAULT TRUE,
+      preferred_time TEXT NOT NULL DEFAULT '09:00', schedule_timezone TEXT NOT NULL DEFAULT 'Africa/Lagos',
+      times_per_day INTEGER NOT NULL DEFAULT 1,
       is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMP DEFAULT NOW()
     )`);
+    await _pool.query(`ALTER TABLE expiry_notification_rules ADD COLUMN IF NOT EXISTS preferred_time TEXT NOT NULL DEFAULT '09:00'`);
+    await _pool.query(`ALTER TABLE expiry_notification_rules ADD COLUMN IF NOT EXISTS schedule_timezone TEXT NOT NULL DEFAULT 'Africa/Lagos'`);
+    await _pool.query(`ALTER TABLE expiry_notification_rules ADD COLUMN IF NOT EXISTS times_per_day INTEGER NOT NULL DEFAULT 1`);
     await _pool.query(`CREATE TABLE IF NOT EXISTS expiry_notification_recipients (
       id SERIAL PRIMARY KEY, rule_id INTEGER NOT NULL REFERENCES expiry_notification_rules(id) ON DELETE CASCADE,
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, email TEXT,
@@ -337,9 +342,25 @@ export async function initDatabase() {
     await _pool.query(`CREATE TABLE IF NOT EXISTS expiry_notification_deliveries (
       id SERIAL PRIMARY KEY, rule_id INTEGER NOT NULL REFERENCES expiry_notification_rules(id) ON DELETE CASCADE,
       entity_type TEXT NOT NULL, entity_id INTEGER NOT NULL, recipient_key TEXT NOT NULL, channel TEXT NOT NULL,
-      delivery_date DATE NOT NULL, success BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE(rule_id, entity_type, entity_id, recipient_key, channel, delivery_date)
+      delivery_date DATE NOT NULL, delivery_occurrence INTEGER NOT NULL DEFAULT 0,
+      success BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(rule_id, entity_type, entity_id, recipient_key, channel, delivery_date, delivery_occurrence)
     )`);
+    await _pool.query(`ALTER TABLE expiry_notification_deliveries ADD COLUMN IF NOT EXISTS delivery_occurrence INTEGER NOT NULL DEFAULT 0`);
+    await _pool.query(`DO $$
+      DECLARE constraint_name TEXT;
+      BEGIN
+        FOR constraint_name IN
+          SELECT conname FROM pg_constraint
+          WHERE conrelid = 'expiry_notification_deliveries'::regclass
+            AND contype = 'u'
+            AND pg_get_constraintdef(oid) NOT ILIKE '%delivery_occurrence%'
+        LOOP
+          EXECUTE format('ALTER TABLE expiry_notification_deliveries DROP CONSTRAINT %I', constraint_name);
+        END LOOP;
+      END $$`);
+    await _pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS expiry_notification_delivery_occurrence_unique
+      ON expiry_notification_deliveries(rule_id, entity_type, entity_id, recipient_key, channel, delivery_date, delivery_occurrence)`);
     await _pool.query(`CREATE INDEX IF NOT EXISTS expiry_notifications_user_status_idx
       ON expiry_notifications(user_id, status, created_at DESC)`);
   } catch (err: any) {

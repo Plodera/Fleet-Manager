@@ -21,7 +21,12 @@ vi.mock("./email", () => ({
 
 import { storage } from "./storage";
 import { sendEmail } from "./email";
-import { runLicenseExpiryChecks } from "./licenseExpiryNotifications";
+import {
+  dueDeliveryOccurrence,
+  runLicenseExpiryChecks,
+  scheduledMinutes,
+  sendExpiryRuleTest,
+} from "./licenseExpiryNotifications";
 
 const storageMock = storage as unknown as {
   getVehicles: ReturnType<typeof vi.fn>;
@@ -59,6 +64,9 @@ function rule(overrides: Record<string, unknown> = {}) {
     thresholdDays: 30,
     sendEmail: false,
     sendInApp: true,
+    preferredTime: "09:00",
+    scheduleTimezone: "Africa/Lagos",
+    timesPerDay: 1,
     isActive: true,
     recipients: [{ userId: user.id }],
     ...overrides,
@@ -80,6 +88,7 @@ function deliveryKey(data: {
     data.recipientKey,
     data.channel,
     data.deliveryDate,
+    data.deliveryOccurrence ?? 0,
   ].join(":");
 }
 
@@ -106,6 +115,56 @@ afterEach(() => {
 });
 
 describe("runLicenseExpiryChecks", () => {
+  it("calculates evenly spaced daily delivery times", () => {
+    expect(scheduledMinutes("09:00", 1)).toEqual([540]);
+    expect(scheduledMinutes("09:00", 3)).toEqual([60, 540, 1020]);
+  });
+
+  it("uses the configured timezone to decide whether a scheduled occurrence is due", () => {
+    const scheduledRule = rule({ preferredTime: "09:00", scheduleTimezone: "Africa/Lagos", timesPerDay: 1 });
+    expect(dueDeliveryOccurrence(scheduledRule, new Date("2026-08-28T07:59:00Z"))).toBeNull();
+    expect(dueDeliveryOccurrence(scheduledRule, new Date("2026-08-28T08:00:00Z"))).toEqual({
+      deliveryDate: "2026-08-28",
+      deliveryOccurrence: 0,
+    });
+  });
+
+  it("honors each configured daily occurrence without duplicating the same occurrence", async () => {
+    storageMock.getVehicles.mockResolvedValue([vehicle]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({ sendEmail: true, sendInApp: false, preferredTime: "09:00", timesPerDay: 2 }),
+    ]);
+    const claims = new Set<string>();
+    storageMock.claimExpiryNotificationDelivery.mockImplementation(async data => {
+      const key = deliveryKey(data);
+      if (claims.has(key)) return null;
+      claims.add(key);
+      return new Date();
+    });
+
+    await runLicenseExpiryChecks({ scheduled: true, now: new Date("2026-08-28T08:00:00Z") });
+    await runLicenseExpiryChecks({ scheduled: true, now: new Date("2026-08-28T08:30:00Z") });
+    await runLicenseExpiryChecks({ scheduled: true, now: new Date("2026-08-28T20:00:00Z") });
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(2);
+    expect(storageMock.claimExpiryNotificationDelivery.mock.calls.map(([data]) => data.deliveryOccurrence)).toEqual([0, 0, 1]);
+  });
+
+  it("does not run an automatic email check before the first configured occurrence", async () => {
+    storageMock.getVehicles.mockResolvedValue([vehicle]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({ sendEmail: true, sendInApp: false, preferredTime: "09:00" }),
+    ]);
+
+    await expect(runLicenseExpiryChecks({
+      scheduled: true,
+      now: new Date("2026-08-28T07:59:00Z"),
+    })).resolves.toBe(0);
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
   it("supports ownership, insurance, and IVM reminder entity types", async () => {
     storageMock.getVehicles.mockResolvedValue([{
       ...vehicle,
@@ -448,6 +507,7 @@ describe("runLicenseExpiryChecks", () => {
         `email:${user.email}`,
         "email",
         "2026-08-28",
+        0,
       ].join(":"),
       Date.now(),
     );
@@ -567,6 +627,38 @@ describe("runLicenseExpiryChecks", () => {
       false,
     );
     expect(storageMock.createExpiryNotification).not.toHaveBeenCalled();
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("sendExpiryRuleTest", () => {
+  it("sends one labeled test email per unique configured address without delivery claims", async () => {
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({
+        sendEmail: true,
+        recipients: [{ userId: user.id }, { email: "ADMIN@example.com" }],
+      }),
+    ]);
+
+    await expect(sendExpiryRuleTest(1)).resolves.toEqual({
+      success: true,
+      sentCount: 1,
+      failedCount: 0,
+    });
+    expect(sendEmailMock).toHaveBeenCalledOnce();
+    expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      to: "admin@example.com",
+      subject: expect.stringContaining("[TEST]"),
+      body: expect.stringContaining("no action is required"),
+    }));
+    expect(storageMock.claimExpiryNotificationDelivery).not.toHaveBeenCalled();
+    expect(storageMock.createExpiryNotification).not.toHaveBeenCalled();
+  });
+
+  it("rejects testing a rule without email delivery", async () => {
+    storageMock.getExpiryNotificationRules.mockResolvedValue([rule({ sendEmail: false })]);
+    await expect(sendExpiryRuleTest(1)).rejects.toThrow("Enable email delivery");
     expect(sendEmailMock).not.toHaveBeenCalled();
   });
 });

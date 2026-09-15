@@ -152,4 +152,15 @@ describe("DatabaseStorage expiry notification delivery claims", () => {
       delivery(ruleIds[1], "email:claim-integration@example.com"),
     )).resolves.not.toBeNull();
   });
+
+  it("allows separate scheduled occurrences on the same day", async () => {
+    const first = delivery(ruleIds[0], "user:claim-integration", { deliveryOccurrence: 0 });
+    const claimedAt = await storage.claimExpiryNotificationDelivery(first);
+    expect(claimedAt).not.toBeNull();
+    await storage.completeExpiryNotificationDelivery(first, claimedAt!, true);
+
+    await expect(storage.claimExpiryNotificationDelivery(
+      delivery(ruleIds[0], "user:claim-integration", { deliveryOccurrence: 1 }),
+    )).resolves.not.toBeNull();
+  });
 });
