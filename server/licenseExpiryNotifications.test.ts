@@ -169,6 +169,20 @@ describe("runLicenseExpiryChecks", () => {
     });
   });
 
+  it("delivers a skipped Lord Howe local time at the first check after the 30-minute spring clock jump", () => {
+    const scheduledRule = rule({
+      preferredTime: "02:15",
+      scheduleTimezone: "Australia/Lord_Howe",
+      timesPerDay: 1,
+    });
+
+    expect(dueDeliveryOccurrence(scheduledRule, new Date("2026-10-03T15:29:00Z"))).toBeNull();
+    expect(dueDeliveryOccurrence(scheduledRule, new Date("2026-10-03T15:30:00Z"))).toEqual({
+      deliveryDate: "2026-10-04",
+      deliveryOccurrence: 0,
+    });
+  });
+
   it("does not send twice when Lisbon repeats the scheduled local hour", async () => {
     storageMock.getVehicles.mockResolvedValue([{
       ...vehicle,
@@ -202,6 +216,42 @@ describe("runLicenseExpiryChecks", () => {
     }))).toEqual([
       { deliveryDate: "2026-10-25", deliveryOccurrence: 0 },
       { deliveryDate: "2026-10-25", deliveryOccurrence: 0 },
+    ]);
+  });
+
+  it("does not send twice when Lord Howe repeats a 30-minute local interval", async () => {
+    storageMock.getVehicles.mockResolvedValue([{
+      ...vehicle,
+      licenseExpiryDate: "2026-05-05",
+    }]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({
+        sendEmail: true,
+        sendInApp: false,
+        preferredTime: "01:45",
+        scheduleTimezone: "Australia/Lord_Howe",
+      }),
+    ]);
+    const claims = new Set<string>();
+    storageMock.claimExpiryNotificationDelivery.mockImplementation(async data => {
+      const key = deliveryKey(data);
+      if (claims.has(key)) return null;
+      claims.add(key);
+      return new Date();
+    });
+
+    await runLicenseExpiryChecks({ scheduled: true, now: new Date("2026-04-04T14:45:00Z") });
+    await runLicenseExpiryChecks({ scheduled: true, now: new Date("2026-04-04T15:15:00Z") });
+
+    expect(sendEmailMock).toHaveBeenCalledOnce();
+    expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledTimes(2);
+    expect(storageMock.claimExpiryNotificationDelivery.mock.calls.map(([data]) => ({
+      deliveryDate: data.deliveryDate,
+      deliveryOccurrence: data.deliveryOccurrence,
+    }))).toEqual([
+      { deliveryDate: "2026-04-05", deliveryOccurrence: 0 },
+      { deliveryDate: "2026-04-05", deliveryOccurrence: 0 },
     ]);
   });
 
