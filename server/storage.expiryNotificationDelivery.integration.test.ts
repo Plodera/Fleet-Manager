@@ -77,6 +77,26 @@ describe("DatabaseStorage expiry notification delivery claims", () => {
     `, [ruleId, TEST_ENTITY_TYPE, entityId, recipientKey, DELIVERY_DATE, success, createdAt]);
   }
 
+  it("deletes only delivery attempts older than the retention cutoff", async () => {
+    const oldAttempt = new Date("2026-01-01T00:00:00.000Z");
+    const recentAttempt = new Date("2026-09-01T00:00:00.000Z");
+    const cutoff = new Date("2026-06-17T00:00:00.000Z");
+
+    await getPool().query(`
+      INSERT INTO expiry_notification_delivery_attempts
+        (rule_id, delivery_type, channel, recipient_label, success, attempted_at)
+      VALUES
+        ($1, 'scheduled', 'email', 'a***@example.com', TRUE, $2),
+        ($1, 'test', 'email', 'a***@example.com', FALSE, $3)
+    `, [ruleIds[0], oldAttempt, recentAttempt]);
+
+    await expect(storage.deleteExpiredExpiryNotificationDeliveryAttempts(cutoff)).resolves.toBe(1);
+
+    const attempts = await storage.getRecentExpiryNotificationDeliveryAttempts(ruleIds, 5);
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0].attemptedAt).toEqual(recentAttempt);
+  });
+
   it("allows only one of two simultaneous claims from overlapping rules", async () => {
     const claims = await Promise.all([
       storage.claimExpiryNotificationDelivery(

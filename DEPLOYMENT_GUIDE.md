@@ -281,6 +281,14 @@ nssm restart FleetCmD
 & "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe" -U postgres -d fleetcmd -F c -f C:\Backups\fleetcmd_backup.dump
 ```
 
+### Reminder delivery history
+
+The license-expiry reminder delivery audit keeps the most recent 90 days of
+scheduled and test delivery attempts. The application removes older attempts
+asynchronously at startup and once every 24 hours, so cleanup does not delay
+email delivery. Recent per-rule history remains available in the administration
+view. No separate Windows scheduled task is required.
+
 ---
 
 ## Troubleshooting

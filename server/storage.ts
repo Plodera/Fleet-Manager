@@ -286,6 +286,7 @@ export interface IStorage {
   claimExpiryNotificationDelivery(data: ExpiryNotificationDeliveryKey): Promise<Date | null>;
   completeExpiryNotificationDelivery(data: ExpiryNotificationDeliveryKey, claimedAt: Date, success: boolean): Promise<void>;
   recordExpiryNotificationDeliveryAttempt(data: { ruleId: number; deliveryType: "scheduled" | "test"; channel?: string; recipientLabel: string; success: boolean; error?: string | null }): Promise<void>;
+  deleteExpiredExpiryNotificationDeliveryAttempts(before: Date): Promise<number>;
   getRecentExpiryNotificationDeliveryAttempts(ruleIds: number[], limitPerRule?: number): Promise<ExpiryNotificationDeliveryAttempt[]>;
   getExpiryNotificationForAlert(data: { userId: number; ruleId: number; entityType: string; entityId: number; expiryDate: string }): Promise<ExpiryNotification | undefined>;
   createExpiryNotification(data: { userId: number; ruleId: number; entityType: string; entityId: number; entityName: string; expiryDate: string }): Promise<ExpiryNotification>;
@@ -1807,6 +1808,13 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async deleteExpiredExpiryNotificationDeliveryAttempts(before: Date): Promise<number> {
+    const deleted = await getDb().delete(expiryNotificationDeliveryAttempts)
+      .where(lt(expiryNotificationDeliveryAttempts.attemptedAt, before))
+      .returning({ id: expiryNotificationDeliveryAttempts.id });
+    return deleted.length;
+  }
+
   async getRecentExpiryNotificationDeliveryAttempts(ruleIds: number[], limitPerRule = 5): Promise<ExpiryNotificationDeliveryAttempt[]> {
     if (ruleIds.length === 0) return [];
     const ranked = getDb().select({
@@ -2849,6 +2857,7 @@ export const storage = {
   claimExpiryNotificationDelivery: (...args: Parameters<DatabaseStorage['claimExpiryNotificationDelivery']>) => getStorage().claimExpiryNotificationDelivery(...args),
   completeExpiryNotificationDelivery: (...args: Parameters<DatabaseStorage['completeExpiryNotificationDelivery']>) => getStorage().completeExpiryNotificationDelivery(...args),
   recordExpiryNotificationDeliveryAttempt: (...args: Parameters<DatabaseStorage['recordExpiryNotificationDeliveryAttempt']>) => getStorage().recordExpiryNotificationDeliveryAttempt(...args),
+  deleteExpiredExpiryNotificationDeliveryAttempts: (...args: Parameters<DatabaseStorage['deleteExpiredExpiryNotificationDeliveryAttempts']>) => getStorage().deleteExpiredExpiryNotificationDeliveryAttempts(...args),
   getRecentExpiryNotificationDeliveryAttempts: (...args: Parameters<DatabaseStorage['getRecentExpiryNotificationDeliveryAttempts']>) => getStorage().getRecentExpiryNotificationDeliveryAttempts(...args),
   getExpiryNotificationForAlert: (...args: Parameters<DatabaseStorage['getExpiryNotificationForAlert']>) => getStorage().getExpiryNotificationForAlert(...args),
   createExpiryNotification: (...args: Parameters<DatabaseStorage['createExpiryNotification']>) => getStorage().createExpiryNotification(...args),

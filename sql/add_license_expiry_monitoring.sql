@@ -96,5 +96,10 @@ ALTER TABLE expiry_notification_delivery_attempts
 CREATE INDEX IF NOT EXISTS expiry_notification_delivery_attempts_rule_time_idx
   ON expiry_notification_delivery_attempts(rule_id, attempted_at DESC);
 
+-- Delivery attempt history is retained for 90 days; the application removes older rows
+-- asynchronously at startup and once per day. This index keeps that cleanup bounded.
+CREATE INDEX IF NOT EXISTS expiry_notification_delivery_attempts_attempted_at_idx
+  ON expiry_notification_delivery_attempts(attempted_at);
+
 CREATE INDEX IF NOT EXISTS expiry_notifications_user_status_idx
   ON expiry_notifications(user_id, status, created_at DESC);

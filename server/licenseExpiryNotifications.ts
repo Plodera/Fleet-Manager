@@ -1,6 +1,10 @@
 import { storage } from "./storage";
 import { maskEmailAddress, sanitizeEmailProviderError, sendEmailWithResult } from "./email";
-import type { ExpiryNotificationRule, ExpiryNotificationRecipient } from "@shared/schema";
+import {
+  EXPIRY_NOTIFICATION_DELIVERY_ATTEMPT_RETENTION_DAYS,
+  type ExpiryNotificationRule,
+  type ExpiryNotificationRecipient,
+} from "@shared/schema";
 
 type ExpiryEntity = {
   entityType: "vehicle_license" | "vehicle_ownership" | "vehicle_insurance" | "vehicle_ivm" | "driver_license" | "company_document";
@@ -12,6 +16,7 @@ type ExpiryEntity = {
 };
 
 type ScheduledRule = Partial<Pick<ExpiryNotificationRule, "preferredTime" | "scheduleTimezone" | "timesPerDay">>;
+const DELIVERY_ATTEMPT_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 function zonedDateTime(now: Date, timezone: string): { date: string; minutes: number } {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -64,6 +69,22 @@ async function recordDeliveryAttempt(data: { ruleId: number; deliveryType: "sche
   } catch (error) {
     console.error("[licenseExpiry] Could not record delivery attempt:", error);
   }
+}
+
+/** Starts best-effort retention cleanup without making notification delivery wait for it. */
+export function cleanupExpiredExpiryNotificationDeliveryAttempts(now = new Date()): void {
+  const cutoff = new Date(
+    now.getTime() - EXPIRY_NOTIFICATION_DELIVERY_ATTEMPT_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  );
+  void storage.deleteExpiredExpiryNotificationDeliveryAttempts(cutoff)
+    .then(deletedCount => {
+      if (deletedCount > 0) {
+        console.log(`[licenseExpiry] Removed ${deletedCount} delivery attempt(s) older than ${EXPIRY_NOTIFICATION_DELIVERY_ATTEMPT_RETENTION_DAYS} days.`);
+      }
+    })
+    .catch(error => {
+      console.error("[licenseExpiry] Could not clean up expired delivery attempts:", error);
+    });
 }
 
 export function dueDeliveryOccurrence(
@@ -428,6 +449,7 @@ export async function sendExpiryRuleTest(
 
 export function scheduleLicenseExpiryNotifications(): void {
   setTimeout(() => {
+    cleanupExpiredExpiryNotificationDeliveryAttempts();
     runLicenseExpiryChecks({ scheduled: true })
       .then(matches => console.log(`[licenseExpiry] Completed startup check (${matches} match(es)).`))
       .catch(error => console.error("[licenseExpiry] Startup check failed:", error));
@@ -438,4 +460,8 @@ export function scheduleLicenseExpiryNotifications(): void {
       .then(matches => console.log(`[licenseExpiry] Completed scheduled check (${matches} match(es)).`))
       .catch(error => console.error("[licenseExpiry] Scheduled check failed:", error));
   }, 60 * 1000);
+
+  setInterval(() => {
+    cleanupExpiredExpiryNotificationDeliveryAttempts();
+  }, DELIVERY_ATTEMPT_CLEANUP_INTERVAL_MS);
 }

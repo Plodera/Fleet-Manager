@@ -360,6 +360,8 @@ export async function initDatabase() {
     await _pool.query(`ALTER TABLE expiry_notification_delivery_attempts ADD COLUMN IF NOT EXISTS recipient_label TEXT`);
     await _pool.query(`CREATE INDEX IF NOT EXISTS expiry_notification_delivery_attempts_rule_time_idx
       ON expiry_notification_delivery_attempts(rule_id, attempted_at DESC)`);
+    await _pool.query(`CREATE INDEX IF NOT EXISTS expiry_notification_delivery_attempts_attempted_at_idx
+      ON expiry_notification_delivery_attempts(attempted_at)`);
     await _pool.query(`DO $$
       DECLARE constraint_name TEXT;
       BEGIN

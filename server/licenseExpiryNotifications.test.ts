@@ -11,6 +11,7 @@ vi.mock("./storage", () => ({
     claimExpiryNotificationDelivery: vi.fn(),
     completeExpiryNotificationDelivery: vi.fn(),
     recordExpiryNotificationDeliveryAttempt: vi.fn(),
+    deleteExpiredExpiryNotificationDeliveryAttempts: vi.fn(),
     getExpiryNotificationForAlert: vi.fn(),
     createExpiryNotification: vi.fn(),
   },
@@ -33,6 +34,7 @@ import { sendEmailWithResult } from "./email";
 import {
   dueDeliveryOccurrence,
   nextDeliveryOccurrence,
+  cleanupExpiredExpiryNotificationDeliveryAttempts,
   runLicenseExpiryChecks,
   scheduledMinutes,
   sendExpiryRuleTest,
@@ -48,6 +50,7 @@ const storageMock = storage as unknown as {
   claimExpiryNotificationDelivery: ReturnType<typeof vi.fn>;
   completeExpiryNotificationDelivery: ReturnType<typeof vi.fn>;
   recordExpiryNotificationDeliveryAttempt: ReturnType<typeof vi.fn>;
+  deleteExpiredExpiryNotificationDeliveryAttempts: ReturnType<typeof vi.fn>;
   getExpiryNotificationForAlert: ReturnType<typeof vi.fn>;
   createExpiryNotification: ReturnType<typeof vi.fn>;
 };
@@ -117,6 +120,7 @@ beforeEach(() => {
   storageMock.claimExpiryNotificationDelivery.mockResolvedValue(new Date());
   storageMock.completeExpiryNotificationDelivery.mockResolvedValue(undefined);
   storageMock.recordExpiryNotificationDeliveryAttempt.mockResolvedValue(undefined);
+  storageMock.deleteExpiredExpiryNotificationDeliveryAttempts.mockResolvedValue(0);
   storageMock.getExpiryNotificationForAlert.mockResolvedValue(undefined);
   storageMock.createExpiryNotification.mockResolvedValue({ id: 1 });
   sendEmailMock.mockResolvedValue({ success: true });
@@ -127,6 +131,16 @@ afterEach(() => {
 });
 
 describe("runLicenseExpiryChecks", () => {
+  it("starts delivery-attempt cleanup at the retention cutoff without awaiting it", () => {
+    const now = new Date("2026-09-15T12:00:00.000Z");
+
+    cleanupExpiredExpiryNotificationDeliveryAttempts(now);
+
+    expect(storageMock.deleteExpiredExpiryNotificationDeliveryAttempts).toHaveBeenCalledWith(
+      new Date("2026-06-17T12:00:00.000Z"),
+    );
+  });
+
   it("calculates evenly spaced daily delivery times", () => {
     expect(scheduledMinutes("09:00", 1)).toEqual([540]);
     expect(scheduledMinutes("09:00", 3)).toEqual([60, 540, 1020]);

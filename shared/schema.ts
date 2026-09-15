@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, numeric, date, pgEnum, jsonb, uniqueIndex, real } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, numeric, date, pgEnum, jsonb, uniqueIndex, index, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -915,6 +915,8 @@ export const EXPIRY_TRIGGER_TYPES = ["expiry_approaching", "expired"] as const;
 export type ExpiryTriggerType = typeof EXPIRY_TRIGGER_TYPES[number];
 export const EXPIRY_NOTIFICATION_STATUSES = ["open", "acknowledged", "resolved"] as const;
 export type ExpiryNotificationStatus = typeof EXPIRY_NOTIFICATION_STATUSES[number];
+/** Delivery attempts are operational history and are retained for 90 days. */
+export const EXPIRY_NOTIFICATION_DELIVERY_ATTEMPT_RETENTION_DAYS = 90;
 
 export const companyDocuments = pgTable("company_documents", {
   id: serial("id").primaryKey(),
@@ -995,7 +997,9 @@ export const expiryNotificationDeliveryAttempts = pgTable("expiry_notification_d
   success: boolean("success").notNull(),
   error: text("error"),
   attemptedAt: timestamp("attempted_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  expiryNotificationDeliveryAttemptsAttemptedAtIdx: index("expiry_notification_delivery_attempts_attempted_at_idx").on(table.attemptedAt),
+}));
 
 export const insertCompanyDocumentSchema = createInsertSchema(companyDocuments).omit({ id: true, createdAt: true });
 export const insertExpiryNotificationRuleSchema = createInsertSchema(expiryNotificationRules)
