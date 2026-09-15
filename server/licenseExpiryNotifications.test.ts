@@ -255,6 +255,44 @@ describe("runLicenseExpiryChecks", () => {
     ]);
   });
 
+  it("delivers each daily occurrence once when Lord Howe repeats a 30-minute local interval", async () => {
+    storageMock.getVehicles.mockResolvedValue([{
+      ...vehicle,
+      licenseExpiryDate: "2026-05-05",
+    }]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({
+        sendEmail: true,
+        sendInApp: false,
+        preferredTime: "01:45",
+        scheduleTimezone: "Australia/Lord_Howe",
+        timesPerDay: 2,
+      }),
+    ]);
+    const claims = new Set<string>();
+    storageMock.claimExpiryNotificationDelivery.mockImplementation(async data => {
+      const key = deliveryKey(data);
+      if (claims.has(key)) return null;
+      claims.add(key);
+      return new Date();
+    });
+
+    await runLicenseExpiryChecks({ scheduled: true, now: new Date("2026-04-04T14:45:00Z") });
+    await runLicenseExpiryChecks({ scheduled: true, now: new Date("2026-04-04T15:15:00Z") });
+    await runLicenseExpiryChecks({ scheduled: true, now: new Date("2026-04-05T03:15:00Z") });
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(2);
+    expect(storageMock.claimExpiryNotificationDelivery.mock.calls.map(([data]) => ({
+      deliveryDate: data.deliveryDate,
+      deliveryOccurrence: data.deliveryOccurrence,
+    }))).toEqual([
+      { deliveryDate: "2026-04-05", deliveryOccurrence: 0 },
+      { deliveryDate: "2026-04-05", deliveryOccurrence: 0 },
+      { deliveryDate: "2026-04-05", deliveryOccurrence: 1 },
+    ]);
+  });
+
   it("honors each configured daily occurrence without duplicating the same occurrence", async () => {
     storageMock.getVehicles.mockResolvedValue([vehicle]);
     storageMock.getUsers.mockResolvedValue([user]);
