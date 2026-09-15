@@ -8,6 +8,7 @@ import LicenseExpiry from "./LicenseExpiry";
 const mocks = vi.hoisted(() => ({
   role: "admin",
   permissions: [] as string[],
+  rules: [] as any[],
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -30,6 +31,26 @@ const labels = {
   licenses: "Licenses",
   companyDocuments: "Company Documents",
   rules: "Rules",
+  addRule: "Add rule",
+  noRules: "No rules",
+  recipients: "Recipients",
+  email: "Email",
+  inApp: "In-app",
+  active: "Active",
+  inactive: "Inactive",
+  scheduleSummary: "{time} · {count} · {timezone}",
+  nextDelivery: "{date} {time} {timezone}",
+  noNextDelivery: "No next delivery",
+  emailDeliveryDisabled: "Email disabled",
+  testing: "Testing",
+  testNotification: "Test notification",
+  recentDeliveries: "Recent deliveries",
+  deliverySucceeded: "Succeeded",
+  deliveryFailed: "Failed",
+  testDelivery: "Test",
+  scheduledDelivery: "Scheduled",
+  recipientUnavailable: "Recipient unavailable",
+  whenExpired: "When expired",
   myAlerts: "My Alerts",
   vehicleCompliance: "Vehicle compliance",
   vehicleComplianceDescription: "Ownership, insurance, and IVM status for each vehicle.",
@@ -127,6 +148,7 @@ vi.mock("@tanstack/react-query", async importOriginal => {
     useQuery: ({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey[0];
       if (key === "/api/license-expiry/overview") return { data: { vehicles, drivers: [] } };
+      if (key === "/api/expiry-notification-rules") return { data: mocks.rules };
       if (key === "/api/vehicle-compliance/import-history" && queryKey.length > 1) return { data: null };
       return { data: [] };
     },
@@ -152,6 +174,7 @@ describe("compact vehicle compliance register", () => {
     vi.setSystemTime(new Date("2026-09-11T12:00:00Z"));
     mocks.role = "admin";
     mocks.permissions = [];
+    mocks.rules = [];
   });
 
   afterEach(() => {
@@ -171,6 +194,20 @@ describe("compact vehicle compliance register", () => {
 
     expect(summaryButton("XYZ-789")).toHaveTextContent("Valid");
     expect(summaryButton("MISS-000")).toHaveTextContent("Missing");
+  });
+
+  it("does not crash when cached reminder rules omit newly added arrays", () => {
+    mocks.rules = [{
+      id: 1,
+      entityType: "vehicle_insurance",
+      triggerType: "expiry_approaching",
+      thresholdDays: 30,
+      sendEmail: true,
+      sendInApp: false,
+      isActive: true,
+    }];
+
+    expect(() => renderPage()).not.toThrow();
   });
 
   it("expands a selected vehicle and reveals every compliance detail", async () => {
