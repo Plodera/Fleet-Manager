@@ -1,0 +1,53 @@
+4.71 kB
+../dist/public/assets/xlsx-CNerDvZX.js                      429.19 kB │ gzip: 142.94 kB
+../dist/public/assets/index-h1bYh4Hv.js                   1,784.00 kB │ gzip: 466.28 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 15.30s
+building server...
+
+  dist/index.cjs  1.8mb ⚠️
+
+⚡ Done in 171ms
+[PM2] Applying action restartProcessId on app [fleetcmd](ids: [ 1 ])
+[PM2] [fleetcmd](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ fleetcmd           │ fork     │ 10   │ online    │ 0%       │ 18.3mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+Module
+┌────┬────────────────────┬──────────┬──────────┬──────────┐
+│ id │ name               │ status   │ cpu      │ mem      │
+├────┼────────────────────┼──────────┼──────────┼──────────┤
+│ 0  │ pm2-logrotate      │ online   │ 0%       │ 70.1mb   │
+└────┴────────────────────┴──────────┴──────────┴──────────┘
+[TAILING] Tailing last 50 lines for [fleetcmd] process (change the value with --lines option)
+/home/aiscoweb/.pm2/logs/fleetcmd-error.log last 50 lines:
+1|fleetcmd | [server] Received SIGINT — ignoring to keep server alive
+1|fleetcmd | [server] Received SIGINT — ignoring to keep server alive
+
+/home/aiscoweb/.pm2/logs/fleetcmd-out.log last 50 lines:
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | [fortigateSync] wan1 TX=5747.74 RX=53777.32 kbps, wan2 TX=1927.44 RX=33452.36 kbps
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | [glpiSync] Synced — total=131 new=0 pending=0 open=2 assigned=1 solved=90 planned=1 closed=39
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
+1|fleetcmd | [itMonitor] Check complete: 65/65 online
+1|fleetcmd | [itMonitor] Pinging 65 host(s)...
