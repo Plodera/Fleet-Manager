@@ -163,4 +163,23 @@ describe("DatabaseStorage expiry notification delivery claims", () => {
       delivery(ruleIds[0], "user:claim-integration", { deliveryOccurrence: 1 }),
     )).resolves.not.toBeNull();
   });
+
+  it("rejects a repeated-clock-hour claim for the same local occurrence", async () => {
+    const repeatedLocalOccurrence = delivery(
+      ruleIds[0],
+      "user:claim-integration",
+      { deliveryDate: "2026-10-25", deliveryOccurrence: 0 },
+    );
+    const claimedAt = await storage.claimExpiryNotificationDelivery(repeatedLocalOccurrence);
+    expect(claimedAt).not.toBeNull();
+    await storage.completeExpiryNotificationDelivery(repeatedLocalOccurrence, claimedAt!, true);
+
+    await expect(storage.claimExpiryNotificationDelivery(
+      delivery(
+        ruleIds[0],
+        "user:claim-integration",
+        { deliveryDate: "2026-10-25", deliveryOccurrence: 0 },
+      ),
+    )).resolves.toBeNull();
+  });
 });

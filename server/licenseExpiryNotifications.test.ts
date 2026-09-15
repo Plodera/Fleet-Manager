@@ -133,6 +133,56 @@ describe("runLicenseExpiryChecks", () => {
     });
   });
 
+  it("delivers a skipped Lisbon local time at the first check after the spring clock jump", () => {
+    const scheduledRule = rule({
+      preferredTime: "01:30",
+      scheduleTimezone: "Europe/Lisbon",
+      timesPerDay: 1,
+    });
+
+    expect(dueDeliveryOccurrence(scheduledRule, new Date("2026-03-29T00:59:00Z"))).toBeNull();
+    expect(dueDeliveryOccurrence(scheduledRule, new Date("2026-03-29T01:00:00Z"))).toEqual({
+      deliveryDate: "2026-03-29",
+      deliveryOccurrence: 0,
+    });
+  });
+
+  it("does not send twice when Lisbon repeats the scheduled local hour", async () => {
+    storageMock.getVehicles.mockResolvedValue([{
+      ...vehicle,
+      licenseExpiryDate: "2026-11-24",
+    }]);
+    storageMock.getUsers.mockResolvedValue([user]);
+    storageMock.getExpiryNotificationRules.mockResolvedValue([
+      rule({
+        sendEmail: true,
+        sendInApp: false,
+        preferredTime: "01:30",
+        scheduleTimezone: "Europe/Lisbon",
+      }),
+    ]);
+    const claims = new Set<string>();
+    storageMock.claimExpiryNotificationDelivery.mockImplementation(async data => {
+      const key = deliveryKey(data);
+      if (claims.has(key)) return null;
+      claims.add(key);
+      return new Date();
+    });
+
+    await runLicenseExpiryChecks({ scheduled: true, now: new Date("2026-10-25T00:30:00Z") });
+    await runLicenseExpiryChecks({ scheduled: true, now: new Date("2026-10-25T01:30:00Z") });
+
+    expect(sendEmailMock).toHaveBeenCalledOnce();
+    expect(storageMock.claimExpiryNotificationDelivery).toHaveBeenCalledTimes(2);
+    expect(storageMock.claimExpiryNotificationDelivery.mock.calls.map(([data]) => ({
+      deliveryDate: data.deliveryDate,
+      deliveryOccurrence: data.deliveryOccurrence,
+    }))).toEqual([
+      { deliveryDate: "2026-10-25", deliveryOccurrence: 0 },
+      { deliveryDate: "2026-10-25", deliveryOccurrence: 0 },
+    ]);
+  });
+
   it("honors each configured daily occurrence without duplicating the same occurrence", async () => {
     storageMock.getVehicles.mockResolvedValue([vehicle]);
     storageMock.getUsers.mockResolvedValue([user]);

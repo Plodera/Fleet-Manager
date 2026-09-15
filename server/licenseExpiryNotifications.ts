@@ -68,6 +68,9 @@ export function dueDeliveryOccurrence(
   now = new Date(),
 ): { deliveryDate: string; deliveryOccurrence: number } | null {
   const local = zonedDateTime(now, rule.scheduleTimezone || "Africa/Lagos");
+  // If a daylight-saving jump skips a configured local time, the first check
+  // after the jump treats that occurrence as due. Repeated local times retain
+  // the same date and occurrence index so the delivery claim deduplicates them.
   const due = scheduledMinutes(rule.preferredTime || "09:00", rule.timesPerDay || 1)
     .map((minutes, occurrence) => ({ minutes, occurrence }))
     .filter(slot => slot.minutes <= local.minutes)
